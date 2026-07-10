@@ -1,0 +1,16 @@
+PASSO A PASSO
+
+1. Abra esta pasta:
+C:\Users\Usuário\Documents\Codex\2026-07-08\oi\online-private-site
+
+2. Dê duplo clique em:
+publicar-site-privado.cmd
+
+3. Espere terminar.
+
+4. Quando aparecer o commit final, volte para o Codex e me envie esse commit.
+
+Observacao importante:
+
+- Este token foi gerado para uso imediato e vence em 10/07/2026 as 18:29.
+- Se aparecer erro dizendo que o token venceu, me avise que eu gero outro.

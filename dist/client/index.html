@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Copy Boy | Orcamento de Apostilas</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Copy Boy</p>
+        <h1>App interno de orcamento de apostilas</h1>
+        <p class="hero-copy">
+          Importe PDFs, ajuste as opcoes de capa e acabamento, e monte varios orcamentos no mesmo lugar.
+        </p>
+      </div>
+      <div class="hero-badges">
+        <span>PDF</span>
+        <span>Miolo</span>
+        <span>Capa</span>
+        <span>Espiral</span>
+      </div>
+    </header>
+
+    <nav class="tab-bar" aria-label="Abas principais">
+      <button class="tab-button is-active" data-tab-target="calculo">Calculo</button>
+      <button class="tab-button" data-tab-target="impressos">Impressos coloridos</button>
+      <button class="tab-button" data-tab-target="configuracao">Configuracao</button>
+      <button class="tab-button" data-tab-target="orcamento">Orcamento</button>
+    </nav>
+
+    <main class="tab-panels">
+      <section class="tab-panel is-active" data-tab-panel="calculo">
+        <div class="summary-grid">
+          <article class="summary-card">
+            <span class="summary-label">Linhas ativas</span>
+            <strong id="summary-active-lines">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Total de apostilas</span>
+            <strong id="summary-booklets">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Total geral</span>
+            <strong id="summary-total">R$ 0,00</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Valor medio</span>
+            <strong id="summary-average">R$ 0,00</strong>
+          </article>
+        </div>
+
+        <div class="workspace-grid">
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Importar PDFs</h2>
+                <p class="panel-copy">Ao importar, o app tenta ler a quantidade de paginas e preencher as linhas automaticamente.</p>
+              </div>
+            </div>
+
+            <label class="dropzone" for="pdf-input" id="pdf-dropzone">
+              <input id="pdf-input" type="file" accept=".pdf,application/pdf" multiple hidden>
+              <strong>Arraste os PDFs aqui</strong>
+              <span>ou clique para escolher arquivos</span>
+            </label>
+
+            <div class="toolbar">
+              <button id="import-button" class="button button-primary" type="button">Escolher PDFs</button>
+              <button id="add-row-button" class="button" type="button">Adicionar linha</button>
+              <button id="clear-all-button" class="button button-danger" type="button">Limpar linhas</button>
+            </div>
+
+            <p class="helper-text" id="import-feedback">
+              O contador de paginas do PDF e automatico. Se algum arquivo vier com a contagem errada, voce pode ajustar manualmente.
+            </p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Preferencias rapidas</h2>
+                <p class="panel-copy">Use isso para aplicar um mesmo padrao em varias linhas de uma vez.</p>
+              </div>
+            </div>
+
+            <div class="preset-grid">
+              <label>
+                <span>Modo de calculo</span>
+                <select id="calc-mode-select">
+                  <option>Independente</option>
+                  <option>Somar quantidades</option>
+                </select>
+              </label>
+              <label>
+                <span>Tipo de impressao</span>
+                <select id="preset-print-type"></select>
+              </label>
+              <label>
+                <span>Tamanho</span>
+                <select id="preset-size"></select>
+              </label>
+              <label>
+                <span>Modo de impressao</span>
+                <select id="preset-print-mode"></select>
+              </label>
+              <label>
+                <span>Acabamento</span>
+                <select id="preset-finishing"></select>
+              </label>
+              <label>
+                <span>Capa</span>
+                <select id="preset-cover"></select>
+              </label>
+              <label>
+                <span>Papel da capa</span>
+                <select id="preset-cover-paper"></select>
+              </label>
+              <label>
+                <span>Contracapa</span>
+                <select id="preset-back-cover"></select>
+              </label>
+              <label>
+                <span>Papel da contracapa</span>
+                <select id="preset-back-cover-paper"></select>
+              </label>
+              <label>
+                <span>Espiral</span>
+                <select id="preset-spiral-option"></select>
+              </label>
+            </div>
+
+            <div class="toolbar">
+              <button id="apply-preset-active" class="button button-primary" type="button">Aplicar nas linhas ativas</button>
+              <button id="apply-preset-all" class="button" type="button">Aplicar em todas</button>
+            </div>
+          </article>
+        </div>
+
+        <article class="panel panel-table">
+          <div class="panel-heading">
+            <div>
+              <h2>Orcamento linear</h2>
+              <p class="panel-copy">Cada linha representa uma apostila diferente. Os totais sao recalculados na hora.</p>
+            </div>
+          </div>
+
+          <div class="group-toolbar">
+            <label class="group-toolbar-field">
+              <span>Grupo de acabamento</span>
+              <input id="group-name-input" type="text" placeholder="Ex.: Grupo A">
+            </label>
+            <button id="apply-group-selected" class="button button-primary" type="button">Aplicar grupo nos selecionados</button>
+            <button id="clear-group-selected" class="button" type="button">Tirar grupo dos selecionados</button>
+          </div>
+
+          <p class="helper-text">
+            Se varias linhas tiverem o mesmo grupo de acabamento, o app soma as paginas desses arquivos e calcula um unico acabamento para o grupo. O valor do acabamento entra na primeira linha do grupo.
+          </p>
+
+          <div class="table-shell">
+            <table class="budget-table">
+              <thead>
+                <tr>
+                  <th>Sel.</th>
+                  <th>Item</th>
+                  <th>Descricao</th>
+                  <th>Tipo</th>
+                  <th>Tam.</th>
+                  <th>Impressao</th>
+                  <th>Acabamento</th>
+                  <th>Grupo acab.</th>
+                  <th>Qtde</th>
+                  <th>Paginas</th>
+                  <th>Capa</th>
+                  <th>Papel capa</th>
+                  <th>Contracapa</th>
+                  <th>Papel contra</th>
+                  <th>Espiral</th>
+                  <th>Total miolo</th>
+                  <th>Total capa</th>
+                  <th>Total contra</th>
+                  <th>Acab.</th>
+                  <th>Total item</th>
+                  <th>Valor/un.</th>
+                </tr>
+              </thead>
+              <tbody id="rows-table-body"></tbody>
+            </table>
+          </div>
+
+          <div class="warning-list" id="warning-list"></div>
+        </article>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="impressos">
+        <div class="summary-grid">
+          <article class="summary-card">
+            <span class="summary-label">Itens ativos</span>
+            <strong id="color-summary-active">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Unidades</span>
+            <strong id="color-summary-quantity">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Total geral</span>
+            <strong id="color-summary-total">R$ 0,00</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Valor medio</span>
+            <strong id="color-summary-average">R$ 0,00</strong>
+          </article>
+        </div>
+
+        <article class="panel panel-table">
+          <div class="panel-heading">
+            <div>
+              <h2>Orcamento de impressos coloridos</h2>
+              <p class="panel-copy">Informe o tamanho em milimetros. Se marcar sangra, o sistema soma 2 mm na largura e 2 mm na altura antes de calcular o encaixe no A4.</p>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <button id="add-color-row-button" class="button button-primary" type="button">Adicionar linha</button>
+            <button id="clear-color-rows-button" class="button button-danger" type="button">Limpar linhas</button>
+          </div>
+
+          <p class="helper-text" id="color-feedback">
+            O corte e sugerido automaticamente pela tabela, mas voce pode sobrescrever o valor em cada linha se precisar.
+          </p>
+
+          <div class="table-shell">
+            <table class="budget-table color-budget-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Descricao</th>
+                  <th>Largura (mm)</th>
+                  <th>Altura (mm)</th>
+                  <th>Sangra</th>
+                  <th>Impressao</th>
+                  <th>Papel</th>
+                  <th>Qtde</th>
+                  <th>Por A4</th>
+                  <th>Folhas A4</th>
+                  <th>Impressoes A4</th>
+                  <th>Impressoes</th>
+                  <th>Corte sugerido</th>
+                  <th>Corte final</th>
+                  <th>Total item</th>
+                  <th>Valor/un.</th>
+                </tr>
+              </thead>
+              <tbody id="color-rows-table-body"></tbody>
+            </table>
+          </div>
+
+          <div class="warning-list" id="color-warning-list"></div>
+        </article>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="configuracao">
+        <div class="workspace-grid config-top-grid">
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Configuracao de precos</h2>
+                <p class="panel-copy">Tudo o que for alterado aqui fica salvo neste navegador.</p>
+              </div>
+            </div>
+
+            <div class="toolbar">
+              <button id="export-config-button" class="button button-primary" type="button">Exportar configuracao</button>
+              <button id="import-config-button" class="button" type="button">Importar configuracao</button>
+              <button id="reset-config-button" class="button button-danger" type="button">Restaurar padrao</button>
+              <input id="config-file-input" type="file" accept=".json,application/json" hidden>
+            </div>
+
+            <p class="helper-text">
+              Se quiser levar os precos para outro computador, exporte a configuracao em JSON e importe depois.
+            </p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Ajustes extras</h2>
+                <p class="panel-copy">Desconto da espiral sem capa plastica e observacoes de uso.</p>
+              </div>
+            </div>
+
+            <div class="preset-grid compact-grid">
+              <label>
+                <span>Desconto sem capas plasticas</span>
+                <input id="spiral-discount-input" type="number" min="0" step="0.01">
+              </label>
+            </div>
+            <p class="helper-text">
+              A espiral so calcula ate 500 folhas por apostila, seguindo a mesma regra da planilha.
+            </p>
+          </article>
+        </div>
+
+        <div class="config-sections" id="config-sections"></div>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="orcamento">
+        <div class="workspace-grid quote-grid">
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Dados do cliente</h2>
+                <p class="panel-copy">Essas informacoes entram no resumo para envio.</p>
+              </div>
+            </div>
+
+            <div class="quote-form-grid">
+              <label>
+                <span>Nome / Razao social</span>
+                <input id="client-name" type="text">
+              </label>
+              <label>
+                <span>Contato</span>
+                <input id="client-contact" type="text">
+              </label>
+              <label>
+                <span>CNPJ</span>
+                <input id="client-cnpj" type="text">
+              </label>
+              <label>
+                <span>Forma de pagamento</span>
+                <input id="payment-terms" type="text">
+              </label>
+              <label class="full-width">
+                <span>Observacoes para o cliente</span>
+                <textarea id="quote-notes" rows="4"></textarea>
+              </label>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Dados da empresa</h2>
+                <p class="panel-copy">Voce pode trocar logo, nome e endereco quando quiser.</p>
+              </div>
+            </div>
+
+            <div class="quote-form-grid">
+              <label class="full-width">
+                <span>Logo</span>
+                <input id="company-logo-input" type="file" accept="image/*">
+              </label>
+              <label class="full-width">
+                <span>Empresa</span>
+                <input id="company-name" type="text">
+              </label>
+              <label>
+                <span>CNPJ</span>
+                <input id="company-cnpj" type="text">
+              </label>
+              <label>
+                <span>Contato</span>
+                <input id="company-contact" type="text">
+              </label>
+              <label class="full-width">
+                <span>Endereco</span>
+                <textarea id="company-address" rows="3"></textarea>
+              </label>
+            </div>
+          </article>
+        </div>
+
+        <article class="panel quote-preview-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>Previa do orcamento</h2>
+              <p class="panel-copy">Pronto para copiar, imprimir ou transformar em PDF.</p>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <button id="copy-quote-button" class="button button-primary" type="button">Copiar resumo</button>
+            <button id="print-quote-button" class="button" type="button">Imprimir</button>
+          </div>
+
+          <div class="quote-preview" id="quote-preview"></div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <template id="logo-placeholder-template">
+    <div class="logo-placeholder">
+      <span>Logo da empresa</span>
+    </div>
+  </template>
+
+  <script src="./app.mjs"></script>
+</body>
+</html>
