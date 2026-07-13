@@ -37,6 +37,9 @@ New-Item -ItemType Directory -Path $openaiOutput -Force | Out-Null
 Copy-Item (Join-Path $clientSource 'index.html') (Join-Path $clientOutput 'index.html')
 Copy-Item (Join-Path $clientSource 'styles.css') (Join-Path $clientOutput 'styles.css')
 Copy-Item (Join-Path $clientSource 'app.mjs') (Join-Path $clientOutput 'app.mjs')
+if (Test-Path (Join-Path $clientSource 'assets')) {
+    Copy-Item (Join-Path $clientSource 'assets') (Join-Path $clientOutput 'assets') -Recurse -Force
+}
 Copy-Item $hostingSource (Join-Path $openaiOutput 'hosting.json')
 
 $workerSource = @'

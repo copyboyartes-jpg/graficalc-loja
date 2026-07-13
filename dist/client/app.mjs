@@ -1,14 +1,22 @@
-const STORAGE_KEYS = {
+﻿const STORAGE_KEYS = {
   state: "copyboy-apostilas-state-v1",
   config: "copyboy-apostilas-config-v1",
+  configView: "copyboy-apostilas-config-view-v1",
+  configSection: "copyboy-apostilas-config-section-v1",
 };
+
+const SESSION_KEYS = {
+  configUnlocked: "graficalc-config-unlocked-v1",
+};
+
+const CONFIG_ACCESS_PASSWORD = "copyboy2026";
 
 const OPTIONS = {
   printTypes: ["Preto e branco", "Colorido jato de tinta", "Colorido laser"],
   sizes: ["A4", "A5"],
-  printModes: ["So frente", "Frente e verso"],
+  printModes: ["Só frente", "Frente e verso"],
   bleedModes: ["Sem sangra", "Com sangra"],
-  finishing: ["Sem acabamento", "Encadernacao espiral", "Livreto"],
+  finishing: ["Sem acabamento", "Encadernação espiral", "Livreto"],
   coverTypes: ["Sem capa", "Colorida so frente", "Colorida frente e verso"],
   backCoverTypes: ["Sem contracapa", "Colorida so frente", "Colorida frente e verso"],
   coverPapers: ["Sulfite 75g", "Papel couche 170g", "Papel couche 250g", "Papel couche 300g"],
@@ -25,9 +33,120 @@ const OPTIONS = {
     "Metalizado branco",
     "Metalizado amarelo",
   ],
-  spiralOptions: ["Completa", "Sem capas plasticas"],
+  spiralOptions: ["Completa", "Sem capas plásticas"],
   calcModes: ["Independente", "Somar quantidades"],
 };
+
+const M2_PRODUCTS = [
+  {
+    id: "adesivo-corte-especial",
+    label: "Adesivo com corte especial",
+    material: "Adesivo vinil branco",
+    print: "Ecossolvente 4x0",
+    finishing: "Corte especial",
+    tiers: [
+      { maxArea: 2, value: 90 },
+      { maxArea: 4, value: 85 },
+      { maxArea: 6, value: 75 },
+      { maxArea: 10, value: 65 },
+    ],
+  },
+  {
+    id: "lona-bainha-ilhos",
+    label: "Lona com bainha e ilhós",
+    material: "Lona vinílica",
+    print: "Ecossolvente 4x0",
+    finishing: "Bainha e ilhós",
+    tiers: [
+      { maxArea: 2, value: 70 },
+      { maxArea: 4, value: 65 },
+      { maxArea: 6, value: 63 },
+      { maxArea: 10, value: 60 },
+      { maxArea: Infinity, value: 58 },
+    ],
+  },
+  {
+    id: "banner",
+    label: "Banner",
+    material: "Lona vinílica",
+    print: "Ecossolvente 4x0",
+    finishing: "Bastão de madeira e cordão",
+    tiers: [
+      { maxArea: 2, value: 70 },
+      { maxArea: 4, value: 65 },
+      { maxArea: 6, value: 63 },
+      { maxArea: 10, value: 60 },
+      { maxArea: Infinity, value: 58 },
+    ],
+  },
+  {
+    id: "adesivo-uv",
+    label: "Rótulo UV",
+    material: "Adesivo vinil branco",
+    print: "UV 4x0",
+    finishing: "Corte reto",
+    tiers: [
+      { maxArea: 2, value: 125 },
+      { maxArea: 4, value: 115 },
+      { maxArea: 6, value: 105 },
+      { maxArea: 10, value: 100 },
+      { maxArea: Infinity, value: 100 },
+    ],
+  },
+  {
+    id: "adesivo-uv-verniz",
+    label: "Rótulo UV com branco/verniz",
+    material: "BOPP branco",
+    print: "UV 4x0 + branco/verniz",
+    finishing: "Corte reto",
+    tiers: [
+      { maxArea: 2, value: 155 },
+      { maxArea: 4, value: 145 },
+      { maxArea: 6, value: 135 },
+      { maxArea: 10, value: 128 },
+      { maxArea: Infinity, value: 120 },
+    ],
+  },
+  {
+    id: "ps-2mm",
+    label: "PS 2mm",
+    material: "PS 2mm",
+    print: "UV 4x0",
+    finishing: "Laminação",
+    tiers: [
+      { maxArea: 1, value: 180 },
+      { maxArea: 2, value: 174 },
+      { maxArea: 4, value: 168 },
+      { maxArea: 10, value: 162 },
+      { maxArea: Infinity, value: 158 },
+    ],
+  },
+  {
+    id: "ps-1mm",
+    label: "PS 1mm",
+    material: "PS 1mm",
+    print: "UV 4x0",
+    finishing: "Laminação",
+    tiers: [
+      { maxArea: 1, value: 156 },
+      { maxArea: 2, value: 144 },
+      { maxArea: 4, value: 132 },
+      { maxArea: 10, value: 126 },
+      { maxArea: Infinity, value: 124 },
+    ],
+  },
+];
+
+const M2_CATALOG = [
+  { id: "digital-cut", label: "Adesivo impressão digital com corte especial", configKey: "digitalCut", bleedMm: 2 },
+  { id: "uv-cut", label: "Adesivo impressão UV com corte especial", configKey: "uvCut", bleedMm: 2 },
+  { id: "uv-verniz", label: "Adesivo impressão UV com verniz ou tinta branca", configKey: "uvVerniz", bleedMm: 2 },
+  { id: "flat-cut", label: "Adesivo corte reto/sem acabamento", configKey: "flatCut" },
+  { id: "banner", label: "Banner", configKey: "banner" },
+  { id: "perfurado", label: "Adesivo perfurado", configKey: "perfurado" },
+  { id: "ps1mm", label: "Chapa PS1mm", configKey: "ps1mm" },
+  { id: "ps2mm", label: "Chapa PS 2mm", configKey: "ps2mm" },
+];
 
 const A4_WIDTH_MM = 210;
 const A4_HEIGHT_MM = 297;
@@ -162,6 +281,77 @@ function createDefaultConfig() {
       ],
       aboveFiveSheetsPerCut: 1.0,
     },
+    m2Pricing: {
+      digitalCut: [
+        { min: 1, value: 30, label: "Valor minimo" },
+        { min: 2, value: 90, label: "até 2 m²" },
+        { min: 4, value: 85, label: "de 2 até 4 m²" },
+        { min: 6, value: 80, label: "de 4 até 6 m²" },
+        { min: 10, value: 75, label: "de 6 até 10 m²" },
+        { min: 1000000, value: 65, label: "acima de 10 m²" },
+      ],
+      uvCut: [
+        { min: 1, value: 30, label: "Valor minimo" },
+        { min: 2, value: 125, label: "até 2 m²" },
+        { min: 4, value: 115, label: "de 2 até 4 m²" },
+        { min: 6, value: 110, label: "de 4 até 6 m²" },
+        { min: 10, value: 105, label: "de 6 até 10 m²" },
+        { min: 1000000, value: 100, label: "acima de 10 m²" },
+      ],
+      uvVerniz: [
+        { min: 1, value: 30, label: "Valor minimo" },
+        { min: 2, value: 155, label: "até 2 m²" },
+        { min: 4, value: 145, label: "de 2 até 4 m²" },
+        { min: 6, value: 140, label: "de 4 até 6 m²" },
+        { min: 10, value: 135, label: "de 6 até 10 m²" },
+        { min: 1000000, value: 130, label: "acima de 10 m²" },
+      ],
+      flatCut: [
+        { min: 1, value: 30, label: "Valor minimo" },
+        { min: 2, value: 70, label: "até 2 m²" },
+        { min: 4, value: 65, label: "de 2 até 4 m²" },
+        { min: 6, value: 63, label: "de 4 até 6 m²" },
+        { min: 10, value: 60, label: "de 6 até 10 m²" },
+        { min: 1000000, value: 58, label: "acima de 10 m²" },
+      ],
+      banner: [
+        { min: 1, value: 35, label: "Valor minimo" },
+        { min: 2, value: 80, label: "até 2 m²" },
+        { min: 4, value: 75, label: "de 2 até 4 m²" },
+        { min: 6, value: 73, label: "de 4 até 6 m²" },
+        { min: 10, value: 70, label: "de 6 até 10 m²" },
+        { min: 1000000, value: 68, label: "acima de 10 m²" },
+      ],
+      perfurado: [
+        { min: 1, value: 45, label: "Valor minimo" },
+        { min: 5, value: 88, label: "de 1 até 5 m²" },
+        { min: 1000000, value: 75, label: "acima de 5 m²" },
+      ],
+      ps1mm: [
+        { min: 1, value: 39, label: "Valor minimo" },
+        { min: 1, value: 176, label: "até 1 m²" },
+        { min: 2, value: 164, label: "de 1 até 2 m²" },
+        { min: 4, value: 152, label: "de 2 até 4 m²" },
+        { min: 10, value: 146, label: "de 4 até 10 m²" },
+        { min: 1000000, value: 144, label: "acima de 10 m²" },
+      ],
+      ps2mm: [
+        { min: 1, value: 39, label: "Valor minimo" },
+        { min: 1, value: 200, label: "até 1 m²" },
+        { min: 2, value: 194, label: "de 1 até 2 m²" },
+        { min: 4, value: 188, label: "de 2 até 4 m²" },
+        { min: 10, value: 182, label: "de 4 até 10 m²" },
+        { min: 1000000, value: 178, label: "acima de 10 m²" },
+      ],
+    },
+    m2Finishes: [
+      { id: "ilhós-simples", label: "Ilhós Simples", type: "eyelet", price: 0.9, spacingCm: 20 },
+      { id: "ilhós-latão", label: "Ilhós Latão", type: "eyelet", price: 1.5, spacingCm: 20 },
+      { id: "bainha-corda", label: "Bainha com corda", type: "perimeter", price: 5.0 },
+      { id: "laminacao", label: "Laminação", type: "area", price: 25.0 },
+      { id: "verniz-laka", label: "Verniz laka", type: "area", price: 5.0 },
+    ],
+    catalogSections: [],
     spiralPlasticDiscount: 1.5,
   };
 }
@@ -172,7 +362,7 @@ function createDefaultRow(index) {
     description: "",
     printType: "Preto e branco",
     size: "A4",
-    printMode: "So frente",
+  printMode: "Só frente",
     finishing: "Sem acabamento",
     bindingGroup: "",
     quantity: 0,
@@ -192,10 +382,25 @@ function createDefaultColorPrintRow(index) {
     widthMm: 0,
     heightMm: 0,
     bleedMode: "Sem sangra",
-    printMode: "So frente",
+    printMode: "Só frente",
     paperType: "Sulfite 75g",
     quantity: 0,
     cutPriceOverride: "",
+  };
+}
+
+function createDefaultM2Row(index) {
+  return {
+    id: `m2-row-${index + 1}`,
+    productId: M2_CATALOG[0].id,
+    description: "",
+    measureUnit: "cm",
+    widthMm: 0,
+    heightMm: 0,
+    quantity: 0,
+    finishIds: [],
+    finishOverrides: {},
+    finishingExtra: 0,
   };
 }
 
@@ -205,7 +410,7 @@ function createDefaultState() {
     presets: {
       printType: "Preto e branco",
       size: "A4",
-      printMode: "So frente",
+      printMode: "Só frente",
       finishing: "Sem acabamento",
       coverType: "Sem capa",
       coverPaper: "Sulfite 75g",
@@ -213,8 +418,9 @@ function createDefaultState() {
       backCoverPaper: "Sulfite 75g",
       spiralOption: "Completa",
     },
-    rows: Array.from({ length: 12 }, (_, index) => createDefaultRow(index)),
-    colorPrintItems: Array.from({ length: 10 }, (_, index) => createDefaultColorPrintRow(index)),
+    rows: Array.from({ length: 5 }, (_, index) => createDefaultRow(index)),
+    colorPrintItems: Array.from({ length: 5 }, (_, index) => createDefaultColorPrintRow(index)),
+    m2Items: Array.from({ length: 5 }, (_, index) => createDefaultM2Row(index)),
     client: {
       name: "",
       contact: "",
@@ -227,6 +433,8 @@ function createDefaultState() {
       address: "Rua Coronel Pedro Demoro, 1793 - Galeria Alecio - Estreito - Fpolis",
       logoDataUrl: "",
     },
+    clients: [],
+    quoteHistory: [],
     paymentTerms: "",
     quoteNotes: "",
   };
@@ -234,6 +442,86 @@ function createDefaultState() {
 
 function deepClone(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function normalizeCatalogSections(list) {
+  if (!Array.isArray(list)) {
+    return [];
+  }
+
+  const normalized = [];
+  for (const item of list) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    if (Array.isArray(item.products)) {
+      const tab = item.tab === "calculo" || item.tab === "impressos" || item.tab === "m2" ? item.tab : "m2";
+      for (const product of item.products) {
+        if (!product || typeof product !== "object") {
+          continue;
+        }
+        normalized.push({
+          id: product.id || `produto-${Date.now()}`,
+          label: product.label || "Novo produto",
+          tab,
+          note: product.note || "",
+        });
+      }
+      continue;
+    }
+    if (item.tab === "calculo" || item.tab === "impressos" || item.tab === "m2") {
+      normalized.push({
+        id: item.id || `produto-${Date.now()}`,
+        label: item.label || item.name || "Novo produto",
+        tab: item.tab,
+        pricingKey: item.tab === "m2" ? (item.pricingKey || "banner") : "",
+        note: item.note || "",
+      });
+    }
+  }
+  return normalized;
+}
+
+function createUniqueM2PricingKey(baseKey, existingKeys) {
+  const base = `custom-${baseKey}`.toLowerCase().replace(/[^a-z0-9-]/g, "-");
+  let candidate = base;
+  let counter = 1;
+  while (existingKeys.has(candidate)) {
+    candidate = `${base}-${counter}`;
+    counter += 1;
+  }
+  existingKeys.add(candidate);
+  return candidate;
+}
+
+function normalizeM2Finishes(candidateFinishes, defaultFinishes) {
+  const defaults = Array.isArray(defaultFinishes) ? defaultFinishes : [];
+  if (!Array.isArray(candidateFinishes) || candidateFinishes.length === 0) {
+    return deepClone(defaults);
+  }
+
+  const normalized = candidateFinishes
+    .filter((item) => item && typeof item === "object")
+    .map((item, index) => ({
+      id: item.id || `acabamento-${Date.now()}-${index}`,
+      label: item.label || "Novo acabamento",
+      type: item.type || "area",
+      price: Number.isFinite(Number(item.price)) ? Number(item.price) : 0,
+      spacingCm: item.spacingCm === "" || item.spacingCm == null ? "" : Number(item.spacingCm),
+    }));
+
+  const existingKeys = new Set(
+    normalized.map((item) => `${String(item.id || "").trim().toLowerCase()}::${String(item.label || "").trim().toLowerCase()}`)
+  );
+
+  for (const finish of defaults) {
+    const key = `${String(finish.id || "").trim().toLowerCase()}::${String(finish.label || "").trim().toLowerCase()}`;
+    if (!existingKeys.has(key)) {
+      normalized.push(deepClone(finish));
+    }
+  }
+
+  return normalized;
 }
 
 function mergeConfig(candidate) {
@@ -284,6 +572,25 @@ function mergeConfig(candidate) {
     }
   }
 
+  merged.m2Finishes = normalizeM2Finishes(candidate.m2Finishes, defaults.m2Finishes);
+
+  if (Array.isArray(candidate.catalogSections)) {
+    merged.catalogSections = normalizeCatalogSections(candidate.catalogSections);
+  }
+
+  if (candidate.m2Pricing && typeof candidate.m2Pricing === "object") {
+    for (const key of Object.keys(merged.m2Pricing)) {
+      if (Array.isArray(candidate.m2Pricing[key])) {
+        merged.m2Pricing[key] = candidate.m2Pricing[key];
+      }
+    }
+    for (const key of Object.keys(candidate.m2Pricing)) {
+      if (!(key in merged.m2Pricing) && Array.isArray(candidate.m2Pricing[key])) {
+        merged.m2Pricing[key] = candidate.m2Pricing[key];
+      }
+    }
+  }
+
   if (Number.isFinite(Number(candidate.spiralPlasticDiscount))) {
     merged.spiralPlasticDiscount = Number(candidate.spiralPlasticDiscount);
   }
@@ -302,6 +609,30 @@ function mergeState(candidate) {
   state.presets = { ...state.presets, ...(candidate.presets || {}) };
   state.client = { ...state.client, ...(candidate.client || {}) };
   state.company = { ...state.company, ...(candidate.company || {}) };
+  state.clients = Array.isArray(candidate.clients)
+    ? candidate.clients
+        .filter((client) => client && typeof client === "object")
+        .map((client, index) => ({
+          id: client.id || `client-${index + 1}`,
+          name: typeof client.name === "string" ? client.name : "",
+          contact: typeof client.contact === "string" ? client.contact : "",
+          cnpj: typeof client.cnpj === "string" ? client.cnpj : "",
+          notes: typeof client.notes === "string" ? client.notes : "",
+          createdAt: typeof client.createdAt === "string" ? client.createdAt : new Date().toISOString(),
+        }))
+    : state.clients;
+  state.quoteHistory = Array.isArray(candidate.quoteHistory)
+    ? candidate.quoteHistory
+        .filter((item) => item && typeof item === "object")
+        .map((item, index) => ({
+          id: item.id || `quote-${index + 1}`,
+          title: typeof item.title === "string" ? item.title : "",
+          clientName: typeof item.clientName === "string" ? item.clientName : "",
+          total: Number.isFinite(Number(item.total)) ? Number(item.total) : 0,
+          summary: typeof item.summary === "string" ? item.summary : "",
+          createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString(),
+        }))
+    : state.quoteHistory;
   state.paymentTerms = typeof candidate.paymentTerms === "string" ? candidate.paymentTerms : state.paymentTerms;
   state.quoteNotes = typeof candidate.quoteNotes === "string" ? candidate.quoteNotes : state.quoteNotes;
 
@@ -326,6 +657,31 @@ function mergeState(candidate) {
         ? ""
         : toMoneyNumber(row?.cutPriceOverride),
       id: row?.id || `color-row-${index + 1}`,
+    }));
+  }
+
+  if (Array.isArray(candidate.m2Items) && candidate.m2Items.length > 0) {
+    const normalizedCatalogSections = normalizeCatalogSections(candidate.catalogSections);
+    const validM2Catalog = new Set(getM2Catalog({ catalogSections: normalizedCatalogSections }).map((product) => product.id));
+    state.catalogSections = normalizedCatalogSections;
+    state.m2Items = candidate.m2Items.map((row, index) => ({
+      ...createDefaultM2Row(index),
+      ...row,
+      widthMm: toDecimalNumber(row?.widthMm),
+      heightMm: toDecimalNumber(row?.heightMm),
+      measureUnit: row?.measureUnit === "m" ? "m" : "cm",
+      quantity: toWholeNumber(row?.quantity),
+      finishIds: Array.isArray(row?.finishIds) ? row.finishIds.filter((item) => typeof item === "string") : [],
+      finishOverrides: row?.finishOverrides && typeof row.finishOverrides === "object" && !Array.isArray(row.finishOverrides)
+        ? Object.fromEntries(
+            Object.entries(row.finishOverrides)
+              .filter(([key]) => typeof key === "string")
+              .map(([key, value]) => [key, value === "" || value === null ? "" : toWholeNumber(value)])
+          )
+        : {},
+      finishingExtra: toMoneyNumber(row?.finishingExtra),
+      productId: validM2Catalog.has(row?.productId) ? row.productId : M2_CATALOG[0].id,
+      id: row?.id || `m2-row-${index + 1}`,
     }));
   }
 
@@ -356,6 +712,72 @@ function saveToStorage(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+function loadSessionFlag(key) {
+  if (typeof sessionStorage === "undefined") {
+    return false;
+  }
+
+  try {
+    return sessionStorage.getItem(key) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function saveSessionFlag(key, value) {
+  if (typeof sessionStorage === "undefined") {
+    return;
+  }
+
+  if (value) {
+    sessionStorage.setItem(key, "true");
+    return;
+  }
+
+  sessionStorage.removeItem(key);
+}
+
+function loadConfigViewMode() {
+  if (typeof localStorage === "undefined") {
+    return "basic";
+  }
+
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.configView);
+    return raw === "advanced" ? "advanced" : "basic";
+  } catch {
+    return "basic";
+  }
+}
+
+function saveConfigViewMode(mode) {
+  if (typeof localStorage === "undefined") {
+    return;
+  }
+  localStorage.setItem(STORAGE_KEYS.configView, mode === "advanced" ? "advanced" : "basic");
+}
+
+function loadConfigSection() {
+  if (typeof localStorage === "undefined") {
+    return "calculo";
+  }
+
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.configSection);
+    return raw === "impressos" || raw === "m2" ? raw : "calculo";
+  } catch {
+    return "calculo";
+  }
+}
+
+function saveConfigSection(section) {
+  if (typeof localStorage === "undefined") {
+    return;
+  }
+  const safeSection = section === "impressos" || section === "m2" ? section : "calculo";
+  localStorage.setItem(STORAGE_KEYS.configSection, safeSection);
+}
+
 function toWholeNumber(value) {
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
@@ -382,10 +804,33 @@ function formatInteger(value) {
   return new Intl.NumberFormat("pt-BR").format(Number(value || 0));
 }
 
+function formatDateTime(value) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
+}
+
 function formatMeasure(value) {
   return new Intl.NumberFormat("pt-BR", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
+  }).format(Number(value || 0));
+}
+
+function formatAreaM2(value) {
+  return new Intl.NumberFormat("pt-BR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 4,
   }).format(Number(value || 0));
 }
 
@@ -489,7 +934,7 @@ function getSpiralUnitPrice(row, bindingSheetsPerCopy, config) {
   const qty = Math.max(0, row.quantity);
   const rateKey = qty >= 101 ? "101" : qty >= 51 ? "51" : qty >= 21 ? "21" : "1";
   const unit = Number(band.rates?.[rateKey] || 0);
-  const discount = row.spiralOption === "Sem capas plasticas" ? Number(config.spiralPlasticDiscount || 0) : 0;
+  const discount = ["Sem capas plásticas", "Sem capas plasticas"].includes(row.spiralOption) ? Number(config.spiralPlasticDiscount || 0) : 0;
   return Math.max(0, unit - discount);
 }
 
@@ -615,22 +1060,22 @@ function calculateWorkbook(state, config) {
       warnings.push(`Grupo ${groupName}: existem tipos de acabamento diferentes. O app usou o acabamento da primeira linha do grupo.`);
     }
 
-    if (mixedSpiral && finishingType === "Encadernacao espiral") {
-      warnings.push(`Grupo ${groupName}: existem opcoes de espiral diferentes. O app usou a opcao da primeira linha do grupo.`);
+    if (mixedSpiral && finishingType === "Encadernação espiral") {
+      warnings.push(`Grupo ${groupName}: existem opções de espiral diferentes. O app usou a opção da primeira linha do grupo.`);
     }
 
     if (quantitySet.length > 1) {
-      warnings.push(`Grupo ${groupName}: as quantidades das linhas estao diferentes. O acabamento foi calculado usando a menor quantidade do grupo.`);
+      warnings.push(`Grupo ${groupName}: as quantidades das linhas estão diferentes. O acabamento foi calculado usando a menor quantidade do grupo.`);
     }
 
     let finishingUnit = 0;
     let finishingTotal = 0;
 
-    if (finishingType === "Encadernacao espiral") {
+    if (finishingType === "Encadernação espiral") {
       finishingUnit = getSpiralUnitPrice({ ...leader.row, quantity: groupQuantity }, sheetsPerCopy, config);
       finishingTotal = groupQuantity * finishingUnit;
       if (sheetsPerCopy > 500) {
-        warnings.push(`Grupo ${groupName}: a espiral vai ate 500 folhas por apostila. Ajuste esse grupo manualmente.`);
+        warnings.push(`Grupo ${groupName}: a espiral vai até 500 folhas por apostila. Ajuste esse grupo manualmente.`);
       }
     } else if (finishingType === "Livreto") {
       finishingUnit = getBookletUnitPrice(groupQuantity, config);
@@ -683,11 +1128,11 @@ function calculateWorkbook(state, config) {
     if (hasGroupedFinishing) {
       finishingUnit = groupMeta.finishingUnit;
       finishingTotal = groupMeta.finishingTotal;
-    } else if (row.finishing === "Encadernacao espiral") {
+    } else if (row.finishing === "Encadernação espiral") {
       finishingUnit = getSpiralUnitPrice(row, bindingSheetsPerCopy, config);
       finishingTotal = row.quantity * finishingUnit;
       if (bindingSheetsPerCopy > 500 && isRowActive(row)) {
-        warnings.push(`Item ${index + 1}: a espiral vai ate 500 folhas por apostila. Ajuste esse item manualmente.`);
+        warnings.push(`Item ${index + 1}: a espiral vai até 500 folhas por apostila. Ajuste esse item manualmente.`);
       }
     } else if (row.finishing === "Livreto") {
       finishingUnit = getBookletUnitPrice(row.quantity, config);
@@ -741,8 +1186,10 @@ function calculateColorPrintWorkbook(state, config) {
   const warnings = [];
 
   const computedRows = state.colorPrintItems.map((row, index) => {
-    const widthMm = toDecimalNumber(row.widthMm);
-    const heightMm = toDecimalNumber(row.heightMm);
+    const widthCm = toDecimalNumber(row.widthMm);
+    const heightCm = toDecimalNumber(row.heightMm);
+    const widthMm = widthCm * 10;
+    const heightMm = heightCm * 10;
     const quantity = toWholeNumber(row.quantity);
     const hasBleed = row.bleedMode === "Com sangra";
     const effectiveWidth = widthMm + (hasBleed ? 2 : 0);
@@ -751,15 +1198,15 @@ function calculateColorPrintWorkbook(state, config) {
 
     if ((effectiveWidth > A4_WIDTH_MM && effectiveWidth > A4_HEIGHT_MM) || (effectiveHeight > A4_HEIGHT_MM && effectiveHeight > A4_WIDTH_MM)) {
       if (active) {
-        warnings.push(`Impresso ${index + 1}: o tamanho informado nao cabe em uma folha A4.`);
+        warnings.push(`Impresso ${index + 1}: o tamanho informado não cabe em uma folha A4.`);
       }
     }
 
     if (effectiveWidth <= 0 || effectiveHeight <= 0 || quantity <= 0) {
       return {
         ...row,
-        widthMm,
-        heightMm,
+        widthMm: widthCm,
+        heightMm: heightCm,
         effectiveWidth,
         effectiveHeight,
         active,
@@ -778,12 +1225,12 @@ function calculateColorPrintWorkbook(state, config) {
     const fit = getBestFitOnA4(effectiveWidth, effectiveHeight);
     if (fit.itemsPerSheet <= 0) {
       if (active) {
-        warnings.push(`Impresso ${index + 1}: o tamanho informado nao cabe em uma folha A4.`);
+        warnings.push(`Impresso ${index + 1}: o tamanho informado não cabe em uma folha A4.`);
       }
       return {
         ...row,
-        widthMm,
-        heightMm,
+        widthMm: widthCm,
+        heightMm: heightCm,
         effectiveWidth,
         effectiveHeight,
         active,
@@ -822,8 +1269,8 @@ function calculateColorPrintWorkbook(state, config) {
 
     return {
       ...row,
-      widthMm,
-      heightMm,
+      widthMm: widthCm,
+      heightMm: heightCm,
       effectiveWidth,
       effectiveHeight,
       active,
@@ -852,6 +1299,194 @@ function calculateColorPrintWorkbook(state, config) {
       totalQuantity,
       totalGeneral,
       averageValue,
+    },
+    warnings,
+  };
+}
+
+function getM2Tier(productId, areaM2) {
+  const product = M2_PRODUCTS.find((item) => item.id === productId) || M2_PRODUCTS[0];
+  return product.tiers.find((tier) => areaM2 <= tier.maxArea) || product.tiers[product.tiers.length - 1];
+}
+
+function calculateM2Workbook(state) {
+  const warnings = [];
+  const rows = state.m2Items.map((row, index) => {
+    const product = M2_PRODUCTS.find((item) => item.id === row.productId) || M2_PRODUCTS[0];
+    const widthMm = toDecimalNumber(row.widthMm);
+    const heightMm = toDecimalNumber(row.heightMm);
+    const quantity = toWholeNumber(row.quantity);
+    const areaM2 = widthMm > 0 && heightMm > 0 ? (widthMm * heightMm) / 1000000 : 0;
+    const effectiveArea = row.includeBleed ? ((widthMm + 4) * (heightMm + 4)) / 1000000 : areaM2;
+    const tier = getM2Tier(product.id, effectiveArea);
+    const unitValue = tier ? Number(tier.value || 0) + toMoneyNumber(row.finishingExtra) : 0;
+    const subtotal = quantity > 0 ? unitValue * quantity : 0;
+    const total = subtotal;
+    const active = widthMm > 0 && heightMm > 0 && quantity > 0;
+
+    if (active && effectiveArea <= 0) {
+      warnings.push(`Item m² ${index + 1}: informe largura e altura válidas.`);
+    }
+
+    return {
+      ...row,
+      productLabel: product.label,
+      material: product.material,
+      print: product.print,
+      finishingLabel: product.finishing,
+      widthMm,
+      heightMm,
+      quantity,
+      areaM2,
+      effectiveArea,
+      tierLabel: tier?.maxArea === Infinity ? "acima do intervalo" : `até ${tier.maxArea} m²`,
+      tierValue: Number(tier?.value || 0),
+      unitValue,
+      total,
+      active,
+    };
+  });
+
+  const activeRows = rows.filter((row) => row.active);
+  const totalQuantity = activeRows.reduce((sum, row) => sum + row.quantity, 0);
+  const totalGeneral = activeRows.reduce((sum, row) => sum + row.total, 0);
+
+  return {
+    rows,
+    activeRows,
+    totals: {
+      activeLines: activeRows.length,
+      totalQuantity,
+      totalGeneral,
+      averageValue: totalQuantity > 0 ? totalGeneral / totalQuantity : 0,
+    },
+    warnings,
+  };
+}
+
+function getM2MinimumValue(pricing) {
+  const minimumRow = Array.isArray(pricing)
+    ? pricing.find((tier) => String(tier.label || "").toLowerCase().includes("valor minimo"))
+    : null;
+  return Number(minimumRow?.value || 30);
+}
+
+function getM2PricingBand(pricing, areaM2) {
+  if (!Array.isArray(pricing) || pricing.length === 0) {
+    return null;
+  }
+
+  const bands = pricing.filter((tier) => !String(tier.label || "").toLowerCase().includes("valor minimo"));
+  return bands.find((tier) => areaM2 <= Number(tier.min || 0)) || bands[bands.length - 1] || null;
+}
+
+function calculateM2WorkbookFromConfig(state, config) {
+  const warnings = [];
+  const catalog = getM2Catalog(config);
+  const rows = state.m2Items.map((row, index) => {
+    const product = catalog.find((item) => item.id === row.productId) || catalog[0];
+    const pricing = config.m2Pricing?.[product.pricingKey || product.configKey] || [];
+    const measureFactor = row.measureUnit === "m" ? 1000 : 10;
+    const widthInput = toDecimalNumber(row.widthMm);
+    const heightInput = toDecimalNumber(row.heightMm);
+    const widthMm = widthInput * measureFactor;
+    const heightMm = heightInput * measureFactor;
+    const bleedMm = Number(product.bleedMm || 0);
+    const pricingWidthMm = widthMm + bleedMm;
+    const pricingHeightMm = heightMm + bleedMm;
+    const quantity = toWholeNumber(row.quantity);
+    const displayAreaM2 = widthMm > 0 && heightMm > 0 ? (widthMm * heightMm) / 1000000 : 0;
+    const areaM2 = pricingWidthMm > 0 && pricingHeightMm > 0 ? (pricingWidthMm * pricingHeightMm) / 1000000 : 0;
+    const tier = getM2PricingBand(pricing, areaM2);
+    const pricePerM2 = Number(tier?.value || 0);
+    const configuredFinishExtra = calculateM2FinishExtra(row, product, config);
+    const manualFinishExtra = toMoneyNumber(row.finishingExtra);
+    const finishingExtra = configuredFinishExtra + manualFinishExtra;
+    const unitValue = areaM2 * pricePerM2 + finishingExtra;
+    const subtotal = quantity > 0 ? unitValue * quantity : 0;
+    const active = widthMm > 0 && heightMm > 0 && quantity > 0;
+
+    if (active && areaM2 <= 0) {
+      warnings.push(`Item m² ${index + 1}: informe largura e altura válidas.`);
+    }
+
+    return {
+      ...row,
+      productLabel: product.label,
+      finishIds: Array.isArray(row.finishIds) ? row.finishIds : [],
+      finishSummary: getM2FinishSummary(row, config).join(" | "),
+      widthMm: widthInput,
+      heightMm: heightInput,
+      quantity,
+      areaM2: displayAreaM2,
+      effectiveArea: areaM2,
+      tierLabel: tier?.label || "",
+      tierValue: pricePerM2,
+      configuredFinishExtra,
+      manualFinishExtra,
+      finishingExtra,
+      unitValue,
+      subtotal,
+      total: subtotal,
+      active,
+    };
+  });
+
+  const totalsByProduct = {};
+  for (const row of rows) {
+    if (!row.active) continue;
+    totalsByProduct[row.productId] = (totalsByProduct[row.productId] || 0) + row.subtotal;
+  }
+
+  const firstActiveIndexByProduct = {};
+  rows.forEach((row, index) => {
+    if (row.active && typeof firstActiveIndexByProduct[row.productId] === "undefined") {
+      firstActiveIndexByProduct[row.productId] = index;
+    }
+  });
+
+  const rowsWithMinimum = rows.map((row, index) => {
+    const groupTotal = totalsByProduct[row.productId] || 0;
+    const product = M2_CATALOG.find((item) => item.id === row.productId) || M2_CATALOG[0];
+    const minimumValue = getM2MinimumValue(config.m2Pricing?.[product.pricingKey || product.configKey] || []);
+    const minimumApplied = groupTotal > 0 && groupTotal < minimumValue;
+    const adjustedGroupTotal = minimumApplied ? minimumValue : groupTotal;
+    const displayTotal = row.active
+      ? minimumApplied
+        ? firstActiveIndexByProduct[row.productId] === index
+          ? adjustedGroupTotal
+          : 0
+        : row.subtotal
+      : 0;
+
+    return {
+      ...row,
+      total: displayTotal,
+      groupTotal,
+      minimumTotal: adjustedGroupTotal,
+      minimumApplied: row.active && minimumApplied,
+    };
+  });
+
+  const activeRows = rowsWithMinimum.filter((row) => row.active);
+  const totalQuantity = activeRows.reduce((sum, row) => sum + row.quantity, 0);
+  const totalGeneral = [...new Set(activeRows.map((row) => row.productId))].reduce(
+    (sum, productId) => {
+      const product = M2_CATALOG.find((item) => item.id === productId) || M2_CATALOG[0];
+      const minimumValue = getM2MinimumValue(config.m2Pricing?.[product.pricingKey || product.configKey] || []);
+      return sum + (totalsByProduct[productId] > 0 && totalsByProduct[productId] < minimumValue ? minimumValue : totalsByProduct[productId]);
+    },
+    0
+  );
+
+  return {
+    rows: rowsWithMinimum,
+    activeRows,
+    totals: {
+      activeLines: activeRows.length,
+      totalQuantity,
+      totalGeneral,
+      averageValue: totalQuantity > 0 ? totalGeneral / totalQuantity : 0,
     },
     warnings,
   };
@@ -901,6 +1536,20 @@ function ensureColorRowCount(state, minimumCount) {
   }
 }
 
+function ensureM2RowCount(state, minimumCount) {
+  while (state.m2Items.length < minimumCount) {
+    state.m2Items.push(createDefaultM2Row(state.m2Items.length));
+  }
+}
+
+function trimEmptyRows(rows, minimumCount, isActive) {
+  const trimmed = [...rows];
+  while (trimmed.length > minimumCount && !isActive(trimmed[trimmed.length - 1])) {
+    trimmed.pop();
+  }
+  return trimmed;
+}
+
 function applyPresetToRow(row, preset) {
   row.printType = preset.printType;
   row.size = preset.size;
@@ -913,203 +1562,327 @@ function applyPresetToRow(row, preset) {
   row.spiralOption = preset.spiralOption;
 }
 
-function createConfigSectionsMarkup(config) {
-  const cards = [];
+function createConfigSectionTabsMarkup(activeSection = "calculo") {
+  const sections = [
+    { id: "calculo", label: "Cálculo de apostila", helper: "Impressão, capas e acabamentos." },
+    { id: "impressos", label: "Impressos coloridos", helper: "Papéis, cortes e produtos extras." },
+    { id: "m2", label: "Cálculo de m²", helper: "Faixas, acabamentos e produtos por área." },
+  ];
 
-  cards.push(
-    createConfigCardMarkup(
-      "Impressao preto e branco",
-      "Nessa tabela os dois primeiros valores continuam como total fixo, igual na planilha.",
-      createTableMarkup(
-        ["Qtd minima", "Valor", "Modo"],
-        config.printPricing.blackWhite,
-        "bw",
-        [
-          { key: "min", type: "number", step: "1" },
-          { key: "value", type: "number", step: "0.01" },
-          { key: "mode", type: "text" },
-        ]
-      )
-    )
-  );
-
-  cards.push(
-    createConfigCardMarkup(
-      "Colorido jato de tinta",
-      "",
-      createTableMarkup(
-        ["Qtd minima", "Valor", "Faixa"],
-        config.printPricing.inkjet,
-        "inkjet",
-        [
-          { key: "min", type: "number", step: "1" },
-          { key: "value", type: "number", step: "0.01" },
-          { key: "label", type: "text" },
-        ]
-      )
-    )
-  );
-
-  cards.push(
-    createConfigCardMarkup(
-      "Colorido laser",
-      "",
-      createTableMarkup(
-        ["Qtd minima", "Valor", "Faixa"],
-        config.printPricing.laser,
-        "laser",
-        [
-          { key: "min", type: "number", step: "1" },
-          { key: "value", type: "number", step: "0.01" },
-          { key: "label", type: "text" },
-        ]
-      )
-    )
-  );
-
-  for (const paper of OPTIONS.coverPapers) {
-    cards.push(
-      createConfigCardMarkup(
-        `Capa e contracapa | ${paper}`,
-        "",
-        createTableMarkup(
-          ["Qtd minima", "Valor", "Faixa"],
-          config.coverPricing[paper],
-          `cover-${paper}`,
-          [
-            { key: "min", type: "number", step: "1" },
-            { key: "value", type: "number", step: "0.01" },
-            { key: "label", type: "text" },
-          ]
+  return `
+    <div class="config-section-tabs" role="tablist" aria-label="Seções da configuração">
+      ${sections
+        .map(
+          (section) => `
+            <button
+              class="button config-section-tab${activeSection === section.id ? " is-active" : ""}"
+              type="button"
+              role="tab"
+              aria-selected="${activeSection === section.id ? "true" : "false"}"
+              data-config-section="${escapeHtml(section.id)}"
+            >
+              <span>${escapeHtml(section.label)}</span>
+              <small>${escapeHtml(section.helper)}</small>
+            </button>
+          `
         )
-      )
-    );
-  }
+        .join("")}
+    </div>
+  `;
+}
 
-  cards.push(
+function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = "calculo") {
+  const apostilaCards = [
     createConfigCardMarkup(
-      "Encadernacao espiral",
-      "Valores por unidade de apostila, conforme faixa de folhas e quantidade de exemplares.",
-      createSpiralTableMarkup(config.spiralPricing)
-    )
-  );
+      "Preços de impressão",
+      "Esses valores alimentam a aba de cálculo de apostila.",
+      [
+        createInlineConfigBlockMarkup(
+          "Preto e branco",
+          createTableMarkup(
+            ["Qtd mínima", "Valor", "Modo"],
+            config.printPricing.blackWhite,
+            "bw",
+            [
+              { key: "min", type: "number", step: "1" },
+              { key: "value", type: "number", step: "0.01" },
+              { key: "mode", type: "text" },
+            ]
+          ),
+          "Os dois primeiros valores continuam como total fixo, igual na planilha."
+        ),
+        createInlineConfigBlockMarkup(
+          "Colorido jato de tinta",
+          createTableMarkup(
+            ["Qtd mínima", "Valor", "Faixa"],
+            config.printPricing.inkjet,
+            "inkjet",
+            [
+              { key: "min", type: "number", step: "1" },
+              { key: "value", type: "number", step: "0.01" },
+              { key: "label", type: "text" },
+            ]
+          )
+        ),
+        createInlineConfigBlockMarkup(
+          "Colorido laser",
+          createTableMarkup(
+            ["Qtd mínima", "Valor", "Faixa"],
+            config.printPricing.laser,
+            "laser",
+            [
+              { key: "min", type: "number", step: "1" },
+              { key: "value", type: "number", step: "0.01" },
+              { key: "label", type: "text" },
+            ]
+          )
+        ),
+      ].join("")
+    ),
+    createConfigCardMarkup(
+      "Capas e contracapas",
+      "Separei por papel para ficar mais fácil localizar o preço certo.",
+      OPTIONS.coverPapers
+        .map((paper) =>
+          createInlineConfigBlockMarkup(
+            paper,
+            createTableMarkup(
+              ["Qtd mínima", "Valor", "Faixa"],
+              config.coverPricing[paper],
+              `cover-${paper}`,
+              [
+                { key: "min", type: "number", step: "1" },
+                { key: "value", type: "number", step: "0.01" },
+                { key: "label", type: "text" },
+              ]
+            )
+          )
+        )
+        .join("")
+    ),
+    createConfigCardMarkup(
+      "Encadernação e livreto",
+      "Ajuste aqui os valores de acabamento usados na apostila.",
+      [
+        createInlineConfigBlockMarkup(
+          "Encadernação espiral",
+          createSpiralTableMarkup(config.spiralPricing),
+          "Valores por unidade de apostila, conforme faixa de folhas e quantidade de exemplares."
+        ),
+        createInlineConfigBlockMarkup(
+          "Livreto",
+          createTableMarkup(
+            ["Qtd mínima", "Valor", "Faixa"],
+            config.bookletPricing,
+            "booklet",
+            [
+              { key: "min", type: "number", step: "1" },
+              { key: "value", type: "number", step: "0.01" },
+              { key: "label", type: "text" },
+            ]
+          )
+        ),
+      ].join("")
+    ),
+    createCatalogTabCardMarkup("calculo", "Produtos extras desta aba", config.catalogSections, config, viewMode),
+  ];
 
-  cards.push(
+  const impressosCards = [
     createConfigCardMarkup(
-      "Livreto",
-      "",
-      createTableMarkup(
-        ["Qtd minima", "Valor", "Faixa"],
-        config.bookletPricing,
-        "booklet",
-        [
-          { key: "min", type: "number", step: "1" },
-          { key: "value", type: "number", step: "0.01" },
-          { key: "label", type: "text" },
-        ]
-      )
-    )
-  );
-
-  cards.push(
+      "Preços por papel",
+      "Esses valores são usados na aba de impressos coloridos.",
+      [
+        createInlineConfigBlockMarkup(
+          "Sulfite 75g",
+          createTableMarkup(
+            ["Qtd mínima", "Valor", "Faixa"],
+            config.colorPrintPricing["Sulfite 75g"],
+            "color-Sulfite 75g",
+            [
+              { key: "min", type: "number", step: "1" },
+              { key: "value", type: "number", step: "0.01" },
+              { key: "label", type: "text" },
+            ]
+          )
+        ),
+        createInlineConfigBlockMarkup(
+          "Offset 120g",
+          createTableMarkup(
+            ["Qtd mínima", "Valor", "Faixa"],
+            config.colorPrintPricing["Offset 120g"],
+            "color-Offset 120g",
+            [
+              { key: "min", type: "number", step: "1" },
+              { key: "value", type: "number", step: "0.01" },
+              { key: "label", type: "text" },
+            ]
+          )
+        ),
+        createInlineConfigBlockMarkup(
+          "Couche 170 / Offset 170 / Reciclato 170",
+          createTableMarkup(
+            ["Qtd mínima", "Valor", "Faixa"],
+            config.colorPrintPricing["170g"],
+            "color-170g",
+            [
+              { key: "min", type: "number", step: "1" },
+              { key: "value", type: "number", step: "0.01" },
+              { key: "label", type: "text" },
+            ]
+          )
+        ),
+        createInlineConfigBlockMarkup(
+          "Couche 250 / Offset 240 / Reciclato 240",
+          createTableMarkup(
+            ["Qtd mínima", "Valor", "Faixa"],
+            config.colorPrintPricing["250g"],
+            "color-250g",
+            [
+              { key: "min", type: "number", step: "1" },
+              { key: "value", type: "number", step: "0.01" },
+              { key: "label", type: "text" },
+            ]
+          )
+        ),
+        createInlineConfigBlockMarkup(
+          "Couche 300 / Metalizados",
+          createTableMarkup(
+            ["Qtd mínima", "Valor", "Faixa"],
+            config.colorPrintPricing["300g"],
+            "color-300g",
+            [
+              { key: "min", type: "number", step: "1" },
+              { key: "value", type: "number", step: "0.01" },
+              { key: "label", type: "text" },
+            ]
+          )
+        ),
+      ].join("")
+    ),
     createConfigCardMarkup(
-      "Impresso colorido | Sulfite 75g",
-      "",
-      createTableMarkup(
-        ["Qtd minima", "Valor", "Faixa"],
-        config.colorPrintPricing["Sulfite 75g"],
-        "color-Sulfite 75g",
-        [
-          { key: "min", type: "number", step: "1" },
-          { key: "value", type: "number", step: "0.01" },
-          { key: "label", type: "text" },
-        ]
-      )
-    )
-  );
-
-  cards.push(
-    createConfigCardMarkup(
-      "Impresso colorido | Offset 120g",
-      "",
-      createTableMarkup(
-        ["Qtd minima", "Valor", "Faixa"],
-        config.colorPrintPricing["Offset 120g"],
-        "color-Offset 120g",
-        [
-          { key: "min", type: "number", step: "1" },
-          { key: "value", type: "number", step: "0.01" },
-          { key: "label", type: "text" },
-        ]
-      )
-    )
-  );
-
-  cards.push(
-    createConfigCardMarkup(
-      "Impresso colorido | Couche 170 / Offset 170 / Reciclato 170",
-      "",
-      createTableMarkup(
-        ["Qtd minima", "Valor", "Faixa"],
-        config.colorPrintPricing["170g"],
-        "color-170g",
-        [
-          { key: "min", type: "number", step: "1" },
-          { key: "value", type: "number", step: "0.01" },
-          { key: "label", type: "text" },
-        ]
-      )
-    )
-  );
-
-  cards.push(
-    createConfigCardMarkup(
-      "Impresso colorido | Couche 250 / Offset 240 / Reciclato 240",
-      "",
-      createTableMarkup(
-        ["Qtd minima", "Valor", "Faixa"],
-        config.colorPrintPricing["250g"],
-        "color-250g",
-        [
-          { key: "min", type: "number", step: "1" },
-          { key: "value", type: "number", step: "0.01" },
-          { key: "label", type: "text" },
-        ]
-      )
-    )
-  );
-
-  cards.push(
-    createConfigCardMarkup(
-      "Impresso colorido | Couche 300 / Metalizados",
-      "",
-      createTableMarkup(
-        ["Qtd minima", "Valor", "Faixa"],
-        config.colorPrintPricing["300g"],
-        "color-300g",
-        [
-          { key: "min", type: "number", step: "1" },
-          { key: "value", type: "number", step: "0.01" },
-          { key: "label", type: "text" },
-        ]
-      )
-    )
-  );
-
-  cards.push(
-    createConfigCardMarkup(
-      "Tabela de cortes | Impressos coloridos",
-      "Ate 5 folhas usa valor fixo por faixa. Acima de 5 folhas usa valor por corte.",
+      "Tabela de cortes",
+      "Até 5 folhas usa valor fixo por faixa. Acima de 5 folhas usa valor por corte.",
       createColorCutTableMarkup(config.cutPricing)
-    )
-  );
+    ),
+    createCatalogTabCardMarkup("impressos", "Produtos extras desta aba", config.catalogSections, config, viewMode),
+  ];
 
-  return cards.join("");
+  const m2Cards = [
+    createConfigCardMarkup(
+      "Faixas de preço do m²",
+      "Cada produto abaixo usa suas próprias faixas na aba de cálculo de m².",
+      createM2PricingMarkup(config.m2Pricing)
+    ),
+    createConfigCardMarkup(
+      "Acabamentos do m²",
+      "Configure aqui os opcionais que aparecem no menu flutuante da aba de m².",
+      createM2FinishesMarkup(config.m2Finishes)
+    ),
+    createCatalogTabCardMarkup("m2", "Produtos extras desta aba", config.catalogSections, config, viewMode),
+  ];
+
+  const safeSection = activeSection === "impressos" || activeSection === "m2" ? activeSection : "calculo";
+  const configGroups = {
+    calculo: createConfigGroupMarkup(
+      "calculo",
+      "Aba: Cálculo de apostila",
+      "Tudo o que aparece aqui afeta somente a aba de apostilas.",
+      apostilaCards
+    ),
+    impressos: createConfigGroupMarkup(
+      "impressos",
+      "Aba: Impressos coloridos",
+      "Use este bloco para ajustar preços, cortes e produtos extras dos impressos coloridos.",
+      impressosCards
+    ),
+    m2: createConfigGroupMarkup(
+      "m2",
+      "Aba: Cálculo de m²",
+      "Aqui ficam as faixas de preço, acabamentos e produtos extras do cálculo por área.",
+      m2Cards
+    ),
+  };
+
+  return [
+    `
+      <article class="config-overview config-overview-hero">
+        <div class="config-hero-copy">
+          <span class="config-kicker">Central inteligente de preços</span>
+          <h3>Organize tudo com visual mais simples e pronto para venda</h3>
+          <p class="helper-text">Primeiro escolha a aba que deseja editar. Depois ajuste preços, acabamentos ou produtos extras somente daquele bloco.</p>
+          <div class="config-tip-grid">
+            <article class="config-tip-card">
+              <span class="config-tip-icon">P</span>
+              <div>
+                <strong>Preços</strong>
+                <p>Atualize faixas e valores sem procurar em várias telas.</p>
+              </div>
+            </article>
+            <article class="config-tip-card">
+              <span class="config-tip-icon">A</span>
+              <div>
+                <strong>Acabamentos</strong>
+                <p>Deixe ilhós, laminação e demais extras prontos para uso.</p>
+              </div>
+            </article>
+            <article class="config-tip-card">
+              <span class="config-tip-icon">D</span>
+              <div>
+                <strong>Dicas</strong>
+                <p>Use o modo iniciante para o essencial e o avançado para os detalhes técnicos.</p>
+              </div>
+            </article>
+          </div>
+        </div>
+        <div class="config-overview-toolbar">
+          <div class="config-view-switch" role="group" aria-label="Modo da configuração">
+            <button class="button button-small${viewMode === "basic" ? " is-active" : ""}" type="button" data-config-view-mode="basic">Modo iniciante</button>
+            <button class="button button-small${viewMode === "advanced" ? " is-active" : ""}" type="button" data-config-view-mode="advanced">Modo avançado</button>
+          </div>
+          ${createConfigSectionTabsMarkup(safeSection)}
+        </div>
+      </article>
+    `,
+    configGroups[safeSection],
+  ].join("");
+}
+
+function createConfigLockedMarkup() {
+  return `
+    <article class="config-lock-card">
+      <span class="config-lock-badge">Área protegida</span>
+      <h3>Configuração bloqueada</h3>
+      <p>
+        Digite a senha para liberar preços, cortes, acabamentos e produtos extras nesta sessão.
+      </p>
+      <form id="config-lock-form" class="config-lock-form">
+        <label>
+          <span>Senha de acesso</span>
+          <input
+            id="config-password-input"
+            type="password"
+            autocomplete="current-password"
+            placeholder="Digite a senha"
+          >
+        </label>
+        <div class="toolbar">
+          <button class="button button-primary" type="submit">Desbloquear configuração</button>
+        </div>
+      </form>
+      <p class="helper-text">
+        Essa trava ajuda a evitar alterações sem permissão nos computadores da equipe.
+      </p>
+    </article>
+  `;
 }
 
 function createConfigCardMarkup(title, copy, innerMarkup) {
   return `
     <article class="config-card">
+      <div class="config-card-meta">
+        <span class="config-card-tag">Configuração</span>
+        <span class="config-card-tag subtle">Salva neste navegador</span>
+      </div>
       <h3>${escapeHtml(title)}</h3>
       ${copy ? `<p class="helper-text">${escapeHtml(copy)}</p>` : ""}
       ${innerMarkup}
@@ -1117,8 +1890,44 @@ function createConfigCardMarkup(title, copy, innerMarkup) {
   `;
 }
 
+function createConfigDeleteButtonMarkup(type, payload, disabled = false) {
+  const attributes = Object.entries(payload)
+    .map(([key, value]) => `data-${key}="${escapeHtml(String(value))}"`)
+    .join(" ");
+  return `
+    <button class="button button-small button-danger config-delete-button" type="button" title="Excluir este item" data-config-delete="${escapeHtml(type)}"${disabled ? " disabled" : ""} ${attributes}>
+      Excluir
+    </button>
+  `;
+}
+
+function createInlineConfigBlockMarkup(title, innerMarkup, copy = "") {
+  return `
+    <section class="config-subblock">
+      <h4>${escapeHtml(title)}</h4>
+      ${copy ? `<p class="helper-text">${escapeHtml(copy)}</p>` : ""}
+      ${innerMarkup}
+    </section>
+  `;
+}
+
+function createConfigGroupMarkup(id, title, copy, cards) {
+  return `
+    <section class="config-group" id="config-group-${escapeHtml(id)}">
+      <div class="config-group-heading">
+        <span class="config-group-kicker">Área de configuração</span>
+        <h3>${escapeHtml(title)}</h3>
+        <p class="helper-text">${escapeHtml(copy)}</p>
+      </div>
+      <div class="config-card-grid">
+        ${cards.join("")}
+      </div>
+    </section>
+  `;
+}
+
 function createTableMarkup(headers, rows, prefix, fields) {
-  const head = headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("");
+  const head = [...headers, "Ações"].map((header) => `<th>${escapeHtml(header)}</th>`).join("");
   const body = rows
     .map((row, rowIndex) => {
       const cells = fields
@@ -1138,7 +1947,15 @@ function createTableMarkup(headers, rows, prefix, fields) {
           `;
         })
         .join("");
-      return `<tr>${cells}</tr>`;
+      const deleteButton = createConfigDeleteButtonMarkup(
+        "config-row",
+        {
+          "config-prefix": prefix,
+          "config-row": rowIndex,
+        },
+        rows.length <= 1
+      );
+      return `<tr>${cells}<td class="config-action-cell">${deleteButton}</td></tr>`;
     })
     .join("");
 
@@ -1172,7 +1989,7 @@ function createSpiralTableMarkup(rows) {
       <table class="config-table">
         <thead>
           <tr>
-            <th>Folhas ate</th>
+            <th>Folhas até</th>
             <th>1</th>
             <th>21</th>
             <th>51</th>
@@ -1203,7 +2020,7 @@ function createColorCutTableMarkup(cutPricing) {
       <table class="config-table">
         <thead>
           <tr>
-            <th>Minimo por folha</th>
+            <th>Mínimo por folha</th>
             <th>Valor</th>
             <th>Faixa</th>
           </tr>
@@ -1220,6 +2037,190 @@ function createColorCutTableMarkup(cutPricing) {
   `;
 }
 
+function createM2PricingMarkup(m2Pricing) {
+  const rows = M2_CATALOG.map((product) => {
+    const bands = m2Pricing?.[product.configKey] || [];
+    return `
+      <section class="m2-config-block">
+        <div class="m2-config-heading">
+          <h4>${escapeHtml(product.label)}</h4>
+          <button class="button button-small" type="button" data-add-m2-pricing="${escapeHtml(product.configKey)}">Adicionar faixa</button>
+        </div>
+        ${createTableMarkup(
+          ["Limite da faixa", "Valor", "Faixa"],
+          bands,
+          `m2-${product.configKey}`,
+          [
+            { key: "min", type: "number", step: "0.01" },
+            { key: "value", type: "number", step: "0.01" },
+            { key: "label", type: "text" },
+          ]
+        )}
+      </section>
+    `;
+  }).join("");
+
+  return `<div class="m2-config-list">${rows}</div>`;
+}
+
+function createM2FinishesMarkup(m2Finishes) {
+  const rows = (m2Finishes || [])
+    .map(
+      (finish, rowIndex) => `
+        <tr>
+          <td><input data-config-prefix="m2-finish" data-config-row="${rowIndex}" data-config-key="label" type="text" value="${escapeHtml(finish.label || "")}"></td>
+          <td>
+            <select data-config-prefix="m2-finish" data-config-row="${rowIndex}" data-config-key="type">
+              <option value="eyelet"${finish.type === "eyelet" ? " selected" : ""}>Ilhós por unidade</option>
+              <option value="perimeter"${finish.type === "perimeter" ? " selected" : ""}>Perímetro</option>
+              <option value="area"${finish.type === "area" ? " selected" : ""}>Área em m²</option>
+            </select>
+          </td>
+          <td><input data-config-prefix="m2-finish" data-config-row="${rowIndex}" data-config-key="price" type="number" step="0.01" value="${escapeHtml(finish.price)}"></td>
+          <td><input data-config-prefix="m2-finish" data-config-row="${rowIndex}" data-config-key="spacingCm" type="number" step="1" value="${escapeHtml(finish.spacingCm ?? "")}"></td>
+          <td class="config-action-cell">
+            ${createConfigDeleteButtonMarkup(
+              "m2-finish",
+              { "finish-row": rowIndex },
+              (m2Finishes || []).length <= 1
+            )}
+          </td>
+        </tr>
+      `
+    )
+    .join("");
+
+  return `
+    <div class="config-grid">
+      <button class="button button-primary" type="button" data-add-m2-finish="1">Adicionar acabamento</button>
+    </div>
+    <p class="helper-text">Use "Ilhós por unidade" para acabamentos baseados na quantidade de ilhós. Nos demais, o espaçamento pode ficar vazio.</p>
+    <div class="table-shell">
+      <table class="config-table">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Como calcula</th>
+            <th>Valor</th>
+            <th>Espaçamento padrão (cm)</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function createM2FinishPickerMarkup(row, config) {
+  const selectedIds = Array.isArray(row.finishIds) ? row.finishIds : [];
+  const finishes = Array.isArray(config.m2Finishes) ? config.m2Finishes : [];
+  const selectedLabels = selectedIds
+    .map((finishId) => finishes.find((finish) => finish.id === finishId)?.label)
+    .filter(Boolean);
+  const buttonLabel = selectedLabels.length
+    ? `Acabamentos (${selectedLabels.length})`
+    : "Sem acabamento";
+
+  return `
+    <div class="finish-picker">
+      <button class="button finish-picker-button" type="button" data-finish-picker-toggle data-finish-row-id="${escapeHtml(row.id)}">
+        <span>${escapeHtml(buttonLabel)}</span>
+        <span class="finish-picker-chevron">▾</span>
+      </button>
+    </div>
+  `;
+}
+
+function createCatalogTabCardMarkup(tab, title, sections, config, viewMode = "basic") {
+  const products = Array.isArray(sections) ? sections.filter((item) => item?.tab === tab) : [];
+  const isAdvanced = viewMode === "advanced";
+  return `
+    <article class="config-card nested-card">
+      <div class="m2-config-heading">
+        <h3>${escapeHtml(title)}</h3>
+        <button class="button button-small" type="button" data-add-catalog-product="${escapeHtml(tab)}">Adicionar produto</button>
+      </div>
+      <p class="helper-text">Crie novos produtos para aparecer nesta aba do orçamento.</p>
+      ${products.length ? `
+        <div class="nested-list">
+          ${products.map((product, productIndex) => `
+            <div class="nested-row${isAdvanced ? " is-advanced" : ""}">
+              <label>
+                <span>Nome do produto</span>
+                <input data-catalog-product-key="label" data-catalog-product-tab="${escapeHtml(tab)}" data-catalog-product-index="${productIndex}" type="text" value="${escapeHtml(product.label || "")}" placeholder="Ex.: Lona 440g">
+              </label>
+              <label${isAdvanced ? "" : ' class="is-hidden-basic"'}>
+                <span>Código interno</span>
+                <input data-catalog-product-key="id" data-catalog-product-tab="${escapeHtml(tab)}" data-catalog-product-index="${productIndex}" type="text" value="${escapeHtml(product.id || "")}" placeholder="Ex.: lona-440g">
+              </label>
+              <label${isAdvanced ? "" : ' class="is-hidden-basic"'}>
+                <span>Observação opcional</span>
+                <input data-catalog-product-key="note" data-catalog-product-tab="${escapeHtml(tab)}" data-catalog-product-index="${productIndex}" type="text" value="${escapeHtml(product.note || "")}" placeholder="Texto auxiliar">
+              </label>
+              <div class="config-row-toolbar">
+                ${createConfigDeleteButtonMarkup(
+                  "catalog-product",
+                  {
+                    "catalog-tab": tab,
+                    "catalog-index": productIndex,
+                  }
+                )}
+              </div>
+            </div>
+            ${tab === "m2" ? createM2ProductPricingMarkup(product, productIndex, config, viewMode) : ""}
+          `).join("")}
+        </div>
+      ` : `<div class="empty-state"><strong>Nenhum produto extra cadastrado</strong><span>Use o botão "Adicionar produto" para montar esta aba do jeito da sua gráfica.</span></div>`}
+    </article>
+  `;
+}
+
+function createM2ProductPricingMarkup(product, productIndex, config, viewMode = "basic") {
+  const pricingKey = product.pricingKey || "banner";
+  const bands = config.m2Pricing?.[pricingKey] || [];
+  const isAdvanced = viewMode === "advanced";
+  return `
+    <div class="m2-product-pricing">
+      <div class="config-field-grid${isAdvanced ? " is-advanced" : ""}">
+        <label>
+          <span>Base de preços</span>
+          <select data-catalog-product-key="pricingKey" data-catalog-product-tab="m2" data-catalog-product-index="${productIndex}">
+            <option value="digitalCut"${pricingKey === "digitalCut" ? " selected" : ""}>Adesivo digital</option>
+            <option value="uvCut"${pricingKey === "uvCut" ? " selected" : ""}>Adesivo UV</option>
+            <option value="uvVerniz"${pricingKey === "uvVerniz" ? " selected" : ""}>UV com verniz/branco</option>
+            <option value="flatCut"${pricingKey === "flatCut" ? " selected" : ""}>Corte reto</option>
+            <option value="banner"${pricingKey === "banner" ? " selected" : ""}>Banner</option>
+            <option value="perfurado"${pricingKey === "perfurado" ? " selected" : ""}>Perfurado</option>
+            <option value="ps1mm"${pricingKey === "ps1mm" ? " selected" : ""}>PS 1mm</option>
+            <option value="ps2mm"${pricingKey === "ps2mm" ? " selected" : ""}>PS 2mm</option>
+          </select>
+        </label>
+        <label${isAdvanced ? "" : ' class="is-hidden-basic"'}>
+          <span>Sangra automática (mm)</span>
+          <input data-catalog-product-key="bleedMm" data-catalog-product-tab="m2" data-catalog-product-index="${productIndex}" type="number" step="0.01" value="${escapeHtml(product.bleedMm ?? 0)}">
+        </label>
+        <div>
+          <span class="helper-text">Faixas de preço</span>
+          <div class="toolbar">
+            <button class="button button-small" type="button" data-add-m2-band="${escapeHtml(pricingKey)}">Adicionar faixa de preço</button>
+          </div>
+        </div>
+      </div>
+      ${createTableMarkup(
+        ["Limite da faixa", "Valor", "Faixa"],
+        bands,
+        `m2-${pricingKey}`,
+        [
+          { key: "min", type: "number", step: "0.01" },
+          { key: "value", type: "number", step: "0.01" },
+          { key: "label", type: "text" },
+        ]
+      )}
+    </div>
+  `;
+}
+
 function getConfigArrayByPrefix(config, prefix) {
   if (prefix === "bw") return config.printPricing.blackWhite;
   if (prefix === "inkjet") return config.printPricing.inkjet;
@@ -1228,6 +2229,7 @@ function getConfigArrayByPrefix(config, prefix) {
   if (prefix === "spiral") return config.spiralPricing;
   if (prefix === "cut-up5") return config.cutPricing.upToFiveSheets;
   if (prefix === "cut-above5") return config.cutPricing;
+  if (prefix.startsWith("m2-")) return config.m2Pricing[prefix.slice(3)];
   if (prefix.startsWith("color-")) return config.colorPrintPricing[prefix.slice(6)];
   if (prefix.startsWith("cover-")) {
     return config.coverPricing[prefix.slice(6)];
@@ -1235,24 +2237,127 @@ function getConfigArrayByPrefix(config, prefix) {
   return null;
 }
 
-function createQuoteHtml(state, workbook, colorWorkbook) {
+function getM2Catalog(config) {
+  const baseCatalog = [...M2_CATALOG];
+  const extraSections = Array.isArray(config.catalogSections) ? config.catalogSections : [];
+  for (const section of extraSections) {
+    if (section?.tab !== "m2") {
+      continue;
+    }
+    if (!section || typeof section !== "object" || !section.id || !section.label) {
+      continue;
+    }
+    if (baseCatalog.some((item) => item.id === section.id)) {
+      continue;
+    }
+    baseCatalog.push({
+      id: section.id,
+      label: section.label,
+      configKey: `custom-${section.id}`,
+      pricingKey: section.pricingKey || "banner",
+      bleedMm: Number(section.bleedMm || 0),
+      note: section.note || "",
+    });
+  }
+  return baseCatalog;
+}
+
+function calculateM2FinishExtra(row, product, config) {
+  const finishes = Array.isArray(config.m2Finishes) ? config.m2Finishes : [];
+  const selected = finishes.filter((finish) => Array.isArray(row.finishIds) && row.finishIds.includes(finish.id));
+  const dimensions = getM2RowDimensions(row);
+  const widthCm = dimensions.widthCm;
+  const heightCm = dimensions.heightCm;
+  const areaM2 = (dimensions.widthMm * dimensions.heightMm) / 1000000;
+  const perimeterCm = (widthCm * 2) + (heightCm * 2);
+  const overrides = row.finishOverrides && typeof row.finishOverrides === "object" ? row.finishOverrides : {};
+
+  return selected.reduce((sum, finish) => {
+    const price = Number(finish.price || 0);
+    if (finish.type === "eyelet") {
+      const spacingCm = Math.max(1, Number(finish.spacingCm || 0));
+      const manualPieces = toWholeNumber(overrides[finish.id]);
+      const pieces = manualPieces > 0 ? manualPieces : Math.max(4, Math.ceil(perimeterCm / spacingCm));
+      return sum + pieces * price;
+    }
+    if (finish.type === "perimeter") {
+      return sum + (perimeterCm / 100) * price;
+    }
+    if (finish.type === "area") {
+      return sum + areaM2 * price;
+    }
+    return sum;
+  }, 0);
+}
+
+function getM2FinishSummary(row, config) {
+  const finishes = Array.isArray(config.m2Finishes) ? config.m2Finishes : [];
+  const selected = finishes.filter((finish) => Array.isArray(row.finishIds) && row.finishIds.includes(finish.id));
+  const dimensions = getM2RowDimensions(row);
+  const widthCm = dimensions.widthCm;
+  const heightCm = dimensions.heightCm;
+  const areaM2 = (dimensions.widthMm * dimensions.heightMm) / 1000000;
+  const perimeterCm = (widthCm * 2) + (heightCm * 2);
+  const overrides = row.finishOverrides && typeof row.finishOverrides === "object" ? row.finishOverrides : {};
+
+  return selected.map((finish) => {
+    if (finish.type === "eyelet") {
+      const spacingCm = Math.max(1, Number(finish.spacingCm || 0));
+      const manualPieces = toWholeNumber(overrides[finish.id]);
+      const pieces = manualPieces > 0 ? manualPieces : Math.max(4, Math.ceil(perimeterCm / spacingCm));
+      const sourceLabel = manualPieces > 0 ? "manual" : "auto";
+      return `${finish.label}: ${pieces} ilhós (${sourceLabel}) | espaçamento ${spacingCm} cm`;
+    }
+    if (finish.type === "perimeter") {
+      return `${finish.label}: ${formatMeasure(perimeterCm / 100)} m lineares`;
+    }
+    if (finish.type === "area") {
+      return `${finish.label}: ${formatAreaM2(areaM2)} m²`;
+    }
+    return finish.label;
+  });
+}
+
+function getM2RowDimensions(row) {
+  const widthInput = Number(row.widthMm || 0);
+  const heightInput = Number(row.heightMm || 0);
+  const factor = row.measureUnit === "m" ? 100 : 1;
+  const widthCm = widthInput * factor;
+  const heightCm = heightInput * factor;
+  const widthMm = widthCm * 10;
+  const heightMm = heightCm * 10;
+  return {
+    widthCm,
+    heightCm,
+    widthMm,
+    heightMm,
+  };
+}
+
+function createQuoteHtml(state, workbook, colorWorkbook, m2Workbook) {
   const dateText = new Intl.DateTimeFormat("pt-BR").format(new Date());
   const quoteEntries = [
     ...workbook.activeRows.map((row) => ({
       kind: "Apostila",
       description: row.description,
-      detail: `${formatInteger(row.quantity)} apostilas | ${formatInteger(row.pages)} paginas | ${row.printType} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}`,
+      detail: `${formatInteger(row.quantity)} apostilas | ${formatInteger(row.pages)} páginas | ${row.printType} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}`,
       total: row.total,
     })),
     ...colorWorkbook.activeRows.map((row) => ({
       kind: "Impresso colorido",
       description: row.description,
-      detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} mm | ${row.paperType} | ${row.printMode}`,
+      detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.paperType} | ${row.printMode}${row.bleedMode === "Com sangra" ? " | Com sangra" : ""}`,
+      total: row.total,
+    })),
+    ...m2Workbook.activeRows.map((row) => ({
+      kind: "Cálculo de m²",
+      description: row.description || row.productLabel,
+      detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.productLabel}${row.finishSummary ? ` | ${row.finishSummary}` : ""}`,
       total: row.total,
     })),
   ];
-  const combinedTotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral;
-  const combinedUnits = workbook.totals.totalQuantity + colorWorkbook.totals.totalQuantity;
+  const combinedTotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral;
+  const combinedUnits = workbook.totals.totalQuantity + colorWorkbook.totals.totalQuantity + m2Workbook.totals.totalQuantity;
   const lineItemsMarkup = quoteEntries.length
     ? quoteEntries
         .map(
@@ -1269,10 +2374,10 @@ function createQuoteHtml(state, workbook, colorWorkbook) {
           `
         )
         .join("")
-    : `<div class="empty-state">Adicione pelo menos uma apostila no calculo para montar o resumo do orcamento.</div>`;
+    : `<div class="empty-state"><strong>Seu orçamento ainda está vazio</strong><span>Adicione itens nas abas de cálculo para montar uma prévia pronta para copiar, imprimir ou salvar em PDF.</span></div>`;
 
   const notesMarkup = state.quoteNotes?.trim()
-    ? `<div class="quote-box"><h3>Observacoes</h3><p class="quote-muted">${escapeHtml(state.quoteNotes).replaceAll("\n", "<br>")}</p></div>`
+    ? `<div class="quote-box"><h3>Observações</h3><p class="quote-muted">${escapeHtml(state.quoteNotes).replaceAll("\n", "<br>")}</p></div>`
     : "";
 
   const logoMarkup = state.company.logoDataUrl
@@ -1284,7 +2389,7 @@ function createQuoteHtml(state, workbook, colorWorkbook) {
       <div class="quote-header">
         ${logoMarkup}
         <div class="quote-company-block">
-          <p class="eyebrow">Orcamento</p>
+          <p class="eyebrow">Orçamento</p>
           <h2 class="quote-company-name">${escapeHtml(state.company.name || "Sua empresa")}</h2>
           <p class="quote-muted">Data: ${escapeHtml(dateText)}</p>
           <p class="quote-muted">CNPJ: ${escapeHtml(state.company.cnpj || "-")}</p>
@@ -1296,7 +2401,7 @@ function createQuoteHtml(state, workbook, colorWorkbook) {
       <div class="quote-meta-grid">
         <div class="quote-box">
           <h3>Cliente</h3>
-          <p class="quote-muted">Nome / Razao social: ${escapeHtml(state.client.name || "-")}</p>
+          <p class="quote-muted">Nome / Razão social: ${escapeHtml(state.client.name || "-")}</p>
           <p class="quote-muted">Contato: ${escapeHtml(state.client.contact || "-")}</p>
           <p class="quote-muted">CNPJ: ${escapeHtml(state.client.cnpj || "-")}</p>
         </div>
@@ -1307,7 +2412,7 @@ function createQuoteHtml(state, workbook, colorWorkbook) {
       </div>
 
       <div class="quote-box">
-        <h3>Itens do orcamento</h3>
+        <h3>Itens do orçamento</h3>
         <div class="quote-lines">${lineItemsMarkup}</div>
       </div>
 
@@ -1324,13 +2429,13 @@ function createQuoteHtml(state, workbook, colorWorkbook) {
   `;
 }
 
-function createQuoteText(state, workbook, colorWorkbook) {
+function createQuoteText(state, workbook, colorWorkbook, m2Workbook) {
   const dateText = new Intl.DateTimeFormat("pt-BR").format(new Date());
   const lines = [
-    `ORCAMENTO | ${state.company.name || "Sua empresa"}`,
+    `ORÇAMENTO | ${state.company.name || "Sua empresa"}`,
     `Data: ${dateText}`,
     `CNPJ: ${state.company.cnpj || "-"}`,
-    `Endereco: ${state.company.address || "-"}`,
+    `Endereço: ${state.company.address || "-"}`,
     "",
     `Cliente: ${state.client.name || "-"}`,
     `Contato: ${state.client.contact || "-"}`,
@@ -1342,10 +2447,13 @@ function createQuoteText(state, workbook, colorWorkbook) {
 
   const quoteEntries = [
     ...workbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || `Apostila ${index + 1}`} | ${row.quantity} apostilas | ${row.pages} paginas | ${row.printType} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""} | ${formatCurrency(row.total)}`,
+      text: `- ${row.description || `Apostila ${index + 1}`} | ${row.quantity} apostilas | ${row.pages} páginas | ${row.printType} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...colorWorkbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || `Impresso ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} mm | ${row.paperType} | ${row.printMode} | ${formatCurrency(row.total)}`,
+      text: `- ${row.description || `Impresso ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.paperType} | ${row.printMode}${row.bleedMode === "Com sangra" ? " | Com sangra" : ""} | ${formatCurrency(row.total)}`,
+    })),
+    ...m2Workbook.activeRows.map((row, index) => ({
+      text: `- ${row.description || row.productLabel || `M² ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.finishSummary ? `${row.finishSummary} | ` : ""}${formatCurrency(row.total)}`,
     })),
   ];
 
@@ -1355,10 +2463,10 @@ function createQuoteText(state, workbook, colorWorkbook) {
     quoteEntries.forEach((entry) => lines.push(entry.text));
   }
 
-  lines.push("", `Total geral: ${formatCurrency(workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral)}`);
+  lines.push("", `Total geral: ${formatCurrency(workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral)}`);
 
   if (state.quoteNotes?.trim()) {
-    lines.push("", "Observacoes:", state.quoteNotes.trim());
+    lines.push("", "Observações:", state.quoteNotes.trim());
   }
 
   return lines.join("\n");
@@ -1367,23 +2475,132 @@ function createQuoteText(state, workbook, colorWorkbook) {
 function initApp() {
   const state = loadFromStorage(STORAGE_KEYS.state, mergeState);
   const config = loadFromStorage(STORAGE_KEYS.config, mergeConfig);
+  let configViewMode = loadConfigViewMode();
+  let activeConfigSection = loadConfigSection();
+  let lastConfigSourceTab = activeConfigSection;
+  let isConfigUnlocked = loadSessionFlag(SESSION_KEYS.configUnlocked);
   const selectedRowIds = new Set();
-  ensureRowCount(state, 12);
-  ensureColorRowCount(state, 10);
+  ensureRowCount(state, 5);
+  ensureColorRowCount(state, 5);
+  ensureM2RowCount(state, 5);
+  state.rows = trimEmptyRows(state.rows, 5, isRowActive);
+  state.colorPrintItems = trimEmptyRows(state.colorPrintItems, 5, isColorPrintRowActive);
+  state.m2Items = trimEmptyRows(state.m2Items, 5, (row) => Boolean(row.description?.trim() || Number(row.quantity) > 0 || Number(row.widthMm) > 0 || Number(row.heightMm) > 0));
 
   const rowsTableBody = document.getElementById("rows-table-body");
   const colorRowsTableBody = document.getElementById("color-rows-table-body");
   const warningList = document.getElementById("warning-list");
   const colorWarningList = document.getElementById("color-warning-list");
+  const m2WarningList = document.getElementById("m2-warning-list");
   const configSections = document.getElementById("config-sections");
+  const clientsList = document.getElementById("clients-list");
+  const historyList = document.getElementById("history-list");
+  const m2RowsTableBody = document.getElementById("m2-rows-table-body");
   const quotePreview = document.getElementById("quote-preview");
   const feedback = document.getElementById("import-feedback");
   const colorFeedback = document.getElementById("color-feedback");
+  const configStatus = document.getElementById("config-status");
+  const spiralDiscountInput = document.getElementById("spiral-discount-input");
+  const lockConfigButton = document.getElementById("lock-config-button");
+  const confirmModal = document.getElementById("confirm-modal");
+  const confirmModalKicker = document.getElementById("confirm-modal-kicker");
+  const confirmModalTitle = document.getElementById("confirm-modal-title");
+  const confirmModalMessage = document.getElementById("confirm-modal-message");
+  const confirmModalConfirm = document.getElementById("confirm-modal-confirm");
+  const confirmModalCancel = document.getElementById("confirm-modal-cancel");
 
   const tabButtons = [...document.querySelectorAll(".tab-button")];
   const tabPanels = [...document.querySelectorAll(".tab-panel")];
 
+  function setStatusMessage(element, message, tone = "neutral") {
+    if (!element) {
+      return;
+    }
+    element.textContent = message;
+    if (tone === "neutral") {
+      delete element.dataset.tone;
+      return;
+    }
+    element.dataset.tone = tone;
+  }
+
+  function setConfigStatus(message, tone = "neutral") {
+    setStatusMessage(configStatus, message, tone);
+  }
+
+  function setMainFeedback(message, tone = "neutral") {
+    setStatusMessage(feedback, message, tone);
+  }
+
+  function setColorFeedback(message, tone = "neutral") {
+    setStatusMessage(colorFeedback, message, tone);
+  }
+
+  function focusConfigPasswordField() {
+    requestAnimationFrame(() => {
+      document.getElementById("config-password-input")?.focus();
+    });
+  }
+
+  function updateConfigAccessUi() {
+    const locked = !isConfigUnlocked;
+    const configButtons = [
+      document.getElementById("save-config-button"),
+      document.getElementById("export-config-button"),
+      document.getElementById("import-config-button"),
+      document.getElementById("reset-config-button"),
+    ];
+
+    configButtons.forEach((button) => {
+      if (button) {
+        button.disabled = locked;
+      }
+    });
+
+    if (spiralDiscountInput) {
+      spiralDiscountInput.disabled = locked;
+    }
+
+    if (lockConfigButton) {
+      lockConfigButton.hidden = locked;
+      lockConfigButton.disabled = false;
+    }
+  }
+
+  function lockConfiguration(message = "Configuração bloqueada novamente.", tone = "warning") {
+    isConfigUnlocked = false;
+    saveSessionFlag(SESSION_KEYS.configUnlocked, false);
+    renderConfig();
+    setConfigStatus(message, tone);
+    focusConfigPasswordField();
+  }
+
+  function unlockConfiguration(password) {
+    if (password !== CONFIG_ACCESS_PASSWORD) {
+      setConfigStatus("Senha incorreta. A configuração continua bloqueada.", "error");
+      focusConfigPasswordField();
+      return false;
+    }
+
+    isConfigUnlocked = true;
+    saveSessionFlag(SESSION_KEYS.configUnlocked, true);
+    renderConfig();
+    setConfigStatus("Configuração desbloqueada nesta sessão.", "success");
+    return true;
+  }
+
   function selectTab(tabName) {
+    if (tabName === "configuracao") {
+      activeConfigSection = lastConfigSourceTab === "impressos" || lastConfigSourceTab === "m2" ? lastConfigSourceTab : "calculo";
+      saveConfigSection(activeConfigSection);
+      renderConfig();
+      if (!isConfigUnlocked) {
+        setConfigStatus("Digite a senha para acessar a configuração.", "warning");
+        focusConfigPasswordField();
+      }
+    } else if (tabName === "calculo" || tabName === "impressos" || tabName === "m2") {
+      lastConfigSourceTab = tabName;
+    }
     tabButtons.forEach((button) => {
       button.classList.toggle("is-active", button.dataset.tabTarget === tabName);
     });
@@ -1423,13 +2640,211 @@ function initApp() {
   }
 
   function renderConfig() {
-    configSections.innerHTML = createConfigSectionsMarkup(config);
-    document.getElementById("spiral-discount-input").value = config.spiralPlasticDiscount;
+    configSections.innerHTML = isConfigUnlocked
+      ? createConfigSectionsMarkup(config, configViewMode, activeConfigSection)
+      : createConfigLockedMarkup();
+    if (spiralDiscountInput) {
+      spiralDiscountInput.value = config.spiralPlasticDiscount;
+    }
+    updateConfigAccessUi();
+  }
+
+  function saveConfiguration() {
+    persist();
+    renderAll();
+    setConfigStatus("Alterações salvas com sucesso.", "success");
+    const button = document.getElementById("save-config-button");
+    if (button) {
+      const original = button.textContent;
+      button.textContent = "Alterações salvas";
+      setTimeout(() => {
+        button.textContent = original;
+      }, 1500);
+    }
+  }
+
+  function removeConfigRow(prefix, rowIndex) {
+    const array = getConfigArrayByPrefix(config, prefix);
+    if (!Array.isArray(array) || array.length <= 1 || !array[rowIndex]) {
+      return false;
+    }
+    array.splice(rowIndex, 1);
+    return true;
+  }
+
+  function removeM2Finish(rowIndex) {
+    const finish = config.m2Finishes?.[rowIndex];
+    if (!finish || config.m2Finishes.length <= 1) {
+      return false;
+    }
+    config.m2Finishes.splice(rowIndex, 1);
+    state.m2Items.forEach((row) => {
+      row.finishIds = Array.isArray(row.finishIds) ? row.finishIds.filter((id) => id !== finish.id) : [];
+      if (row.finishOverrides && typeof row.finishOverrides === "object") {
+        delete row.finishOverrides[finish.id];
+      }
+    });
+    return true;
+  }
+
+  function removeCatalogProduct(tab, visibleIndex) {
+    const products = config.catalogSections.filter((item) => item?.tab === tab);
+    const product = products[visibleIndex];
+    if (!product) {
+      return false;
+    }
+
+    const sourceIndex = config.catalogSections.findIndex((item) => item?.id === product.id && item?.tab === tab);
+    if (sourceIndex === -1) {
+      return false;
+    }
+
+    config.catalogSections.splice(sourceIndex, 1);
+    if (tab === "m2") {
+      const removedPricingKey = product.pricingKey;
+      const isBaseKey = M2_CATALOG.some((item) => item.configKey === removedPricingKey);
+      if (removedPricingKey && !isBaseKey) {
+        delete config.m2Pricing[removedPricingKey];
+      }
+      state.m2Items.forEach((row) => {
+        if (row.productId === product.id) {
+          row.productId = M2_CATALOG[0].id;
+        }
+      });
+    }
+    return true;
+  }
+
+  function confirmAppAction(options = {}) {
+    const {
+      kicker = "Confirmação",
+      title = "Confirmar ação",
+      message = "Deseja realmente continuar?",
+      confirmLabel = "Confirmar",
+      danger = true,
+    } = options;
+
+    if (!confirmModal || !confirmModalKicker || !confirmModalTitle || !confirmModalMessage || !confirmModalConfirm || !confirmModalCancel) {
+      return Promise.resolve(true);
+    }
+
+    confirmModalKicker.textContent = kicker;
+    confirmModalTitle.textContent = title;
+    confirmModalMessage.textContent = message;
+    confirmModalConfirm.textContent = confirmLabel;
+    confirmModalConfirm.classList.toggle("button-danger", danger);
+    confirmModalConfirm.classList.toggle("button-primary", !danger);
+    confirmModal.hidden = false;
+    document.body.style.overflow = "hidden";
+
+    return new Promise((resolve) => {
+      let settled = false;
+
+      const finish = (result) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        confirmModal.hidden = true;
+        document.body.style.overflow = "";
+        confirmModalConfirm.removeEventListener("click", onConfirm);
+        confirmModalCancel.removeEventListener("click", onCancel);
+        confirmModal.removeEventListener("click", onBackdrop);
+        document.removeEventListener("keydown", onKeydown);
+        resolve(result);
+      };
+
+      const onConfirm = () => finish(true);
+      const onCancel = () => finish(false);
+      const onBackdrop = (event) => {
+        if (event.target instanceof HTMLElement && event.target.hasAttribute("data-modal-close")) {
+          finish(false);
+        }
+      };
+      const onKeydown = (event) => {
+        if (event.key === "Escape") {
+          finish(false);
+        }
+      };
+
+      confirmModalConfirm.addEventListener("click", onConfirm);
+      confirmModalCancel.addEventListener("click", onCancel);
+      confirmModal.addEventListener("click", onBackdrop);
+      document.addEventListener("keydown", onKeydown);
+      confirmModalConfirm.focus();
+    });
+  }
+
+  function confirmConfigDelete(message) {
+    return confirmAppAction({
+      kicker: "Exclusão",
+      title: "Confirmar exclusão",
+      message,
+      confirmLabel: "Excluir",
+      danger: true,
+    });
+  }
+
+  function renderClientsTab() {
+    document.getElementById("clients-count").textContent = formatInteger(state.clients.length);
+    document.getElementById("clients-latest").textContent = state.clients[0]?.name || "Nenhum cliente salvo";
+    clientsList.innerHTML = state.clients.length
+      ? state.clients
+          .map(
+            (client) => `
+              <article class="list-card" data-client-id="${escapeHtml(client.id)}">
+                <div>
+                  <h3>${escapeHtml(client.name || "Sem nome")}</h3>
+                  <p>${escapeHtml(client.contact || "Sem contato")}</p>
+                  <p class="list-meta">${escapeHtml(client.cnpj || "Sem CNPJ")}</p>
+                  ${client.notes ? `<p class="list-notes">${escapeHtml(client.notes)}</p>` : ""}
+                  <p class="list-meta">Criado em ${escapeHtml(formatDateTime(client.createdAt) || "data indisponível")}</p>
+                </div>
+                <div class="list-actions">
+                  <button class="button button-primary" type="button" data-client-action="load" data-client-id="${escapeHtml(client.id)}">Carregar</button>
+                  <button class="button" type="button" data-client-action="duplicate" data-client-id="${escapeHtml(client.id)}">Duplicar</button>
+                  <button class="button button-danger" type="button" data-client-action="delete" data-client-id="${escapeHtml(client.id)}">Excluir</button>
+                </div>
+              </article>
+            `
+          )
+          .join("")
+      : `<div class="empty-state"><strong>Nenhum cliente salvo ainda</strong><span>Quando preencher um orçamento, use "Salvar cliente atual" para criar sua base local de contatos.</span></div>`;
+  }
+
+  function renderHistoryTab() {
+    const totalQuotes = state.quoteHistory.length;
+    const totalValue = state.quoteHistory.reduce((sum, item) => sum + Number(item.total || 0), 0);
+    document.getElementById("history-count").textContent = formatInteger(totalQuotes);
+    document.getElementById("history-total").textContent = formatCurrency(totalValue);
+    historyList.innerHTML = state.quoteHistory.length
+      ? state.quoteHistory
+          .map(
+            (item) => `
+              <article class="list-card" data-quote-id="${escapeHtml(item.id)}">
+                <div>
+                  <h3>${escapeHtml(item.title || "Orçamento salvo")}</h3>
+                  <p>${escapeHtml(item.clientName || "Cliente não informado")}</p>
+                  <p class="list-meta">${escapeHtml(formatDateTime(item.createdAt) || "data indisponível")}</p>
+                  ${item.summary ? `<p class="list-notes">${escapeHtml(item.summary)}</p>` : ""}
+                </div>
+                <div class="list-actions">
+                  <button class="button button-primary" type="button" data-history-action="load-client" data-quote-id="${escapeHtml(item.id)}">Usar cliente</button>
+                  <button class="button" type="button" data-history-action="copy" data-quote-id="${escapeHtml(item.id)}">Copiar resumo</button>
+                  <button class="button button-danger" type="button" data-history-action="delete" data-quote-id="${escapeHtml(item.id)}">Excluir</button>
+                </div>
+              </article>
+            `
+          )
+          .join("")
+      : `<div class="empty-state"><strong>Nenhum orçamento salvo ainda</strong><span>Salve um fechamento para manter um histórico rápido de clientes, valores e resumos recentes.</span></div>`;
   }
 
   function renderRowsAndSummary() {
     const workbook = calculateWorkbook(state, config);
     const colorWorkbook = calculateColorPrintWorkbook(state, config);
+    const m2Workbook = calculateM2WorkbookFromConfig(state, config);
+    const m2Catalog = getM2Catalog(config);
 
     document.getElementById("summary-active-lines").textContent = formatInteger(workbook.totals.activeLines);
     document.getElementById("summary-booklets").textContent = formatInteger(workbook.totals.totalQuantity);
@@ -1440,6 +2855,11 @@ function initApp() {
     document.getElementById("color-summary-quantity").textContent = formatInteger(colorWorkbook.totals.totalQuantity);
     document.getElementById("color-summary-total").textContent = formatCurrency(colorWorkbook.totals.totalGeneral);
     document.getElementById("color-summary-average").textContent = formatCurrency(colorWorkbook.totals.averageValue);
+
+    document.getElementById("m2-summary-active").textContent = formatInteger(m2Workbook.totals.activeLines);
+    document.getElementById("m2-summary-quantity").textContent = formatInteger(m2Workbook.totals.totalQuantity);
+    document.getElementById("m2-summary-total").textContent = formatCurrency(m2Workbook.totals.totalGeneral);
+    document.getElementById("m2-summary-average").textContent = formatCurrency(m2Workbook.totals.averageValue);
 
     rowsTableBody.innerHTML = workbook.rows
       .map((row, index) => {
@@ -1499,14 +2919,239 @@ function initApp() {
 
     warningList.innerHTML = workbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("");
     colorWarningList.innerHTML = colorWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("");
-    quotePreview.innerHTML = createQuoteHtml(state, workbook, colorWorkbook);
-    return { workbook, colorWorkbook };
+    m2WarningList.innerHTML = m2Workbook.warnings.length
+      ? m2Workbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
+      : `<div class="warning-item is-success">Sem alertas no momento. Preencha as medidas e acabamentos para o app montar o valor final com segurança.</div>`;
+
+    m2RowsTableBody.innerHTML = m2Workbook.rows
+      .map(
+        (row, index) => `
+          <tr class="${row.active ? "" : "is-empty"}" data-m2-row-index="${index}">
+            <td><strong>${String(index + 1).padStart(2, "0")}</strong></td>
+            <td>
+              <select class="cell-select" name="productId">
+                ${m2Catalog.map((product) => `<option value="${escapeHtml(product.id)}"${product.id === row.productId ? " selected" : ""}>${escapeHtml(product.label)}</option>`).join("")}
+              </select>
+            </td>
+            <td>
+              ${createM2FinishPickerMarkup(row, config)}
+            </td>
+            <td><input class="cell-input description" name="description" value="${escapeHtml(row.description)}" placeholder="${escapeHtml(row.productLabel)}"></td>
+            <td>
+              <select class="cell-select" name="measureUnit">
+                <option value="cm"${row.measureUnit === "cm" ? " selected" : ""}>cm</option>
+                <option value="m"${row.measureUnit === "m" ? " selected" : ""}>m</option>
+              </select>
+            </td>
+            <td><input class="cell-input" name="widthMm" type="number" min="0" step="0.1" value="${escapeHtml(row.widthMm)}" placeholder="0,0"></td>
+            <td><input class="cell-input" name="heightMm" type="number" min="0" step="0.1" value="${escapeHtml(row.heightMm)}" placeholder="0,0"></td>
+            <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${escapeHtml(row.quantity)}" placeholder="0"></td>
+            <td><span class="readonly-value subtle">${formatAreaM2(row.effectiveArea)}</span></td>
+            <td><span class="readonly-value subtle">${escapeHtml(row.tierLabel)}</span></td>
+            <td><span class="readonly-value subtle">${formatCurrency(row.tierValue)}</span></td>
+            <td><input class="cell-input" name="finishingExtra" type="number" min="0" step="0.01" value="${escapeHtml(row.finishingExtra)}" placeholder="0,00"></td>
+            <td><span class="readonly-value">${formatCurrency(row.total)}</span></td>
+          </tr>
+        `
+      )
+      .join("");
+    quotePreview.innerHTML = createQuoteHtml(state, workbook, colorWorkbook, m2Workbook);
+    return { workbook, colorWorkbook, m2Workbook };
+  }
+
+  function closeM2FinishPopover() {
+    const existing = document.getElementById("m2-finish-popover");
+    if (existing) {
+      existing.remove();
+    }
+  }
+
+  function openM2FinishPopover(rowIndex, anchor) {
+    const row = state.m2Items[rowIndex];
+    if (!row || !anchor) {
+      return;
+    }
+
+    closeM2FinishPopover();
+
+    const finishes = Array.isArray(config.m2Finishes) ? config.m2Finishes : [];
+    const selectedIds = Array.isArray(row.finishIds) ? row.finishIds : [];
+    const selectedLabels = selectedIds
+      .map((finishId) => finishes.find((finish) => finish.id === finishId)?.label)
+      .filter(Boolean);
+    const popover = document.createElement("div");
+    popover.id = "m2-finish-popover";
+    popover.className = "finish-popover";
+    popover.innerHTML = `
+      <div class="finish-popover-header">
+        <div class="finish-popover-title">
+          <strong>Acabamentos</strong>
+          <span>Selecione um ou mais opcionais para este item.</span>
+        </div>
+        <button type="button" class="button finish-popover-close" data-finish-popover-close>Fechar</button>
+      </div>
+      <label class="finish-picker-option is-none finish-popover-empty">
+        <input type="radio" name="m2-finish-none" value="none"${selectedIds.length === 0 ? " checked" : ""} data-finish-popover-option>
+        <div class="finish-picker-option-body">
+          <div class="finish-option-copy">
+            <span class="finish-option-label">Sem acabamento</span>
+            <small>Use esta opção quando o item não tiver nenhum adicional de produção.</small>
+          </div>
+        </div>
+      </label>
+      <div class="finish-popover-list">
+        ${finishes.map((finish) => {
+          const checked = selectedIds.includes(finish.id);
+          const isEyelet = finish.type === "eyelet";
+          const overrideValue = row.finishOverrides?.[finish.id];
+          const finishHint = isEyelet
+            ? "Calculado pela quantidade de ilhós, com espaçamento automático ou quantidade manual."
+            : finish.type === "perimeter"
+              ? "Calculado pelo perímetro total da peça."
+              : "Calculado pela área total em m².";
+          return `
+          <label class="finish-picker-option">
+            <input type="checkbox" value="${escapeHtml(finish.id)}"${checked ? " checked" : ""} data-finish-popover-option data-finish-id="${escapeHtml(finish.id)}">
+            <div class="finish-picker-option-body">
+              <div class="finish-option-copy">
+                <span class="finish-option-label">${escapeHtml(finish.label)}</span>
+                <small>${escapeHtml(finishHint)}</small>
+              </div>
+              ${isEyelet ? `
+                <div class="finish-eyelet-settings"${checked ? "" : " hidden"}>
+                  <span>Espaçamento</span>
+                  <input type="number" min="1" step="1" value="${escapeHtml(finish.spacingCm || 20)}" data-finish-spacing-id="${escapeHtml(finish.id)}">
+                  <span>cm</span>
+                </div>
+                <div class="finish-eyelet-settings"${checked ? "" : " hidden"}>
+                  <span>Qtd. manual</span>
+                  <input type="number" min="0" step="1" value="${overrideValue > 0 ? escapeHtml(overrideValue) : ""}" placeholder="Auto" data-finish-override-id="${escapeHtml(finish.id)}">
+                  <span>ilhós</span>
+                </div>
+              ` : ""}
+            </div>
+          </label>
+        `;}).join("")}
+      </div>
+      <div class="finish-popover-footer">
+        <span class="finish-popover-summary">${escapeHtml(selectedLabels.length ? `${selectedLabels.length} selecionado(s)` : "Nenhum acabamento selecionado")}</span>
+        <button type="button" class="button finish-popover-clear" data-finish-popover-clear>Limpar seleção</button>
+      </div>
+    `;
+
+    document.body.appendChild(popover);
+
+    const rect = anchor.getBoundingClientRect();
+    popover.style.position = "fixed";
+    popover.style.visibility = "hidden";
+    popover.style.top = "12px";
+    popover.style.left = "12px";
+    const popoverRect = popover.getBoundingClientRect();
+    const spacing = 12;
+    const fitsBelow = rect.bottom + spacing + popoverRect.height <= window.innerHeight - spacing;
+    const top = fitsBelow
+      ? rect.bottom + spacing
+      : Math.max(spacing, rect.top - popoverRect.height - spacing);
+    const left = Math.min(
+      Math.max(spacing, rect.left),
+      Math.max(spacing, window.innerWidth - popoverRect.width - spacing)
+    );
+    popover.style.position = "fixed";
+    popover.style.top = `${top}px`;
+    popover.style.left = `${left}px`;
+    popover.style.visibility = "visible";
+    popover.dataset.rowIndex = String(rowIndex);
+
+    const syncSelection = () => {
+      const checked = Array.from(popover.querySelectorAll('input[type="checkbox"][data-finish-popover-option]:checked')).map((input) => input.value);
+      row.finishIds = checked;
+      persist();
+      renderRowsAndSummary();
+    };
+
+    popover.addEventListener("change", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement)) {
+        return;
+      }
+
+      if (target.type === "radio" && target.value === "none") {
+        row.finishIds = [];
+        persist();
+        renderRowsAndSummary();
+        closeM2FinishPopover();
+        return;
+      }
+
+      if (target.type === "checkbox") {
+        const noneRadio = popover.querySelector('input[type="radio"][value="none"]');
+        if (noneRadio) {
+          noneRadio.checked = false;
+        }
+        const rowLabel = target.closest(".finish-picker-option");
+        rowLabel?.querySelectorAll(".finish-eyelet-settings").forEach((item) => {
+          item.hidden = !target.checked;
+        });
+        const hasAny = Array.from(popover.querySelectorAll('input[type="checkbox"][data-finish-popover-option]')).some((input) => input.checked);
+        if (!hasAny && noneRadio) {
+          noneRadio.checked = true;
+        }
+        syncSelection();
+        return;
+      }
+
+      if (target.type === "number" && target.dataset.finishSpacingId) {
+        const finish = config.m2Finishes.find((item) => item.id === target.dataset.finishSpacingId);
+        if (finish) {
+          finish.spacingCm = toWholeNumber(target.value);
+          persist();
+          renderRowsAndSummary();
+        }
+        return;
+      }
+
+      if (target.type === "number" && target.dataset.finishOverrideId) {
+        const finishId = target.dataset.finishOverrideId;
+        if (!row.finishOverrides || typeof row.finishOverrides !== "object") {
+          row.finishOverrides = {};
+        }
+        const rawValue = String(target.value || "").trim();
+        if (!rawValue) {
+          delete row.finishOverrides[finishId];
+        } else {
+          const overrideValue = toWholeNumber(rawValue);
+          if (overrideValue > 0) {
+            row.finishOverrides[finishId] = overrideValue;
+          } else {
+            delete row.finishOverrides[finishId];
+          }
+        }
+        persist();
+        renderRowsAndSummary();
+      }
+    });
+
+    popover.addEventListener("click", (event) => {
+      if (event.target.closest("[data-finish-popover-close]")) {
+        closeM2FinishPopover();
+        return;
+      }
+
+      if (event.target.closest("[data-finish-popover-clear]")) {
+        row.finishIds = [];
+        persist();
+        renderRowsAndSummary();
+        closeM2FinishPopover();
+      }
+    });
   }
 
   function renderAll() {
     renderPresetControls();
     renderClientFields();
     renderConfig();
+    renderClientsTab();
+    renderHistoryTab();
     return renderRowsAndSummary();
   }
 
@@ -1529,7 +3174,7 @@ function initApp() {
   async function importPdfFiles(fileList) {
     const files = [...fileList].filter((file) => file.name.toLowerCase().endsWith(".pdf"));
     if (files.length === 0) {
-      feedback.textContent = "Nenhum PDF valido foi selecionado.";
+      setMainFeedback("Nenhum PDF válido foi selecionado. Escolha um ou mais arquivos em PDF para preencher as linhas automaticamente.", "warning");
       return;
     }
 
@@ -1551,7 +3196,7 @@ function initApp() {
 
     persist();
     renderRowsAndSummary();
-    feedback.textContent = `${imported} PDF(s) importado(s). Se alguma contagem de paginas vier diferente, basta corrigir direto na linha.`;
+      setMainFeedback(`${imported} PDF(s) importado(s) com sucesso. Se a contagem de páginas de algum arquivo vier diferente, você pode corrigir direto na linha.`, "success");
   }
 
   tabButtons.forEach((button) => {
@@ -1583,19 +3228,62 @@ function initApp() {
     renderRowsAndSummary();
   });
 
-  document.getElementById("clear-all-button").addEventListener("click", () => {
-    selectedRowIds.clear();
-    state.rows = Array.from({ length: 12 }, (_, index) => createDefaultRow(index));
+  document.getElementById("add-m2-row-button").addEventListener("click", () => {
+    state.m2Items.push(createDefaultM2Row(state.m2Items.length));
     persist();
     renderRowsAndSummary();
-    feedback.textContent = "As linhas foram limpas.";
   });
 
-  document.getElementById("clear-color-rows-button").addEventListener("click", () => {
-    state.colorPrintItems = Array.from({ length: 10 }, (_, index) => createDefaultColorPrintRow(index));
+  document.getElementById("clear-all-button").addEventListener("click", async () => {
+    if (!(await confirmAppAction({
+      kicker: "Limpeza",
+      title: "Limpar linhas de apostila",
+      message: "Deseja realmente limpar todas as linhas da aba de cálculo de apostila?",
+      confirmLabel: "Limpar",
+      danger: true,
+    }))) {
+      setMainFeedback("A limpeza das linhas de apostila foi cancelada.", "warning");
+      return;
+    }
+    selectedRowIds.clear();
+    state.rows = Array.from({ length: 5 }, (_, index) => createDefaultRow(index));
     persist();
     renderRowsAndSummary();
-    colorFeedback.textContent = "As linhas de impressos coloridos foram limpas.";
+    setMainFeedback("As linhas de cálculo de apostila foram limpas.", "warning");
+  });
+
+  document.getElementById("clear-color-rows-button").addEventListener("click", async () => {
+    if (!(await confirmAppAction({
+      kicker: "Limpeza",
+      title: "Limpar impressos coloridos",
+      message: "Deseja realmente limpar todas as linhas da aba de impressos coloridos?",
+      confirmLabel: "Limpar",
+      danger: true,
+    }))) {
+      setColorFeedback("A limpeza dos impressos coloridos foi cancelada.", "warning");
+      return;
+    }
+    state.colorPrintItems = Array.from({ length: 5 }, (_, index) => createDefaultColorPrintRow(index));
+    persist();
+    renderRowsAndSummary();
+    setColorFeedback("As linhas de impressos coloridos foram limpas.", "warning");
+  });
+
+  document.getElementById("clear-m2-rows-button").addEventListener("click", async () => {
+    if (!(await confirmAppAction({
+      kicker: "Limpeza",
+      title: "Limpar cálculo de m²",
+      message: "Deseja realmente limpar todas as linhas da aba de cálculo de m²?",
+      confirmLabel: "Limpar",
+      danger: true,
+    }))) {
+      setConfigStatus("Limpeza cancelada.", "warning");
+      return;
+    }
+    state.m2Items = Array.from({ length: 5 }, (_, index) => createDefaultM2Row(index));
+    persist();
+    renderRowsAndSummary();
+    setConfigStatus("Linhas de cálculo de m² limpas.", "warning");
   });
 
   document.getElementById("calc-mode-select").addEventListener("change", (event) => {
@@ -1684,10 +3372,59 @@ function initApp() {
     renderRowsAndSummary();
   });
 
+  m2RowsTableBody.addEventListener("change", (event) => {
+    const target = event.target;
+    const rowElement = target.closest("tr[data-m2-row-index]");
+    if (!rowElement) {
+      return;
+    }
+
+    const row = state.m2Items[Number(rowElement.dataset.m2RowIndex)];
+    const field = target.name;
+    if (!field || !row) {
+      return;
+    }
+
+    if (field === "widthMm" || field === "heightMm") {
+      row[field] = toDecimalNumber(target.value);
+    } else if (field === "measureUnit") {
+      row.measureUnit = target.value === "m" ? "m" : "cm";
+    } else if (field === "quantity") {
+      row[field] = toWholeNumber(target.value);
+    } else if (field === "finishingExtra") {
+      row[field] = toMoneyNumber(target.value);
+    } else {
+      row[field] = target.value;
+    }
+
+    persist();
+    renderRowsAndSummary();
+  });
+
+  m2RowsTableBody.addEventListener("click", (event) => {
+    const toggle = event.target.closest("[data-finish-picker-toggle]");
+    if (toggle) {
+      event.preventDefault();
+      const rowElement = toggle.closest("tr[data-m2-row-index]");
+      if (!rowElement) {
+        return;
+      }
+      openM2FinishPopover(Number(rowElement.dataset.m2RowIndex), toggle);
+      return;
+    }
+  });
+
+  document.addEventListener("click", (event) => {
+    if (event.target.closest("[data-finish-picker-toggle]") || event.target.closest("#m2-finish-popover")) {
+      return;
+    }
+    closeM2FinishPopover();
+  });
+
   document.getElementById("apply-group-selected").addEventListener("click", () => {
     const groupName = normalizeBindingGroup(document.getElementById("group-name-input").value);
     if (!groupName) {
-      feedback.textContent = "Digite um nome de grupo antes de aplicar nas linhas selecionadas.";
+      setMainFeedback("Digite um nome de grupo antes de aplicar o acabamento em lote.", "warning");
       return;
     }
 
@@ -1701,7 +3438,7 @@ function initApp() {
 
     persist();
     renderRowsAndSummary();
-    feedback.textContent = changed > 0 ? `Grupo ${groupName} aplicado em ${changed} linha(s).` : "Nenhuma linha foi selecionada.";
+    setMainFeedback(changed > 0 ? `Grupo ${groupName} aplicado em ${changed} linha(s).` : "Selecione pelo menos uma linha para aplicar o grupo.", changed > 0 ? "success" : "warning");
   });
 
   document.getElementById("clear-group-selected").addEventListener("click", () => {
@@ -1715,21 +3452,86 @@ function initApp() {
 
     persist();
     renderRowsAndSummary();
-    feedback.textContent = changed > 0 ? `Grupo removido de ${changed} linha(s).` : "Nenhuma linha foi selecionada.";
+    setMainFeedback(changed > 0 ? `Grupo removido de ${changed} linha(s).` : "Selecione pelo menos uma linha para remover o grupo.", changed > 0 ? "success" : "warning");
   });
 
-  document.getElementById("spiral-discount-input").addEventListener("input", (event) => {
+  spiralDiscountInput.addEventListener("input", (event) => {
+    if (!isConfigUnlocked) {
+      event.target.value = config.spiralPlasticDiscount;
+      return;
+    }
     config.spiralPlasticDiscount = toMoneyNumber(event.target.value);
     persist();
     renderRowsAndSummary();
+    setConfigStatus("Desconto da espiral atualizado.", "success");
+  });
+
+  configSections.addEventListener("submit", (event) => {
+    if (event.target.id !== "config-lock-form") {
+      return;
+    }
+
+    event.preventDefault();
+    const passwordInput = document.getElementById("config-password-input");
+    unlockConfiguration(passwordInput?.value || "");
+    if (passwordInput) {
+      passwordInput.value = "";
+    }
   });
 
   configSections.addEventListener("input", (event) => {
+    if (!isConfigUnlocked) {
+      return;
+    }
+
     const target = event.target;
     const prefix = target.dataset.configPrefix;
     const rowIndex = Number(target.dataset.configRow);
     const key = target.dataset.configKey;
+    const catalogProductTab = target.dataset.catalogProductTab;
+    const catalogProductIndex = Number(target.dataset.catalogProductIndex);
+    const catalogProductKey = target.dataset.catalogProductKey;
     if (!prefix || !key) {
+      if (catalogProductTab && catalogProductKey && Number.isFinite(catalogProductIndex)) {
+        const product = config.catalogSections.filter((item) => item?.tab === catalogProductTab)[catalogProductIndex];
+        if (!product) {
+          return;
+        }
+        const previousId = product.id;
+        if (catalogProductKey === "bleedMm") {
+          product[catalogProductKey] = toDecimalNumber(target.value);
+        } else {
+          product[catalogProductKey] = target.value;
+        }
+        if (catalogProductKey === "id" && catalogProductTab === "m2" && previousId && product.id && previousId !== product.id) {
+          state.m2Items.forEach((row) => {
+            if (row.productId === previousId) {
+              row.productId = product.id;
+            }
+          });
+        }
+        persist();
+        renderRowsAndSummary();
+        setConfigStatus("Produto extra atualizado.", "success");
+      }
+      return;
+    }
+
+    if (prefix === "m2-finish") {
+      const finish = config.m2Finishes?.[rowIndex];
+      if (!finish) {
+        return;
+      }
+      if (key === "spacingCm") {
+        finish[key] = toWholeNumber(target.value);
+      } else if (key === "price") {
+        finish[key] = toMoneyNumber(target.value);
+      } else {
+        finish[key] = target.value;
+      }
+      persist();
+      renderRowsAndSummary();
+      setConfigStatus("Acabamento de m² atualizado.", "success");
       return;
     }
 
@@ -1743,6 +3545,14 @@ function initApp() {
       array[rowIndex].rates[rateKey] = toMoneyNumber(target.value);
     } else if (prefix === "cut-above5") {
       array[key] = toMoneyNumber(target.value);
+    } else if (prefix.startsWith("m2-")) {
+      if (key === "min") {
+        array[rowIndex][key] = toDecimalNumber(target.value);
+      } else if (key === "value") {
+        array[rowIndex][key] = toMoneyNumber(target.value);
+      } else {
+        array[rowIndex][key] = target.value;
+      }
     } else if (key === "min" || key === "maxSheets") {
       array[rowIndex][key] = toWholeNumber(target.value);
     } else if (key === "minUp") {
@@ -1755,13 +3565,196 @@ function initApp() {
 
     persist();
     renderRowsAndSummary();
+    setConfigStatus("Preço atualizado.", "success");
   });
 
-  document.getElementById("reset-config-button").addEventListener("click", () => {
+  configSections.addEventListener("click", async (event) => {
+    if (!isConfigUnlocked) {
+      return;
+    }
+
+    const modeButton = event.target.closest("[data-config-view-mode]");
+    if (modeButton) {
+      configViewMode = modeButton.dataset.configViewMode === "advanced" ? "advanced" : "basic";
+      saveConfigViewMode(configViewMode);
+      renderConfig();
+      setConfigStatus(
+        configViewMode === "advanced"
+          ? "Modo avançado ativado."
+          : "Modo iniciante ativado.",
+        "success"
+      );
+      return;
+    }
+
+    const sectionButton = event.target.closest("[data-config-section]");
+    if (sectionButton) {
+      activeConfigSection = sectionButton.dataset.configSection === "impressos" || sectionButton.dataset.configSection === "m2"
+        ? sectionButton.dataset.configSection
+        : "calculo";
+      saveConfigSection(activeConfigSection);
+      renderConfig();
+      setConfigStatus("Seção da configuração atualizada.", "success");
+      return;
+    }
+
+    const deleteButton = event.target.closest("[data-config-delete]");
+    if (deleteButton) {
+      const deleteType = deleteButton.dataset.configDelete;
+      if (deleteType === "config-row") {
+        const prefix = deleteButton.dataset.configPrefix;
+        const rowIndex = Number(deleteButton.dataset.configRow);
+        if (!(await confirmConfigDelete("Deseja realmente excluir esta faixa de preço?"))) {
+          setConfigStatus("Exclusão cancelada.", "warning");
+          return;
+        }
+        if (removeConfigRow(prefix, rowIndex)) {
+          persist();
+          renderConfig();
+          renderRowsAndSummary();
+          setConfigStatus("Faixa excluída com sucesso.", "warning");
+        }
+        return;
+      }
+
+      if (deleteType === "m2-finish") {
+        const rowIndex = Number(deleteButton.dataset.finishRow);
+        if (!(await confirmConfigDelete("Deseja realmente excluir este acabamento de m²?"))) {
+          setConfigStatus("Exclusão cancelada.", "warning");
+          return;
+        }
+        if (removeM2Finish(rowIndex)) {
+          persist();
+          renderConfig();
+          renderRowsAndSummary();
+          setConfigStatus("Acabamento excluído com sucesso.", "warning");
+        }
+        return;
+      }
+
+      if (deleteType === "catalog-product") {
+        const tab = deleteButton.dataset.catalogTab;
+        const rowIndex = Number(deleteButton.dataset.catalogIndex);
+        if (!(await confirmConfigDelete("Deseja realmente excluir este produto extra?"))) {
+          setConfigStatus("Exclusão cancelada.", "warning");
+          return;
+        }
+        if (removeCatalogProduct(tab, rowIndex)) {
+          persist();
+          renderConfig();
+          renderRowsAndSummary();
+          setConfigStatus("Produto extra excluído com sucesso.", "warning");
+        }
+        return;
+      }
+    }
+
+    const button = event.target.closest("[data-add-m2-pricing]");
+    if (!button) {
+      const addBandButton = event.target.closest("[data-add-m2-band]");
+      if (addBandButton) {
+        const pricingKey = addBandButton.dataset.addM2Band;
+        if (!pricingKey) {
+          return;
+        }
+        const bands = config.m2Pricing[pricingKey] || (config.m2Pricing[pricingKey] = []);
+        const lastBand = bands[bands.length - 1] || { min: 0, value: 0, label: "Nova faixa" };
+        bands.push({
+          min: Number(lastBand.min || 0) + 1,
+          value: Number(lastBand.value || 0),
+          label: lastBand.label ? `acima de ${lastBand.min || 0} m²` : "nova faixa",
+        });
+        persist();
+        renderConfig();
+        setConfigStatus("Nova faixa criada para este produto.", "success");
+        return;
+      }
+
+      const addFinishButton = event.target.closest("[data-add-m2-finish]");
+      if (addFinishButton) {
+        config.m2Finishes.push({
+          id: `acabamento-${Date.now()}`,
+          label: "Novo acabamento",
+          type: "area",
+          price: 0,
+          spacingCm: 20,
+        });
+        persist();
+        renderConfig();
+        setConfigStatus("Novo acabamento criado.", "success");
+        return;
+      }
+
+      const addProductButton = event.target.closest("[data-add-catalog-product]");
+      if (addProductButton) {
+        const tab = addProductButton.dataset.addCatalogProduct;
+        if (!tab) {
+          return;
+        }
+        const sectionProducts = config.catalogSections.filter((item) => item?.tab === tab);
+        const existingKeys = new Set(Object.keys(config.m2Pricing || {}));
+        const newPricingKey = tab === "m2" ? createUniqueM2PricingKey("lona", existingKeys) : "";
+        config.catalogSections.push({
+          id: `produto-${Date.now()}`,
+          label: "Novo produto",
+          tab,
+          pricingKey: newPricingKey,
+          note: "",
+        });
+        if (tab === "m2") {
+          config.m2Pricing[newPricingKey] = deepClone(config.m2Pricing.banner || []);
+        }
+        persist();
+        renderConfig();
+        setConfigStatus("Novo produto extra criado.", "success");
+      }
+      return;
+    }
+
+    const configKey = button.dataset.addM2Pricing;
+    const bands = config.m2Pricing?.[configKey];
+    if (!Array.isArray(bands)) {
+      return;
+    }
+
+    const lastBand = bands[bands.length - 1] || { min: 0, value: 0 };
+    const lastMin = Number(lastBand.min || 0);
+    const nextMin = lastMin >= 1000000 ? 1000000 : lastMin + 1;
+    bands.push({
+      min: nextMin,
+      value: Number(lastBand.value || 0),
+      label: lastMin >= 1000000 ? "nova faixa" : `acima de ${lastMin} m²`,
+    });
+
+    persist();
+    renderAll();
+    setConfigStatus("Nova faixa de preço adicionada.", "success");
+  });
+
+  document.getElementById("save-config-button").addEventListener("click", () => {
+    saveConfiguration();
+  });
+
+  lockConfigButton.addEventListener("click", () => {
+    lockConfiguration();
+  });
+
+  document.getElementById("reset-config-button").addEventListener("click", async () => {
+    if (!(await confirmAppAction({
+      kicker: "Restauração",
+      title: "Restaurar configuração padrão",
+      message: "Deseja realmente restaurar os preços e ajustes originais da configuração?",
+      confirmLabel: "Restaurar",
+      danger: true,
+    }))) {
+      setConfigStatus("Restauração cancelada.", "warning");
+      return;
+    }
     const reset = createDefaultConfig();
     Object.assign(config, reset);
     persist();
     renderAll();
+    setConfigStatus("Configuração restaurada para o padrão.", "warning");
   });
 
   document.getElementById("export-config-button").addEventListener("click", () => {
@@ -1769,7 +3762,7 @@ function initApp() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "configuracao-apostilas-copy-boy.json";
+    link.download = "configuracao-graficalc.json";
     link.click();
     URL.revokeObjectURL(url);
   });
@@ -1790,9 +3783,11 @@ function initApp() {
       Object.assign(config, imported);
       persist();
       renderAll();
-      feedback.textContent = "Configuracao importada com sucesso.";
+      setMainFeedback("Configuração importada com sucesso. Os novos valores já foram aplicados ao app.", "success");
+      setConfigStatus("Configuração importada com sucesso.", "success");
     } catch {
-      feedback.textContent = "Nao consegui ler esse arquivo de configuracao.";
+      setMainFeedback("Não foi possível ler esse arquivo de configuração. Confira se o arquivo está em JSON válido.", "error");
+      setConfigStatus("Não foi possível importar esse arquivo de configuração.", "error");
     }
 
     event.target.value = "";
@@ -1837,18 +3832,152 @@ function initApp() {
   document.getElementById("copy-quote-button").addEventListener("click", async () => {
     const workbook = calculateWorkbook(state, config);
     const colorWorkbook = calculateColorPrintWorkbook(state, config);
-    const text = createQuoteText(state, workbook, colorWorkbook);
+    const m2Workbook = calculateM2WorkbookFromConfig(state, config);
+    const text = createQuoteText(state, workbook, colorWorkbook, m2Workbook);
     try {
       await navigator.clipboard.writeText(text);
-      feedback.textContent = "Resumo do orcamento copiado.";
+      setMainFeedback("Resumo do orçamento copiado com sucesso.", "success");
     } catch {
-      feedback.textContent = "Nao consegui copiar automaticamente, mas a previa continua disponivel na tela.";
+      setMainFeedback("Não foi possível copiar automaticamente, mas a prévia continua disponível na tela para conferência.", "warning");
     }
   });
 
   document.getElementById("print-quote-button").addEventListener("click", () => {
     selectTab("orcamento");
     window.print();
+  });
+
+  document.getElementById("save-client-button").addEventListener("click", () => {
+    const clientName = state.client.name.trim();
+    if (!clientName) {
+      setMainFeedback("Digite o nome do cliente antes de salvar na base local.", "warning");
+      return;
+    }
+
+    const existingIndex = state.clients.findIndex((client) => client.name.trim().toLowerCase() === clientName.toLowerCase());
+    const payload = {
+      id: existingIndex >= 0 ? state.clients[existingIndex].id : `client-${Date.now()}`,
+      name: state.client.name.trim(),
+      contact: state.client.contact.trim(),
+      cnpj: state.client.cnpj.trim(),
+      notes: state.quoteNotes.trim(),
+      createdAt: existingIndex >= 0 ? state.clients[existingIndex].createdAt : new Date().toISOString(),
+    };
+
+    if (existingIndex >= 0) {
+      state.clients[existingIndex] = payload;
+    } else {
+      state.clients.unshift(payload);
+    }
+
+    persist();
+    renderClientsTab();
+    setMainFeedback("Cliente salvo na base local com sucesso.", "success");
+  });
+
+  document.getElementById("save-history-button").addEventListener("click", () => {
+    const workbook = calculateWorkbook(state, config);
+    const colorWorkbook = calculateColorPrintWorkbook(state, config);
+    const m2Workbook = calculateM2WorkbookFromConfig(state, config);
+    const title = state.client.name.trim() || `Orçamento ${new Date().toLocaleDateString("pt-BR")}`;
+    const summary = createQuoteText(state, workbook, colorWorkbook, m2Workbook).split("\n").slice(0, 10).join(" • ");
+
+    state.quoteHistory.unshift({
+      id: `quote-${Date.now()}`,
+      title,
+      clientName: state.client.name.trim(),
+      total: workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral,
+      summary,
+      createdAt: new Date().toISOString(),
+    });
+
+    state.quoteHistory = state.quoteHistory.slice(0, 20);
+    persist();
+    renderHistoryTab();
+    setMainFeedback("Orçamento salvo no histórico local.", "success");
+  });
+
+  clientsList.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-client-action]");
+    if (!button) {
+      return;
+    }
+
+    const client = state.clients.find((item) => item.id === button.dataset.clientId);
+    if (!client) {
+      return;
+    }
+
+    if (button.dataset.clientAction === "load") {
+      state.client.name = client.name;
+      state.client.contact = client.contact;
+      state.client.cnpj = client.cnpj;
+      state.quoteNotes = client.notes || state.quoteNotes;
+      persist();
+      renderAll();
+      setMainFeedback("Cliente carregado no orçamento atual.", "success");
+    } else if (button.dataset.clientAction === "duplicate") {
+      state.clients.unshift({
+        ...client,
+        id: `client-${Date.now()}`,
+        name: `${client.name} (cópia)`,
+        createdAt: new Date().toISOString(),
+      });
+      persist();
+      renderClientsTab();
+    } else if (button.dataset.clientAction === "delete") {
+      if (!(await confirmAppAction({
+        kicker: "Exclusão",
+        title: "Excluir cliente salvo",
+        message: `Deseja realmente excluir o cliente "${client.name || "Sem nome"}" da base local?`,
+        confirmLabel: "Excluir",
+        danger: true,
+      }))) {
+        setMainFeedback("A exclusão do cliente foi cancelada.", "warning");
+        return;
+      }
+      state.clients = state.clients.filter((item) => item.id !== client.id);
+      persist();
+      renderClientsTab();
+      setMainFeedback("Cliente excluído da base local.", "warning");
+    }
+  });
+
+  historyList.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-history-action]");
+    if (!button) {
+      return;
+    }
+
+    const item = state.quoteHistory.find((entry) => entry.id === button.dataset.quoteId);
+    if (!item) {
+      return;
+    }
+
+    if (button.dataset.historyAction === "load-client") {
+      state.client.name = item.clientName || state.client.name;
+      persist();
+      renderAll();
+      setMainFeedback("Cliente do histórico carregado no orçamento atual.", "success");
+    } else if (button.dataset.historyAction === "copy") {
+      navigator.clipboard.writeText(item.summary || item.title || "").catch(() => {});
+      setMainFeedback("Resumo do histórico copiado.", "success");
+    } else if (button.dataset.historyAction === "delete") {
+      if (!(await confirmAppAction({
+        kicker: "Exclusão",
+        title: "Excluir item do histórico",
+        message: `Deseja realmente excluir o histórico "${item.title || "Orçamento salvo"}"?`,
+        confirmLabel: "Excluir",
+        danger: true,
+      }))) {
+        setMainFeedback("A exclusão do histórico foi cancelada.", "warning");
+        return;
+      }
+      state.quoteHistory = state.quoteHistory.filter((entry) => entry.id !== item.id);
+      persist();
+      renderHistoryTab();
+      setMainFeedback("Item removido do histórico.", "warning");
+    }
   });
 
   const dropzone = document.getElementById("pdf-dropzone");
@@ -1879,3 +4008,25 @@ function initApp() {
 if (typeof window !== "undefined" && typeof document !== "undefined") {
   initApp();
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

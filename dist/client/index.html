@@ -1,34 +1,28 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Copy Boy | Orcamento de Apostilas</title>
+  <title>GrafiCalc | Orçamento Gráfico</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <div class="page-shell">
     <header class="hero">
-      <div>
-        <p class="eyebrow">Copy Boy</p>
-        <h1>App interno de orcamento de apostilas</h1>
-        <p class="hero-copy">
-          Importe PDFs, ajuste as opcoes de capa e acabamento, e monte varios orcamentos no mesmo lugar.
-        </p>
-      </div>
-      <div class="hero-badges">
-        <span>PDF</span>
-        <span>Miolo</span>
-        <span>Capa</span>
-        <span>Espiral</span>
-      </div>
+      <img class="hero-logo" src="./assets/logo-graficalc.png" alt="GrafiCalc">
+      <p class="hero-copy">
+        Importe PDFs, ajuste as opções de capa e acabamento, e monte vários orçamentos no mesmo lugar.
+      </p>
     </header>
 
     <nav class="tab-bar" aria-label="Abas principais">
-      <button class="tab-button is-active" data-tab-target="calculo">Calculo</button>
+      <button class="tab-button is-active" data-tab-target="calculo">Cálculo de apostila</button>
       <button class="tab-button" data-tab-target="impressos">Impressos coloridos</button>
-      <button class="tab-button" data-tab-target="configuracao">Configuracao</button>
-      <button class="tab-button" data-tab-target="orcamento">Orcamento</button>
+      <button class="tab-button" data-tab-target="m2">Cálculo de m²</button>
+      <button class="tab-button" data-tab-target="configuracao">Configuração</button>
+      <button class="tab-button" data-tab-target="clientes">Clientes</button>
+      <button class="tab-button" data-tab-target="historico">Histórico</button>
+      <button class="tab-button" data-tab-target="orcamento">Orçamento</button>
     </nav>
 
     <main class="tab-panels">
@@ -47,7 +41,7 @@
             <strong id="summary-total">R$ 0,00</strong>
           </article>
           <article class="summary-card">
-            <span class="summary-label">Valor medio</span>
+            <span class="summary-label">Valor médio</span>
             <strong id="summary-average">R$ 0,00</strong>
           </article>
         </div>
@@ -57,7 +51,7 @@
             <div class="panel-heading">
               <div>
                 <h2>Importar PDFs</h2>
-                <p class="panel-copy">Ao importar, o app tenta ler a quantidade de paginas e preencher as linhas automaticamente.</p>
+                <p class="panel-copy">Ao importar, o app tenta ler a quantidade de páginas e preencher as linhas automaticamente.</p>
               </div>
             </div>
 
@@ -73,29 +67,29 @@
               <button id="clear-all-button" class="button button-danger" type="button">Limpar linhas</button>
             </div>
 
-            <p class="helper-text" id="import-feedback">
-              O contador de paginas do PDF e automatico. Se algum arquivo vier com a contagem errada, voce pode ajustar manualmente.
+            <p class="helper-text status-note" id="import-feedback">
+              O contador de páginas do PDF é automático. Se algum arquivo vier com a contagem incorreta, você pode ajustá-la manualmente.
             </p>
           </article>
 
           <article class="panel">
             <div class="panel-heading">
               <div>
-                <h2>Preferencias rapidas</h2>
-                <p class="panel-copy">Use isso para aplicar um mesmo padrao em varias linhas de uma vez.</p>
+                <h2>Preferências rápidas</h2>
+                <p class="panel-copy">Use isso para aplicar um mesmo padrão em várias linhas de uma vez.</p>
               </div>
             </div>
 
             <div class="preset-grid">
               <label>
-                <span>Modo de calculo</span>
+                <span>Modo de cálculo</span>
                 <select id="calc-mode-select">
                   <option>Independente</option>
                   <option>Somar quantidades</option>
                 </select>
               </label>
               <label>
-                <span>Tipo de impressao</span>
+                <span>Tipo de impressão</span>
                 <select id="preset-print-type"></select>
               </label>
               <label>
@@ -103,7 +97,7 @@
                 <select id="preset-size"></select>
               </label>
               <label>
-                <span>Modo de impressao</span>
+                <span>Modo de impressão</span>
                 <select id="preset-print-mode"></select>
               </label>
               <label>
@@ -142,8 +136,8 @@
         <article class="panel panel-table">
           <div class="panel-heading">
             <div>
-              <h2>Orcamento linear</h2>
-              <p class="panel-copy">Cada linha representa uma apostila diferente. Os totais sao recalculados na hora.</p>
+              <h2>Orçamento de apostilas</h2>
+              <p class="panel-copy">Cada linha representa uma apostila diferente. Os totais são recalculados na hora.</p>
             </div>
           </div>
 
@@ -157,7 +151,7 @@
           </div>
 
           <p class="helper-text">
-            Se varias linhas tiverem o mesmo grupo de acabamento, o app soma as paginas desses arquivos e calcula um unico acabamento para o grupo. O valor do acabamento entra na primeira linha do grupo.
+            Se várias linhas tiverem o mesmo grupo de acabamento, o app soma as páginas desses arquivos e calcula um único acabamento para o grupo. O valor do acabamento entra na primeira linha do grupo.
           </p>
 
           <div class="table-shell">
@@ -166,25 +160,25 @@
                 <tr>
                   <th>Sel.</th>
                   <th>Item</th>
-                  <th>Descricao</th>
+                  <th>Descrição</th>
                   <th>Tipo</th>
                   <th>Tam.</th>
-                  <th>Impressao</th>
+                  <th>Impressão</th>
                   <th>Acabamento</th>
-                  <th>Grupo acab.</th>
-                  <th>Qtde</th>
-                  <th>Paginas</th>
+                  <th>Grupo de acab.</th>
+                  <th>Quantidade</th>
+                  <th>Páginas</th>
                   <th>Capa</th>
-                  <th>Papel capa</th>
+                  <th>Papel da capa</th>
                   <th>Contracapa</th>
-                  <th>Papel contra</th>
+                  <th>Papel da contracapa</th>
                   <th>Espiral</th>
                   <th>Total miolo</th>
                   <th>Total capa</th>
                   <th>Total contra</th>
-                  <th>Acab.</th>
+                  <th>Acabamento</th>
                   <th>Total item</th>
-                  <th>Valor/un.</th>
+                  <th>Valor un.</th>
                 </tr>
               </thead>
               <tbody id="rows-table-body"></tbody>
@@ -210,7 +204,7 @@
             <strong id="color-summary-total">R$ 0,00</strong>
           </article>
           <article class="summary-card">
-            <span class="summary-label">Valor medio</span>
+            <span class="summary-label">Valor médio</span>
             <strong id="color-summary-average">R$ 0,00</strong>
           </article>
         </div>
@@ -218,8 +212,8 @@
         <article class="panel panel-table">
           <div class="panel-heading">
             <div>
-              <h2>Orcamento de impressos coloridos</h2>
-              <p class="panel-copy">Informe o tamanho em milimetros. Se marcar sangra, o sistema soma 2 mm na largura e 2 mm na altura antes de calcular o encaixe no A4.</p>
+              <h2>Orçamento de impressos coloridos</h2>
+              <p class="panel-copy">Informe o tamanho em centímetros. Se marcar sangra, o sistema soma 2 mm na largura e 2 mm na altura antes de calcular o encaixe no A4.</p>
             </div>
           </div>
 
@@ -228,8 +222,8 @@
             <button id="clear-color-rows-button" class="button button-danger" type="button">Limpar linhas</button>
           </div>
 
-          <p class="helper-text" id="color-feedback">
-            O corte e sugerido automaticamente pela tabela, mas voce pode sobrescrever o valor em cada linha se precisar.
+          <p class="helper-text status-note" id="color-feedback">
+            O corte é sugerido automaticamente pela tabela, mas você pode substituir o valor em cada linha, se necessário.
           </p>
 
           <div class="table-shell">
@@ -237,21 +231,21 @@
               <thead>
                 <tr>
                   <th>Item</th>
-                  <th>Descricao</th>
-                  <th>Largura (mm)</th>
-                  <th>Altura (mm)</th>
+                  <th>Descrição</th>
+                  <th>Largura (cm)</th>
+                  <th>Altura (cm)</th>
                   <th>Sangra</th>
-                  <th>Impressao</th>
+                  <th>Impressão</th>
                   <th>Papel</th>
-                  <th>Qtde</th>
+                  <th>Quantidade</th>
                   <th>Por A4</th>
                   <th>Folhas A4</th>
-                  <th>Impressoes A4</th>
-                  <th>Impressoes</th>
+                  <th>Impressões A4</th>
+                  <th>Impressões</th>
                   <th>Corte sugerido</th>
                   <th>Corte final</th>
                   <th>Total item</th>
-                  <th>Valor/un.</th>
+                  <th>Valor un.</th>
                 </tr>
               </thead>
               <tbody id="color-rows-table-body"></tbody>
@@ -262,25 +256,97 @@
         </article>
       </section>
 
+      <section class="tab-panel" data-tab-panel="m2">
+        <div class="summary-grid">
+          <article class="summary-card">
+            <span class="summary-label">Linhas ativas</span>
+            <strong id="m2-summary-active">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Peças</span>
+            <strong id="m2-summary-quantity">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Total geral</span>
+            <strong id="m2-summary-total">R$ 0,00</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Valor médio</span>
+            <strong id="m2-summary-average">R$ 0,00</strong>
+          </article>
+        </div>
+
+        <article class="panel panel-table m2-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>Orçamento por m²</h2>
+              <p class="panel-copy">Selecione o produto, escolha cm ou m, e deixe o app aplicar a faixa de preço correta.</p>
+            </div>
+          </div>
+
+          <div class="toolbar m2-toolbar">
+            <button id="add-m2-row-button" class="button button-primary" type="button">Adicionar linha</button>
+            <button id="clear-m2-rows-button" class="button button-danger" type="button">Limpar linhas</button>
+          </div>
+
+          <div class="m2-quick-notes">
+            <span class="m2-note-chip">Aceita medidas em cm e m</span>
+            <span class="m2-note-chip">Aplica faixa automaticamente</span>
+            <span class="m2-note-chip">Acabamentos somados ao total do item</span>
+          </div>
+
+          <div class="table-shell">
+            <table class="budget-table m2-budget-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Produto</th>
+                  <th>Acabamentos</th>
+                  <th>Descrição</th>
+                  <th>Unidade</th>
+                  <th>Largura</th>
+                  <th>Altura</th>
+                  <th>Quantidade</th>
+                  <th>Área total (m²)</th>
+                  <th>Faixa</th>
+                  <th>Valor do m²</th>
+                  <th>Acabamento extra</th>
+                  <th>Total item</th>
+                </tr>
+              </thead>
+              <tbody id="m2-rows-table-body"></tbody>
+            </table>
+          </div>
+
+          <div class="warning-list" id="m2-warning-list"></div>
+        </article>
+      </section>
+
       <section class="tab-panel" data-tab-panel="configuracao">
         <div class="workspace-grid config-top-grid">
           <article class="panel">
             <div class="panel-heading">
               <div>
-                <h2>Configuracao de precos</h2>
-                <p class="panel-copy">Tudo o que for alterado aqui fica salvo neste navegador.</p>
+                <h2>Central de configuração</h2>
+                <p class="panel-copy">Organize preços, acabamentos e produtos extras de cada aba do app em um só lugar.</p>
               </div>
             </div>
 
             <div class="toolbar">
-              <button id="export-config-button" class="button button-primary" type="button">Exportar configuracao</button>
-              <button id="import-config-button" class="button" type="button">Importar configuracao</button>
-              <button id="reset-config-button" class="button button-danger" type="button">Restaurar padrao</button>
+              <button id="save-config-button" class="button button-primary button-spotlight" type="button">Salvar alterações</button>
+              <button id="lock-config-button" class="button" type="button" hidden>Bloquear configuração</button>
+              <button id="export-config-button" class="button" type="button">Exportar configuração</button>
+              <button id="import-config-button" class="button" type="button">Importar configuração</button>
+              <button id="reset-config-button" class="button button-danger" type="button">Restaurar padrão</button>
               <input id="config-file-input" type="file" accept=".json,application/json" hidden>
             </div>
 
+            <p class="helper-text config-status status-note" id="config-status">
+              Essa área é protegida por senha. Depois de desbloquear, use "Salvar alterações" para confirmar visualmente cada ajuste desta aba.
+            </p>
+
             <p class="helper-text">
-              Se quiser levar os precos para outro computador, exporte a configuracao em JSON e importe depois.
+              Se quiser levar os preços para outro computador, exporte a configuração em JSON e importe depois.
             </p>
           </article>
 
@@ -288,23 +354,105 @@
             <div class="panel-heading">
               <div>
                 <h2>Ajustes extras</h2>
-                <p class="panel-copy">Desconto da espiral sem capa plastica e observacoes de uso.</p>
+                <p class="panel-copy">Desconto da espiral sem capa plástica e observações de uso.</p>
               </div>
             </div>
 
             <div class="preset-grid compact-grid">
               <label>
-                <span>Desconto sem capas plasticas</span>
+                <span>Desconto sem capas plásticas</span>
                 <input id="spiral-discount-input" type="number" min="0" step="0.01">
               </label>
             </div>
             <p class="helper-text">
-              A espiral so calcula ate 500 folhas por apostila, seguindo a mesma regra da planilha.
+              A espiral só calcula até 500 folhas por apostila, seguindo a mesma regra da planilha.
             </p>
           </article>
         </div>
 
         <div class="config-sections" id="config-sections"></div>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="clientes">
+        <div class="summary-grid">
+          <article class="summary-card">
+            <span class="summary-label">Clientes salvos</span>
+            <strong id="clients-count">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Último cliente</span>
+            <strong id="clients-latest">Nenhum cliente salvo</strong>
+          </article>
+        </div>
+
+        <div class="workspace-grid">
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Salvar cliente atual</h2>
+                <p class="panel-copy">Guarde contatos para reutilizar em novos orçamentos.</p>
+              </div>
+            </div>
+
+            <div class="toolbar">
+              <button id="save-client-button" class="button button-primary" type="button">Salvar cliente atual</button>
+            </div>
+
+            <p class="helper-text">Os dados são puxados da aba de orçamento e ficam guardados neste navegador.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Base local</h2>
+                <p class="panel-copy">A lista abaixo funciona como um cadastro rápido de clientes.</p>
+              </div>
+            </div>
+
+            <div id="clients-list" class="stack-list"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="historico">
+        <div class="summary-grid">
+          <article class="summary-card">
+            <span class="summary-label">Orçamentos salvos</span>
+            <strong id="history-count">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Total acumulado</span>
+            <strong id="history-total">R$ 0,00</strong>
+          </article>
+        </div>
+
+        <div class="workspace-grid">
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Salvar fechamento</h2>
+                <p class="panel-copy">Guarde os principais dados do fechamento para consulta posterior.</p>
+              </div>
+            </div>
+
+            <div class="toolbar">
+              <button id="save-history-button" class="button button-primary" type="button">Salvar orçamento atual</button>
+            </div>
+
+            <p class="helper-text">Cada registro salva o total, o cliente e um resumo curto do orçamento.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Histórico local</h2>
+                <p class="panel-copy">Use para consultar orçamentos recentes ou reaproveitar dados do cliente.</p>
+              </div>
+            </div>
+
+            <div id="history-list" class="stack-list"></div>
+          </article>
+        </div>
       </section>
 
       <section class="tab-panel" data-tab-panel="orcamento">
@@ -313,13 +461,13 @@
             <div class="panel-heading">
               <div>
                 <h2>Dados do cliente</h2>
-                <p class="panel-copy">Essas informacoes entram no resumo para envio.</p>
+                <p class="panel-copy">Essas informações entram no resumo para envio.</p>
               </div>
             </div>
 
             <div class="quote-form-grid">
               <label>
-                <span>Nome / Razao social</span>
+                <span>Nome / Razão social</span>
                 <input id="client-name" type="text">
               </label>
               <label>
@@ -335,7 +483,7 @@
                 <input id="payment-terms" type="text">
               </label>
               <label class="full-width">
-                <span>Observacoes para o cliente</span>
+                <span>Observações para o cliente</span>
                 <textarea id="quote-notes" rows="4"></textarea>
               </label>
             </div>
@@ -345,7 +493,7 @@
             <div class="panel-heading">
               <div>
                 <h2>Dados da empresa</h2>
-                <p class="panel-copy">Voce pode trocar logo, nome e endereco quando quiser.</p>
+                <p class="panel-copy">Você pode trocar a logo, o nome e o endereço quando quiser.</p>
               </div>
             </div>
 
@@ -367,7 +515,7 @@
                 <input id="company-contact" type="text">
               </label>
               <label class="full-width">
-                <span>Endereco</span>
+                <span>Endereço</span>
                 <textarea id="company-address" rows="3"></textarea>
               </label>
             </div>
@@ -377,14 +525,14 @@
         <article class="panel quote-preview-panel">
           <div class="panel-heading">
             <div>
-              <h2>Previa do orcamento</h2>
+              <h2>Prévia do orçamento</h2>
               <p class="panel-copy">Pronto para copiar, imprimir ou transformar em PDF.</p>
             </div>
           </div>
 
           <div class="toolbar">
-            <button id="copy-quote-button" class="button button-primary" type="button">Copiar resumo</button>
-            <button id="print-quote-button" class="button" type="button">Imprimir</button>
+            <button id="copy-quote-button" class="button" type="button">Copiar resumo</button>
+            <button id="print-quote-button" class="button button-primary button-spotlight" type="button">Imprimir / Salvar em PDF</button>
           </div>
 
           <div class="quote-preview" id="quote-preview"></div>
@@ -399,6 +547,42 @@
     </div>
   </template>
 
+  <div class="app-modal" id="confirm-modal" hidden>
+    <div class="app-modal-backdrop" data-modal-close></div>
+    <div class="app-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title" aria-describedby="confirm-modal-message">
+      <div class="app-modal-icon">!</div>
+      <div class="app-modal-copy">
+        <span class="app-modal-kicker" id="confirm-modal-kicker">Confirmação</span>
+        <h3 id="confirm-modal-title">Confirmar exclusão</h3>
+        <p id="confirm-modal-message">Deseja realmente continuar?</p>
+      </div>
+      <div class="app-modal-actions">
+        <button class="button" id="confirm-modal-cancel" type="button">Cancelar</button>
+        <button class="button button-danger" id="confirm-modal-confirm" type="button">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
   <script src="./app.mjs"></script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
