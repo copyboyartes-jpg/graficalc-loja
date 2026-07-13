@@ -2403,7 +2403,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, m2Workbook) {
     ...colorWorkbook.activeRows.map((row) => ({
       kind: "Impresso colorido",
       description: row.description,
-      detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.paperType} | ${row.printMode}${row.bleedMode === "Com sangra" ? " | Com sangra" : ""}`,
+      detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.paperType} | ${row.printMode}`,
       total: row.total,
     })),
     ...m2Workbook.activeRows.map((row) => ({
@@ -2507,7 +2507,7 @@ function createQuoteText(state, workbook, colorWorkbook, m2Workbook) {
       text: `- ${row.description || `Apostila ${index + 1}`} | ${row.quantity} apostilas | ${row.pages} páginas | ${row.printType} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...colorWorkbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || `Impresso ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.paperType} | ${row.printMode}${row.bleedMode === "Com sangra" ? " | Com sangra" : ""} | ${formatCurrency(row.total)}`,
+      text: `- ${row.description || `Impresso ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.paperType} | ${row.printMode} | ${formatCurrency(row.total)}`,
     })),
     ...m2Workbook.activeRows.map((row, index) => ({
       text: `- ${row.description || row.productLabel || `M² ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.finishSummary ? `${row.finishSummary} | ` : ""}${row.artCreationFee > 0 ? `Arte/edição: ${formatCurrency(row.artCreationFee)} | ` : ""}${formatCurrency(row.total)}`,
