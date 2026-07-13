@@ -637,6 +637,14 @@ textarea:disabled {
   margin-top: 16px;
 }
 
+.toolbar-field {
+  min-width: 240px;
+}
+
+.toolbar-field span {
+  font-size: 0.82rem;
+}
+
 .group-toolbar {
   display: flex;
   flex-wrap: wrap;

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GrafiCalc | Orçamento Gráfico</title>
-  <link rel="stylesheet" href="./styles.css?v=310b71d97f6a">
+  <link rel="stylesheet" href="./styles.css?v=68a632a3b34d">
 </head>
 <body>
   <div class="page-shell">
@@ -290,12 +290,20 @@
           <div class="toolbar m2-toolbar">
             <button id="add-m2-row-button" class="button button-primary" type="button">Adicionar linha</button>
             <button id="clear-m2-rows-button" class="button button-danger" type="button">Limpar linhas</button>
+            <label class="toolbar-field">
+              <span>Modo de cálculo</span>
+              <select id="m2-calc-mode-select">
+                <option value="Independente">Independente</option>
+                <option value="Somar materiais iguais">Somar materiais iguais</option>
+              </select>
+            </label>
           </div>
 
           <div class="m2-quick-notes">
             <span class="m2-note-chip">Aceita medidas em cm e m</span>
             <span class="m2-note-chip">Aplica faixa automaticamente</span>
             <span class="m2-note-chip">Acabamentos separados do extra fixo</span>
+            <span class="m2-note-chip">Soma apenas materiais iguais quando ativado</span>
           </div>
 
           <div class="table-shell">
@@ -568,7 +576,7 @@
     </div>
   </div>
 
-  <script src="./app.mjs?v=9570fdbc80d8"></script>
+  <script src="./app.mjs?v=26cb47c09aa7"></script>
 </body>
 </html>
 

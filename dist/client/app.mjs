@@ -37,6 +37,7 @@ const OPTIONS = {
   ],
   spiralOptions: ["Completa", "Sem capas plásticas"],
   calcModes: ["Independente", "Somar quantidades"],
+  m2CalcModes: ["Independente", "Somar materiais iguais"],
 };
 
 const M2_PRODUCTS = [
@@ -410,6 +411,7 @@ function createDefaultM2Row(index) {
 function createDefaultState() {
   return {
     calcMode: "Independente",
+    m2CalcMode: "Independente",
     presets: {
       printType: "Preto e branco",
       size: "A4",
@@ -609,6 +611,7 @@ function mergeState(candidate) {
 
   const state = deepClone(defaults);
   state.calcMode = OPTIONS.calcModes.includes(candidate.calcMode) ? candidate.calcMode : state.calcMode;
+  state.m2CalcMode = OPTIONS.m2CalcModes.includes(candidate.m2CalcMode) ? candidate.m2CalcMode : state.m2CalcMode;
   state.presets = { ...state.presets, ...(candidate.presets || {}) };
   state.client = { ...state.client, ...(candidate.client || {}) };
   state.company = { ...state.company, ...(candidate.company || {}) };
@@ -1438,7 +1441,7 @@ function getM2PricingBand(pricing, areaM2) {
 function calculateM2WorkbookFromConfig(state, config) {
   const warnings = [];
   const catalog = getM2Catalog(config);
-  const rows = state.m2Items.map((row, index) => {
+  const baseRows = state.m2Items.map((row, index) => {
     const product = catalog.find((item) => item.id === row.productId) || catalog[0];
     const pricing = config.m2Pricing?.[product.pricingKey || product.configKey] || [];
     const measureFactor = row.measureUnit === "m" ? 1000 : 10;
@@ -1496,29 +1499,78 @@ function calculateM2WorkbookFromConfig(state, config) {
     };
   });
 
+  const shouldGroupSameMaterials = state.m2CalcMode === "Somar materiais iguais";
+  const pricingAreaByProduct = {};
+  for (const row of baseRows) {
+    if (!row.active) continue;
+    pricingAreaByProduct[row.productId] = (pricingAreaByProduct[row.productId] || 0) + row.effectiveArea;
+  }
+
+  const rows = baseRows.map((row) => {
+    if (!row.active) {
+      return row;
+    }
+
+    const catalogProduct = catalog.find((item) => item.id === row.productId) || catalog[0];
+    const pricing = config.m2Pricing?.[catalogProduct.pricingKey || catalogProduct.configKey] || [];
+    const pricingArea = shouldGroupSameMaterials ? pricingAreaByProduct[row.productId] || row.effectiveArea : row.effectiveArea;
+    const tier = getM2PricingBand(pricing, pricingArea);
+    const pricePerM2 = Number(tier?.value || 0);
+    const subtotal = (row.effectiveArea * pricePerM2) + row.configuredFinishExtraTotal;
+    const unitValue = row.quantity > 0 ? subtotal / row.quantity : 0;
+    const total = subtotal + row.fixedCharges;
+
+    return {
+      ...row,
+      tierLabel: tier?.label || "",
+      tierValue: pricePerM2,
+      subtotal,
+      unitValue,
+      total,
+      groupedPricingArea: pricingArea,
+    };
+  });
+
   const totalsByProduct = {};
   const baseTotalsByProduct = {};
   const fixedTotalsByProduct = {};
   for (const row of rows) {
     if (!row.active) continue;
-    totalsByProduct[row.productId] = (totalsByProduct[row.productId] || 0) + row.total;
-    baseTotalsByProduct[row.productId] = (baseTotalsByProduct[row.productId] || 0) + row.subtotal;
-    fixedTotalsByProduct[row.productId] = (fixedTotalsByProduct[row.productId] || 0) + row.fixedCharges;
+    if (shouldGroupSameMaterials) {
+      totalsByProduct[row.productId] = (totalsByProduct[row.productId] || 0) + row.total;
+      baseTotalsByProduct[row.productId] = (baseTotalsByProduct[row.productId] || 0) + row.subtotal;
+      fixedTotalsByProduct[row.productId] = (fixedTotalsByProduct[row.productId] || 0) + row.fixedCharges;
+    }
   }
 
   const firstActiveIndexByProduct = {};
   rows.forEach((row, index) => {
-    if (row.active && typeof firstActiveIndexByProduct[row.productId] === "undefined") {
+    if (shouldGroupSameMaterials && row.active && typeof firstActiveIndexByProduct[row.productId] === "undefined") {
       firstActiveIndexByProduct[row.productId] = index;
     }
   });
 
   const rowsWithMinimum = rows.map((row, index) => {
+    const product = M2_CATALOG.find((item) => item.id === row.productId) || M2_CATALOG[0];
+    const minimumValue = getM2MinimumValue(config.m2Pricing?.[product.pricingKey || product.configKey] || []);
+
+    if (!shouldGroupSameMaterials) {
+      const minimumApplied = row.active && row.subtotal > 0 && row.subtotal < minimumValue;
+      const adjustedBase = minimumApplied ? minimumValue : row.subtotal;
+      return {
+        ...row,
+        total: row.active ? adjustedBase + row.fixedCharges : 0,
+        groupTotal: row.total,
+        groupBaseTotal: row.subtotal,
+        groupFixedTotal: row.fixedCharges,
+        minimumTotal: adjustedBase + row.fixedCharges,
+        minimumApplied,
+      };
+    }
+
     const groupTotal = totalsByProduct[row.productId] || 0;
     const groupBaseTotal = baseTotalsByProduct[row.productId] || 0;
     const groupFixedTotal = fixedTotalsByProduct[row.productId] || 0;
-    const product = M2_CATALOG.find((item) => item.id === row.productId) || M2_CATALOG[0];
-    const minimumValue = getM2MinimumValue(config.m2Pricing?.[product.pricingKey || product.configKey] || []);
     const minimumApplied = groupBaseTotal > 0 && groupBaseTotal < minimumValue;
     const adjustedGroupBaseTotal = minimumApplied ? minimumValue : groupBaseTotal;
     const displayTotal = row.active
@@ -1542,17 +1594,19 @@ function calculateM2WorkbookFromConfig(state, config) {
 
   const activeRows = rowsWithMinimum.filter((row) => row.active);
   const totalQuantity = activeRows.reduce((sum, row) => sum + row.quantity, 0);
-  const totalGeneral = [...new Set(activeRows.map((row) => row.productId))].reduce(
-    (sum, productId) => {
-      const product = M2_CATALOG.find((item) => item.id === productId) || M2_CATALOG[0];
-      const minimumValue = getM2MinimumValue(config.m2Pricing?.[product.pricingKey || product.configKey] || []);
-      const productBase = baseTotalsByProduct[productId] || 0;
-      const productFixed = fixedTotalsByProduct[productId] || 0;
-      const adjustedBase = productBase > 0 && productBase < minimumValue ? minimumValue : productBase;
-      return sum + adjustedBase + productFixed;
-    },
-    0
-  );
+  const totalGeneral = shouldGroupSameMaterials
+    ? [...new Set(activeRows.map((row) => row.productId))].reduce(
+        (sum, productId) => {
+          const product = M2_CATALOG.find((item) => item.id === productId) || M2_CATALOG[0];
+          const minimumValue = getM2MinimumValue(config.m2Pricing?.[product.pricingKey || product.configKey] || []);
+          const productBase = baseTotalsByProduct[productId] || 0;
+          const productFixed = fixedTotalsByProduct[productId] || 0;
+          const adjustedBase = productBase > 0 && productBase < minimumValue ? minimumValue : productBase;
+          return sum + adjustedBase + productFixed;
+        },
+        0
+      )
+    : activeRows.reduce((sum, row) => sum + row.total, 0);
 
   return {
     rows: rowsWithMinimum,
@@ -2876,6 +2930,7 @@ async function initApp() {
 
   function renderPresetControls() {
     document.getElementById("calc-mode-select").value = state.calcMode;
+    document.getElementById("m2-calc-mode-select").value = state.m2CalcMode;
     document.getElementById("preset-print-type").innerHTML = buildOptions(OPTIONS.printTypes, state.presets.printType);
     document.getElementById("preset-size").innerHTML = buildOptions(OPTIONS.sizes, state.presets.size);
     document.getElementById("preset-print-mode").innerHTML = buildOptions(OPTIONS.printModes, state.presets.printMode);
@@ -3550,6 +3605,12 @@ async function initApp() {
 
   document.getElementById("calc-mode-select").addEventListener("change", (event) => {
     state.calcMode = event.target.value;
+    persist();
+    renderRowsAndSummary();
+  });
+
+  document.getElementById("m2-calc-mode-select").addEventListener("change", (event) => {
+    state.m2CalcMode = OPTIONS.m2CalcModes.includes(event.target.value) ? event.target.value : "Independente";
     persist();
     renderRowsAndSummary();
   });
