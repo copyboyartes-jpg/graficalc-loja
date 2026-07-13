@@ -1341,14 +1341,17 @@ function calculateM2Workbook(state) {
     const widthMm = toDecimalNumber(row.widthMm);
     const heightMm = toDecimalNumber(row.heightMm);
     const quantity = toWholeNumber(row.quantity);
-    const areaM2 = widthMm > 0 && heightMm > 0 ? (widthMm * heightMm) / 1000000 : 0;
-    const effectiveArea = row.includeBleed ? ((widthMm + 4) * (heightMm + 4)) / 1000000 : areaM2;
+    const unitAreaM2 = widthMm > 0 && heightMm > 0 ? (widthMm * heightMm) / 1000000 : 0;
+    const unitEffectiveArea = row.includeBleed ? ((widthMm + 4) * (heightMm + 4)) / 1000000 : unitAreaM2;
+    const areaM2 = unitAreaM2 * quantity;
+    const effectiveArea = unitEffectiveArea * quantity;
     const tier = getM2Tier(product.id, effectiveArea);
     const extraCharge = toMoneyNumber(typeof row.extraCharge !== "undefined" ? row.extraCharge : row.finishingExtra);
     const artCreationFee = toMoneyNumber(row.artCreationFee);
     const fixedCharges = extraCharge + artCreationFee;
-    const unitValue = tier ? Number(tier.value || 0) : 0;
-    const subtotal = quantity > 0 ? unitValue * quantity : 0;
+    const tierValue = Number(tier?.value || 0);
+    const subtotal = effectiveArea * tierValue;
+    const unitValue = quantity > 0 ? subtotal / quantity : 0;
     const total = subtotal + fixedCharges;
     const active = widthMm > 0 && heightMm > 0 && quantity > 0;
 
@@ -1368,7 +1371,7 @@ function calculateM2Workbook(state) {
       areaM2,
       effectiveArea,
       tierLabel: tier?.maxArea === Infinity ? "acima do intervalo" : `até ${tier.maxArea} m²`,
-      tierValue: Number(tier?.value || 0),
+      tierValue,
       configuredFinishExtra: 0,
       configuredFinishExtraTotal: 0,
       extraCharge,
@@ -1429,8 +1432,10 @@ function calculateM2WorkbookFromConfig(state, config) {
     const pricingWidthMm = widthMm + bleedMm;
     const pricingHeightMm = heightMm + bleedMm;
     const quantity = toWholeNumber(row.quantity);
-    const displayAreaM2 = widthMm > 0 && heightMm > 0 ? (widthMm * heightMm) / 1000000 : 0;
-    const areaM2 = pricingWidthMm > 0 && pricingHeightMm > 0 ? (pricingWidthMm * pricingHeightMm) / 1000000 : 0;
+    const unitDisplayAreaM2 = widthMm > 0 && heightMm > 0 ? (widthMm * heightMm) / 1000000 : 0;
+    const unitPricingAreaM2 = pricingWidthMm > 0 && pricingHeightMm > 0 ? (pricingWidthMm * pricingHeightMm) / 1000000 : 0;
+    const displayAreaM2 = unitDisplayAreaM2 * quantity;
+    const areaM2 = unitPricingAreaM2 * quantity;
     const tier = getM2PricingBand(pricing, areaM2);
     const pricePerM2 = Number(tier?.value || 0);
     const configuredFinishExtra = calculateM2FinishExtra(row, product, config);
@@ -1439,8 +1444,8 @@ function calculateM2WorkbookFromConfig(state, config) {
     const artCreationFee = toMoneyNumber(row.artCreationFee);
     const fixedCharges = extraCharge + artCreationFee;
     const finishingExtra = configuredFinishExtra;
-    const unitValue = areaM2 * pricePerM2 + finishingExtra;
-    const subtotal = quantity > 0 ? unitValue * quantity : 0;
+    const subtotal = (areaM2 * pricePerM2) + configuredFinishExtraTotal;
+    const unitValue = quantity > 0 ? subtotal / quantity : 0;
     const total = subtotal + fixedCharges;
     const active = widthMm > 0 && heightMm > 0 && quantity > 0;
 
@@ -3159,7 +3164,7 @@ async function initApp() {
             <td><input class="cell-input" name="widthMm" type="number" min="0" step="0.1" value="${escapeHtml(row.widthMm)}" placeholder="0,0"></td>
             <td><input class="cell-input" name="heightMm" type="number" min="0" step="0.1" value="${escapeHtml(row.heightMm)}" placeholder="0,0"></td>
             <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${escapeHtml(row.quantity)}" placeholder="0"></td>
-            <td><span class="readonly-value subtle">${formatAreaM2(row.effectiveArea)}</span></td>
+            <td><span class="readonly-value subtle">${formatAreaM2(row.areaM2)}</span></td>
             <td><span class="readonly-value subtle">${escapeHtml(row.tierLabel)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.tierValue)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.configuredFinishExtraTotal || 0)}</span></td>
