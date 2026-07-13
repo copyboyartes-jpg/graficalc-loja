@@ -2393,13 +2393,15 @@ function getM2RowDimensions(row) {
 
 function buildApostilaCoverDetail(row) {
   const parts = [];
+  const hasCover = (row.coverType && row.coverType !== "Sem capa") || Number(row.coverTotal) > 0;
+  const hasBackCover = (row.backCoverType && row.backCoverType !== "Sem contracapa") || Number(row.backTotal) > 0;
 
-  if (row.coverType && row.coverType !== "Sem capa") {
-    parts.push(`Capa: ${row.coverType} | ${row.coverPaper}`);
+  if (hasCover) {
+    parts.push(`Capa: ${row.coverType && row.coverType !== "Sem capa" ? row.coverType : "Colorida"} | ${row.coverPaper || "Papel não informado"}`);
   }
 
-  if (row.backCoverType && row.backCoverType !== "Sem contracapa") {
-    parts.push(`Contracapa: ${row.backCoverType} | ${row.backCoverPaper}`);
+  if (hasBackCover) {
+    parts.push(`Contracapa: ${row.backCoverType && row.backCoverType !== "Sem contracapa" ? row.backCoverType : "Colorida"} | ${row.backCoverPaper || "Papel não informado"}`);
   }
 
   return parts.join(" | ");
@@ -2413,7 +2415,8 @@ function createQuoteHtml(state, workbook, colorWorkbook, m2Workbook) {
       return {
         kind: "Apostila",
         description: row.description,
-        detail: `${formatInteger(row.quantity)} apostilas | ${formatInteger(row.pages)} páginas | ${row.printType} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}${coverDetail ? ` | ${coverDetail}` : ""}`,
+        detail: `${formatInteger(row.quantity)} apostilas | ${formatInteger(row.pages)} páginas | ${row.printType} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}`,
+        extraDetail: coverDetail,
         total: row.total,
       };
     }),
@@ -2442,6 +2445,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, m2Workbook) {
                 <small>
                   ${escapeHtml(entry.kind)} | ${escapeHtml(entry.detail)}
                 </small>
+                ${entry.extraDetail ? `<small class="quote-extra-detail">${escapeHtml(entry.extraDetail)}</small>` : ""}
               </div>
               <div>${formatCurrency(entry.total)}</div>
             </div>

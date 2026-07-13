@@ -1516,6 +1516,12 @@ textarea {
   margin-top: 3px;
 }
 
+.quote-extra-detail {
+  margin-top: 6px;
+  font-weight: 600;
+  color: var(--ink) !important;
+}
+
 .quote-total-bar {
   display: flex;
   justify-content: space-between;
