@@ -875,12 +875,29 @@ function lookupTier(tiers, quantity, valueKey = "value") {
   return Number(selected?.[valueKey] || 0);
 }
 
-function getBlackWhiteTotal(rowImpressions, effectiveQuantity, config) {
+function getPrintAggregationKey(printType, printMode) {
+  if (printType === "Preto e branco") {
+    return `${printType}::${printMode === "Frente e verso" ? "Frente e verso" : "Só frente"}`;
+  }
+
+  return printType;
+}
+
+function getApplicableBlackWhiteTiers(config, printMode) {
+  const tiers = Array.isArray(config?.printPricing?.blackWhite) ? config.printPricing.blackWhite : [];
+  if (printMode === "Frente e verso") {
+    return tiers;
+  }
+
+  return tiers.filter((tier) => Number(tier?.min || 0) < 1000);
+}
+
+function getBlackWhiteTotal(rowImpressions, effectiveQuantity, config, printMode) {
   if (rowImpressions <= 0 || effectiveQuantity <= 0) {
     return 0;
   }
 
-  const tiers = config.printPricing.blackWhite;
+  const tiers = getApplicableBlackWhiteTiers(config, printMode);
   const fixedOne = Number(tiers[0]?.value || 0);
   const fixedTwo = Number(tiers[1]?.value || 0);
 
@@ -903,9 +920,9 @@ function getRegularPrintTotal(rowImpressions, effectiveQuantity, tiers) {
   return rowImpressions * lookupTier(tiers, effectiveQuantity);
 }
 
-function getPrintTotalByType(printType, rowImpressions, effectiveQuantity, config) {
+function getPrintTotalByType(printType, rowImpressions, effectiveQuantity, config, printMode) {
   if (printType === "Preto e branco") {
-    return getBlackWhiteTotal(rowImpressions, effectiveQuantity, config);
+    return getBlackWhiteTotal(rowImpressions, effectiveQuantity, config, printMode);
   }
 
   if (printType === "Colorido jato de tinta") {
@@ -1038,11 +1055,12 @@ function calculateWorkbook(state, config) {
     return { row, innerImpressions, bindingSheetsPerCopy, coverImpressions, backImpressions };
   });
 
-  const aggregateInnerByType = {};
+  const aggregateInnerByKey = {};
   const aggregateCoverByPaper = {};
 
   for (const item of rowBase) {
-    aggregateInnerByType[item.row.printType] = (aggregateInnerByType[item.row.printType] || 0) + item.innerImpressions;
+    const innerKey = getPrintAggregationKey(item.row.printType, item.row.printMode);
+    aggregateInnerByKey[innerKey] = (aggregateInnerByKey[innerKey] || 0) + item.innerImpressions;
 
     if (item.coverImpressions > 0) {
       aggregateCoverByPaper[item.row.coverPaper] = (aggregateCoverByPaper[item.row.coverPaper] || 0) + item.coverImpressions;
@@ -1123,7 +1141,7 @@ function calculateWorkbook(state, config) {
   const computedRows = rowBase.map((item, index) => {
     const { row, innerImpressions, bindingSheetsPerCopy, coverImpressions, backImpressions } = item;
     const effectiveInnerQty =
-      state.calcMode === "Somar quantidades" ? aggregateInnerByType[row.printType] || 0 : innerImpressions;
+      state.calcMode === "Somar quantidades" ? aggregateInnerByKey[getPrintAggregationKey(row.printType, row.printMode)] || 0 : innerImpressions;
 
     const samePaper = row.coverPaper === row.backCoverPaper;
     const coverPricingQty =
@@ -1139,7 +1157,7 @@ function calculateWorkbook(state, config) {
           ? coverImpressions + backImpressions
           : backImpressions;
 
-    const innerTotal = getPrintTotalByType(row.printType, innerImpressions, effectiveInnerQty, config);
+    const innerTotal = getPrintTotalByType(row.printType, innerImpressions, effectiveInnerQty, config, row.printMode);
     const coverUnit = coverImpressions > 0 ? lookupTier(config.coverPricing[row.coverPaper], coverPricingQty) : 0;
     const backUnit = backImpressions > 0 ? lookupTier(config.coverPricing[row.backCoverPaper], backPricingQty) : 0;
     const coverTotal = coverImpressions * coverUnit;
@@ -1666,7 +1684,7 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
               { key: "mode", type: "text" },
             ]
           ),
-          "Os dois primeiros valores continuam como total fixo, igual na planilha."
+          "Os dois primeiros valores continuam como total fixo. As faixas de 1000 e 10000 valem apenas para frente e verso; no só frente, acima de 100 continua na mesma faixa."
         ),
         createInlineConfigBlockMarkup(
           "Colorido jato de tinta",
