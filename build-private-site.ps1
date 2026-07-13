@@ -26,6 +26,15 @@ Copy-Item (Join-Path $clientSource 'app.mjs') (Join-Path $clientOutput 'app.mjs'
 if (Test-Path (Join-Path $clientSource 'assets')) {
     Copy-Item (Join-Path $clientSource 'assets') (Join-Path $clientOutput 'assets') -Recurse -Force
 }
+
+$appHash = (Get-FileHash (Join-Path $clientOutput 'app.mjs') -Algorithm SHA256).Hash.Substring(0, 12).ToLower()
+$stylesHash = (Get-FileHash (Join-Path $clientOutput 'styles.css') -Algorithm SHA256).Hash.Substring(0, 12).ToLower()
+$indexPath = Join-Path $clientOutput 'index.html'
+$indexContent = Get-Content -Path $indexPath -Raw
+$indexContent = $indexContent.Replace('./styles.css', "./styles.css?v=$stylesHash")
+$indexContent = $indexContent.Replace('./app.mjs', "./app.mjs?v=$appHash")
+Set-Content -Path $indexPath -Value $indexContent -Encoding UTF8
+
 Copy-Item $hostingSource (Join-Path $openaiOutput 'hosting.json')
 Copy-Item $serverSource (Join-Path $serverOutput 'index.js')
 
