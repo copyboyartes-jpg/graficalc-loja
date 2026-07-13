@@ -4,24 +4,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-function Write-Utf8File {
-    param(
-        [string]$Path,
-        [string]$Content
-    )
-
-    $directory = Split-Path -Parent $Path
-    if (-not (Test-Path $directory)) {
-        New-Item -ItemType Directory -Path $directory -Force | Out-Null
-    }
-
-    $encoding = New-Object System.Text.UTF8Encoding($false)
-    [System.IO.File]::WriteAllText($Path, $Content, $encoding)
-}
-
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $clientSource = Join-Path $projectRoot 'internal-web-app'
 $hostingSource = Join-Path $projectRoot '.openai\hosting.json'
+$serverSource = Join-Path $PSScriptRoot 'server\index.js'
 $clientOutput = Join-Path $OutputRoot 'client'
 $serverOutput = Join-Path $OutputRoot 'server'
 $openaiOutput = Join-Path $OutputRoot '.openai'
@@ -41,47 +27,6 @@ if (Test-Path (Join-Path $clientSource 'assets')) {
     Copy-Item (Join-Path $clientSource 'assets') (Join-Path $clientOutput 'assets') -Recurse -Force
 }
 Copy-Item $hostingSource (Join-Path $openaiOutput 'hosting.json')
-
-$workerSource = @'
-const HTML_FALLBACK = "/index.html";
-
-function isAssetRequest(pathname) {
-  return /\.[a-zA-Z0-9]+$/.test(pathname);
-}
-
-async function fetchAsset(env, request, pathname) {
-  const assetUrl = new URL(request.url);
-  assetUrl.pathname = pathname;
-  return env.ASSETS.fetch(new Request(assetUrl.toString(), request));
-}
-
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-
-    if (request.method !== "GET" && request.method !== "HEAD") {
-      return new Response("Method not allowed", { status: 405 });
-    }
-
-    const directResponse = await fetchAsset(env, request, url.pathname);
-    if (directResponse.status !== 404) {
-      return directResponse;
-    }
-
-    if (isAssetRequest(url.pathname)) {
-      return directResponse;
-    }
-
-    const fallbackResponse = await fetchAsset(env, request, HTML_FALLBACK);
-    if (fallbackResponse.status !== 404) {
-      return fallbackResponse;
-    }
-
-    return new Response("Not found", { status: 404 });
-  },
-};
-'@
-
-Write-Utf8File -Path (Join-Path $serverOutput 'index.js') -Content $workerSource
+Copy-Item $serverSource (Join-Path $serverOutput 'index.js')
 
 Write-Output ("Build pronto em " + $OutputRoot)

@@ -105,6 +105,11 @@ button {
   line-height: 1.6;
 }
 
+.hero-status {
+  width: min(760px, 100%);
+  margin-top: 4px;
+}
+
 .tab-bar {
   display: flex;
   flex-wrap: wrap;

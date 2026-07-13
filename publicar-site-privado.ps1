@@ -5,8 +5,8 @@ $ErrorActionPreference = 'Stop'
 $projectId = 'appgprj_6a515a7e24b8819183b2e9bd948265dc'
 $remoteUrl = 'https://git.chatgpt-team.site/76804600-c670-4841-ad5a-d5dddee30694/appgprj_6a515a7e24b8819183b2e9bd948265dc.git'
 $branchName = 'main'
-$token = 'art_v1_a619ec4ddadc594e4a167cb70ccef4ec434e3917'
-$tokenExpiresLocal = '13/07/2026 07:47'
+$token = 'art_v1_98b1a11c290d8c7a54c773d6b7c982e5e55655cf'
+$tokenExpiresLocal = '13/07/2026 08:05'
 
 function Resolve-GitPath {
     $candidates = @(
@@ -79,7 +79,7 @@ if (-not ($existingOrigin -match '(^|`n)origin($|`n)')) {
     Invoke-Git -GitPath $gitPath -WorkingDirectory $scriptDirectory -Arguments @('remote', 'add', 'origin', $remoteUrl)
 }
 
-Invoke-Git -GitPath $gitPath -WorkingDirectory $scriptDirectory -Arguments @('add', '--', 'build-private-site.ps1', 'dist', '.openai', 'README.md', 'publicar-site-privado.ps1', 'publicar-site-privado.cmd', 'COMO-PUBLICAR.txt')
+Invoke-Git -GitPath $gitPath -WorkingDirectory $scriptDirectory -Arguments @('add', '--', 'build-private-site.ps1', 'server', 'dist', '.openai', 'README.md', 'publicar-site-privado.ps1', 'publicar-site-privado.cmd', 'COMO-PUBLICAR.txt')
 
 & $gitPath -C $scriptDirectory -c ("safe.directory=" + $scriptDirectory) -c 'user.name=Codex Publish' -c 'user.email=codex-publish@example.com' commit -m 'Atualiza app online privado' *> $null
 if ($LASTEXITCODE -ne 0) {

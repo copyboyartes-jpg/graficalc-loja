@@ -10,6 +10,8 @@ const SESSION_KEYS = {
 };
 
 const CONFIG_ACCESS_PASSWORD = "copyboy2026";
+const SHARED_API_PATH = "/api/shared-state";
+const SHARED_SYNC_INTERVAL_MS = 20000;
 
 const OPTIONS = {
   printTypes: ["Preto e branco", "Colorido jato de tinta", "Colorido laser"],
@@ -735,6 +737,25 @@ function saveSessionFlag(key, value) {
   }
 
   sessionStorage.removeItem(key);
+}
+
+async function requestSharedState(method = "GET", payload) {
+  if (typeof fetch !== "function") {
+    throw new Error("fetch-unavailable");
+  }
+
+  const response = await fetch(SHARED_API_PATH, {
+    method,
+    headers: payload ? { "Content-Type": "application/json" } : undefined,
+    body: payload ? JSON.stringify(payload) : undefined,
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(`shared-http-${response.status}`);
+  }
+
+  return response.json();
 }
 
 function loadConfigViewMode() {
@@ -1881,7 +1902,7 @@ function createConfigCardMarkup(title, copy, innerMarkup) {
     <article class="config-card">
       <div class="config-card-meta">
         <span class="config-card-tag">Configuração</span>
-        <span class="config-card-tag subtle">Salva neste navegador</span>
+        <span class="config-card-tag subtle">Base compartilhada</span>
       </div>
       <h3>${escapeHtml(title)}</h3>
       ${copy ? `<p class="helper-text">${escapeHtml(copy)}</p>` : ""}
@@ -2472,13 +2493,20 @@ function createQuoteText(state, workbook, colorWorkbook, m2Workbook) {
   return lines.join("\n");
 }
 
-function initApp() {
+async function initApp() {
   const state = loadFromStorage(STORAGE_KEYS.state, mergeState);
   const config = loadFromStorage(STORAGE_KEYS.config, mergeConfig);
   let configViewMode = loadConfigViewMode();
   let activeConfigSection = loadConfigSection();
   let lastConfigSourceTab = activeConfigSection;
   let isConfigUnlocked = loadSessionFlag(SESSION_KEYS.configUnlocked);
+  let sharedSyncTimer = null;
+  let sharedSyncInFlight = false;
+  let sharedSyncQueued = false;
+  let sharedBootstrapComplete = false;
+  let sharedUpdatedAt = "";
+  let lastSharedSnapshot = "";
+  let sharedRefreshHandle = null;
   const selectedRowIds = new Set();
   ensureRowCount(state, 5);
   ensureColorRowCount(state, 5);
@@ -2500,6 +2528,7 @@ function initApp() {
   const feedback = document.getElementById("import-feedback");
   const colorFeedback = document.getElementById("color-feedback");
   const configStatus = document.getElementById("config-status");
+  const syncStatus = document.getElementById("sync-status");
   const spiralDiscountInput = document.getElementById("spiral-discount-input");
   const lockConfigButton = document.getElementById("lock-config-button");
   const confirmModal = document.getElementById("confirm-modal");
@@ -2534,6 +2563,159 @@ function initApp() {
 
   function setColorFeedback(message, tone = "neutral") {
     setStatusMessage(colorFeedback, message, tone);
+  }
+
+  function setSyncStatus(message, tone = "neutral") {
+    setStatusMessage(syncStatus, message, tone);
+  }
+
+  function persistLocalOnly() {
+    saveToStorage(STORAGE_KEYS.state, state);
+    saveToStorage(STORAGE_KEYS.config, config);
+  }
+
+  function createSharedPayload() {
+    return {
+      state: deepClone(state),
+      config: deepClone(config),
+    };
+  }
+
+  function applySharedPayload(payload, successMessage) {
+    if (!payload || typeof payload !== "object") {
+      return;
+    }
+
+    Object.assign(state, mergeState(payload.state));
+    Object.assign(config, mergeConfig(payload.config));
+    persistLocalOnly();
+    renderAll();
+    if (successMessage) {
+      setSyncStatus(successMessage, "success");
+    }
+  }
+
+  async function flushSharedSave(force = false) {
+    if (!sharedBootstrapComplete && !force) {
+      return;
+    }
+
+    if (sharedSyncInFlight) {
+      sharedSyncQueued = true;
+      return;
+    }
+
+    const payload = createSharedPayload();
+    const serialized = JSON.stringify(payload);
+    if (!force && serialized === lastSharedSnapshot) {
+      return;
+    }
+
+    sharedSyncInFlight = true;
+    setSyncStatus("Salvando alterações na base compartilhada...", "warning");
+
+    try {
+      const result = await requestSharedState("PUT", payload);
+      lastSharedSnapshot = serialized;
+      sharedUpdatedAt = result.updatedAt || new Date().toISOString();
+      setSyncStatus("Tudo salvo e compartilhado entre os computadores.", "success");
+    } catch {
+      setSyncStatus("Não foi possível atualizar a base compartilhada agora. O app continua funcionando nesta máquina.", "error");
+    } finally {
+      sharedSyncInFlight = false;
+      if (sharedSyncQueued) {
+        sharedSyncQueued = false;
+        void flushSharedSave(force);
+      }
+    }
+  }
+
+  function queueSharedSave(force = false) {
+    if (sharedSyncTimer) {
+      clearTimeout(sharedSyncTimer);
+    }
+
+    if (force) {
+      void flushSharedSave(true);
+      return;
+    }
+
+    if (!sharedBootstrapComplete) {
+      return;
+    }
+
+    sharedSyncTimer = setTimeout(() => {
+      sharedSyncTimer = null;
+      void flushSharedSave(false);
+    }, 500);
+  }
+
+  async function refreshSharedState(showMessage = false) {
+    if (!sharedBootstrapComplete || sharedSyncInFlight) {
+      return;
+    }
+
+    try {
+      const result = await requestSharedState("GET");
+      if (!result?.exists || !result.payload) {
+        return;
+      }
+
+      const serialized = JSON.stringify(result.payload);
+      if (serialized === lastSharedSnapshot || result.updatedAt === sharedUpdatedAt) {
+        return;
+      }
+
+      sharedUpdatedAt = result.updatedAt || "";
+      lastSharedSnapshot = serialized;
+      applySharedPayload(
+        result.payload,
+        showMessage ? "Dados compartilhados atualizados com mudanças feitas em outro computador." : ""
+      );
+    } catch {
+      if (showMessage) {
+        setSyncStatus("A base compartilhada não respondeu agora. Tente novamente em instantes.", "error");
+      }
+    }
+  }
+
+  async function bootstrapSharedState() {
+    setSyncStatus("Conectando a base compartilhada...", "warning");
+
+    try {
+      const result = await requestSharedState("GET");
+      sharedBootstrapComplete = true;
+
+      if (result?.exists && result.payload) {
+        sharedUpdatedAt = result.updatedAt || "";
+        lastSharedSnapshot = JSON.stringify(result.payload);
+        applySharedPayload(result.payload, "Base compartilhada conectada com sucesso.");
+        return;
+      }
+
+      persistLocalOnly();
+      await flushSharedSave(true);
+    } catch {
+      sharedBootstrapComplete = true;
+      setSyncStatus("Não foi possível conectar a base compartilhada agora. O app segue disponível nesta máquina.", "error");
+    }
+  }
+
+  function startSharedRefresh() {
+    if (sharedRefreshHandle || typeof window === "undefined") {
+      return;
+    }
+
+    sharedRefreshHandle = window.setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) {
+        return;
+      }
+      void refreshSharedState(false);
+    }, SHARED_SYNC_INTERVAL_MS);
+
+    window.addEventListener("focus", () => {
+      void refreshSharedState(true);
+    });
   }
 
   function focusConfigPasswordField() {
@@ -2610,8 +2792,8 @@ function initApp() {
   }
 
   function persist() {
-    saveToStorage(STORAGE_KEYS.state, state);
-    saveToStorage(STORAGE_KEYS.config, config);
+    persistLocalOnly();
+    queueSharedSave(false);
   }
 
   function renderPresetControls() {
@@ -2809,7 +2991,7 @@ function initApp() {
             `
           )
           .join("")
-      : `<div class="empty-state"><strong>Nenhum cliente salvo ainda</strong><span>Quando preencher um orçamento, use "Salvar cliente atual" para criar sua base local de contatos.</span></div>`;
+      : `<div class="empty-state"><strong>Nenhum cliente salvo ainda</strong><span>Quando preencher um orçamento, use "Salvar cliente atual" para criar sua base compartilhada de contatos.</span></div>`;
   }
 
   function renderHistoryTab() {
@@ -3850,7 +4032,7 @@ function initApp() {
   document.getElementById("save-client-button").addEventListener("click", () => {
     const clientName = state.client.name.trim();
     if (!clientName) {
-      setMainFeedback("Digite o nome do cliente antes de salvar na base local.", "warning");
+      setMainFeedback("Digite o nome do cliente antes de salvar na base compartilhada.", "warning");
       return;
     }
 
@@ -3872,7 +4054,7 @@ function initApp() {
 
     persist();
     renderClientsTab();
-    setMainFeedback("Cliente salvo na base local com sucesso.", "success");
+    setMainFeedback("Cliente salvo na base compartilhada com sucesso.", "success");
   });
 
   document.getElementById("save-history-button").addEventListener("click", () => {
@@ -3894,7 +4076,7 @@ function initApp() {
     state.quoteHistory = state.quoteHistory.slice(0, 20);
     persist();
     renderHistoryTab();
-    setMainFeedback("Orçamento salvo no histórico local.", "success");
+    setMainFeedback("Orçamento salvo no histórico compartilhado.", "success");
   });
 
   clientsList.addEventListener("click", async (event) => {
@@ -3929,7 +4111,7 @@ function initApp() {
       if (!(await confirmAppAction({
         kicker: "Exclusão",
         title: "Excluir cliente salvo",
-        message: `Deseja realmente excluir o cliente "${client.name || "Sem nome"}" da base local?`,
+        message: `Deseja realmente excluir o cliente "${client.name || "Sem nome"}" da base compartilhada?`,
         confirmLabel: "Excluir",
         danger: true,
       }))) {
@@ -3939,7 +4121,7 @@ function initApp() {
       state.clients = state.clients.filter((item) => item.id !== client.id);
       persist();
       renderClientsTab();
-      setMainFeedback("Cliente excluído da base local.", "warning");
+      setMainFeedback("Cliente excluído da base compartilhada.", "warning");
     }
   });
 
@@ -4002,11 +4184,13 @@ function initApp() {
     }
   });
 
+  await bootstrapSharedState();
+  startSharedRefresh();
   renderAll();
 }
 
 if (typeof window !== "undefined" && typeof document !== "undefined") {
-  initApp();
+  initApp().catch(() => {});
 }
 
 
