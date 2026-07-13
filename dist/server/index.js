@@ -13,6 +13,16 @@ async function fetchAsset(env, request, pathname) {
   return env.ASSETS.fetch(new Request(assetUrl.toString(), request));
 }
 
+function withCacheHeaders(response, cacheControl) {
+  const headers = new Headers(response.headers);
+  headers.set("Cache-Control", cacheControl);
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -139,6 +149,9 @@ export default {
 
     const directResponse = await fetchAsset(env, request, url.pathname);
     if (directResponse.status !== 404) {
+      if (url.pathname === "/" || url.pathname.endsWith(".html")) {
+        return withCacheHeaders(directResponse, "no-store");
+      }
       return directResponse;
     }
 
@@ -148,7 +161,7 @@ export default {
 
     const fallbackResponse = await fetchAsset(env, request, HTML_FALLBACK);
     if (fallbackResponse.status !== 404) {
-      return fallbackResponse;
+      return withCacheHeaders(fallbackResponse, "no-store");
     }
 
     return new Response("Not found", { status: 404 });
