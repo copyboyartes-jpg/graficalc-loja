@@ -2391,15 +2391,32 @@ function getM2RowDimensions(row) {
   };
 }
 
+function buildApostilaCoverDetail(row) {
+  const parts = [];
+
+  if (row.coverType && row.coverType !== "Sem capa") {
+    parts.push(`Capa: ${row.coverType} | ${row.coverPaper}`);
+  }
+
+  if (row.backCoverType && row.backCoverType !== "Sem contracapa") {
+    parts.push(`Contracapa: ${row.backCoverType} | ${row.backCoverPaper}`);
+  }
+
+  return parts.join(" | ");
+}
+
 function createQuoteHtml(state, workbook, colorWorkbook, m2Workbook) {
   const dateText = new Intl.DateTimeFormat("pt-BR").format(new Date());
   const quoteEntries = [
-    ...workbook.activeRows.map((row) => ({
-      kind: "Apostila",
-      description: row.description,
-      detail: `${formatInteger(row.quantity)} apostilas | ${formatInteger(row.pages)} páginas | ${row.printType} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}`,
-      total: row.total,
-    })),
+    ...workbook.activeRows.map((row) => {
+      const coverDetail = buildApostilaCoverDetail(row);
+      return {
+        kind: "Apostila",
+        description: row.description,
+        detail: `${formatInteger(row.quantity)} apostilas | ${formatInteger(row.pages)} páginas | ${row.printType} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}${coverDetail ? ` | ${coverDetail}` : ""}`,
+        total: row.total,
+      };
+    }),
     ...colorWorkbook.activeRows.map((row) => ({
       kind: "Impresso colorido",
       description: row.description,
@@ -2503,9 +2520,12 @@ function createQuoteText(state, workbook, colorWorkbook, m2Workbook) {
   ];
 
   const quoteEntries = [
-    ...workbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || `Apostila ${index + 1}`} | ${row.quantity} apostilas | ${row.pages} páginas | ${row.printType} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""} | ${formatCurrency(row.total)}`,
-    })),
+    ...workbook.activeRows.map((row, index) => {
+      const coverDetail = buildApostilaCoverDetail(row);
+      return {
+        text: `- ${row.description || `Apostila ${index + 1}`} | ${row.quantity} apostilas | ${row.pages} páginas | ${row.printType} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}${coverDetail ? ` | ${coverDetail}` : ""} | ${formatCurrency(row.total)}`,
+      };
+    }),
     ...colorWorkbook.activeRows.map((row, index) => ({
       text: `- ${row.description || `Impresso ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.paperType} | ${row.printMode} | ${formatCurrency(row.total)}`,
     })),
