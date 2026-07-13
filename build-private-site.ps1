@@ -11,6 +11,7 @@ $serverSource = Join-Path $PSScriptRoot 'server\index.js'
 $clientOutput = Join-Path $OutputRoot 'client'
 $serverOutput = Join-Path $OutputRoot 'server'
 $openaiOutput = Join-Path $OutputRoot '.openai'
+$archiveOutput = Join-Path $PSScriptRoot 'copyboy-private-site.tar.gz'
 
 if (Test-Path $OutputRoot) {
     Remove-Item -LiteralPath $OutputRoot -Recurse -Force
@@ -37,5 +38,20 @@ Set-Content -Path $indexPath -Value $indexContent -Encoding UTF8
 
 Copy-Item $hostingSource (Join-Path $openaiOutput 'hosting.json')
 Copy-Item $serverSource (Join-Path $serverOutput 'index.js')
+
+if (Test-Path $archiveOutput) {
+    Remove-Item -LiteralPath $archiveOutput -Force
+}
+
+Push-Location $PSScriptRoot
+try {
+    tar -czf $archiveOutput 'dist'
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Falha ao criar o pacote compactado da versao online.'
+    }
+}
+finally {
+    Pop-Location
+}
 
 Write-Output ("Build pronto em " + $OutputRoot)
