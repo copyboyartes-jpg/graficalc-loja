@@ -845,7 +845,7 @@ textarea {
 }
 
 .m2-budget-table {
-  min-width: 1560px;
+  min-width: 1820px;
 }
 
 .m2-budget-table thead th {
@@ -861,7 +861,9 @@ textarea {
 .m2-budget-table td:nth-child(10),
 .m2-budget-table td:nth-child(11),
 .m2-budget-table td:nth-child(12),
-.m2-budget-table td:nth-child(13) {
+.m2-budget-table td:nth-child(13),
+.m2-budget-table td:nth-child(14),
+.m2-budget-table td:nth-child(15) {
   background: rgba(255, 255, 255, 0.5);
 }
 

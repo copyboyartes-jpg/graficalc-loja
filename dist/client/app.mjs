@@ -402,7 +402,8 @@ function createDefaultM2Row(index) {
     quantity: 0,
     finishIds: [],
     finishOverrides: {},
-    finishingExtra: 0,
+    extraCharge: 0,
+    artCreationFee: 0,
   };
 }
 
@@ -681,7 +682,10 @@ function mergeState(candidate) {
               .map(([key, value]) => [key, value === "" || value === null ? "" : toWholeNumber(value)])
           )
         : {},
-      finishingExtra: toMoneyNumber(row?.finishingExtra),
+      extraCharge: toMoneyNumber(
+        typeof row?.extraCharge !== "undefined" ? row.extraCharge : row?.finishingExtra
+      ),
+      artCreationFee: toMoneyNumber(row?.artCreationFee),
       productId: validM2Catalog.has(row?.productId) ? row.productId : M2_CATALOG[0].id,
       id: row?.id || `m2-row-${index + 1}`,
     }));
@@ -1340,9 +1344,12 @@ function calculateM2Workbook(state) {
     const areaM2 = widthMm > 0 && heightMm > 0 ? (widthMm * heightMm) / 1000000 : 0;
     const effectiveArea = row.includeBleed ? ((widthMm + 4) * (heightMm + 4)) / 1000000 : areaM2;
     const tier = getM2Tier(product.id, effectiveArea);
-    const unitValue = tier ? Number(tier.value || 0) + toMoneyNumber(row.finishingExtra) : 0;
+    const extraCharge = toMoneyNumber(typeof row.extraCharge !== "undefined" ? row.extraCharge : row.finishingExtra);
+    const artCreationFee = toMoneyNumber(row.artCreationFee);
+    const fixedCharges = extraCharge + artCreationFee;
+    const unitValue = tier ? Number(tier.value || 0) : 0;
     const subtotal = quantity > 0 ? unitValue * quantity : 0;
-    const total = subtotal;
+    const total = subtotal + fixedCharges;
     const active = widthMm > 0 && heightMm > 0 && quantity > 0;
 
     if (active && effectiveArea <= 0) {
@@ -1362,7 +1369,13 @@ function calculateM2Workbook(state) {
       effectiveArea,
       tierLabel: tier?.maxArea === Infinity ? "acima do intervalo" : `até ${tier.maxArea} m²`,
       tierValue: Number(tier?.value || 0),
+      configuredFinishExtra: 0,
+      configuredFinishExtraTotal: 0,
+      extraCharge,
+      artCreationFee,
+      fixedCharges,
       unitValue,
+      subtotal,
       total,
       active,
     };
@@ -1421,10 +1434,14 @@ function calculateM2WorkbookFromConfig(state, config) {
     const tier = getM2PricingBand(pricing, areaM2);
     const pricePerM2 = Number(tier?.value || 0);
     const configuredFinishExtra = calculateM2FinishExtra(row, product, config);
-    const manualFinishExtra = toMoneyNumber(row.finishingExtra);
-    const finishingExtra = configuredFinishExtra + manualFinishExtra;
+    const configuredFinishExtraTotal = configuredFinishExtra * quantity;
+    const extraCharge = toMoneyNumber(typeof row.extraCharge !== "undefined" ? row.extraCharge : row.finishingExtra);
+    const artCreationFee = toMoneyNumber(row.artCreationFee);
+    const fixedCharges = extraCharge + artCreationFee;
+    const finishingExtra = configuredFinishExtra;
     const unitValue = areaM2 * pricePerM2 + finishingExtra;
     const subtotal = quantity > 0 ? unitValue * quantity : 0;
+    const total = subtotal + fixedCharges;
     const active = widthMm > 0 && heightMm > 0 && quantity > 0;
 
     if (active && areaM2 <= 0) {
@@ -1444,19 +1461,26 @@ function calculateM2WorkbookFromConfig(state, config) {
       tierLabel: tier?.label || "",
       tierValue: pricePerM2,
       configuredFinishExtra,
-      manualFinishExtra,
+      configuredFinishExtraTotal,
+      extraCharge,
+      artCreationFee,
+      fixedCharges,
       finishingExtra,
       unitValue,
       subtotal,
-      total: subtotal,
+      total,
       active,
     };
   });
 
   const totalsByProduct = {};
+  const baseTotalsByProduct = {};
+  const fixedTotalsByProduct = {};
   for (const row of rows) {
     if (!row.active) continue;
-    totalsByProduct[row.productId] = (totalsByProduct[row.productId] || 0) + row.subtotal;
+    totalsByProduct[row.productId] = (totalsByProduct[row.productId] || 0) + row.total;
+    baseTotalsByProduct[row.productId] = (baseTotalsByProduct[row.productId] || 0) + row.subtotal;
+    fixedTotalsByProduct[row.productId] = (fixedTotalsByProduct[row.productId] || 0) + row.fixedCharges;
   }
 
   const firstActiveIndexByProduct = {};
@@ -1468,23 +1492,27 @@ function calculateM2WorkbookFromConfig(state, config) {
 
   const rowsWithMinimum = rows.map((row, index) => {
     const groupTotal = totalsByProduct[row.productId] || 0;
+    const groupBaseTotal = baseTotalsByProduct[row.productId] || 0;
+    const groupFixedTotal = fixedTotalsByProduct[row.productId] || 0;
     const product = M2_CATALOG.find((item) => item.id === row.productId) || M2_CATALOG[0];
     const minimumValue = getM2MinimumValue(config.m2Pricing?.[product.pricingKey || product.configKey] || []);
-    const minimumApplied = groupTotal > 0 && groupTotal < minimumValue;
-    const adjustedGroupTotal = minimumApplied ? minimumValue : groupTotal;
+    const minimumApplied = groupBaseTotal > 0 && groupBaseTotal < minimumValue;
+    const adjustedGroupBaseTotal = minimumApplied ? minimumValue : groupBaseTotal;
     const displayTotal = row.active
       ? minimumApplied
         ? firstActiveIndexByProduct[row.productId] === index
-          ? adjustedGroupTotal
-          : 0
-        : row.subtotal
+          ? adjustedGroupBaseTotal + row.fixedCharges
+          : row.fixedCharges
+        : row.total
       : 0;
 
     return {
       ...row,
       total: displayTotal,
       groupTotal,
-      minimumTotal: adjustedGroupTotal,
+      groupBaseTotal,
+      groupFixedTotal,
+      minimumTotal: adjustedGroupBaseTotal + groupFixedTotal,
       minimumApplied: row.active && minimumApplied,
     };
   });
@@ -1495,7 +1523,10 @@ function calculateM2WorkbookFromConfig(state, config) {
     (sum, productId) => {
       const product = M2_CATALOG.find((item) => item.id === productId) || M2_CATALOG[0];
       const minimumValue = getM2MinimumValue(config.m2Pricing?.[product.pricingKey || product.configKey] || []);
-      return sum + (totalsByProduct[productId] > 0 && totalsByProduct[productId] < minimumValue ? minimumValue : totalsByProduct[productId]);
+      const productBase = baseTotalsByProduct[productId] || 0;
+      const productFixed = fixedTotalsByProduct[productId] || 0;
+      const adjustedBase = productBase > 0 && productBase < minimumValue ? minimumValue : productBase;
+      return sum + adjustedBase + productFixed;
     },
     0
   );
@@ -2373,7 +2404,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, m2Workbook) {
     ...m2Workbook.activeRows.map((row) => ({
       kind: "Cálculo de m²",
       description: row.description || row.productLabel,
-      detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.productLabel}${row.finishSummary ? ` | ${row.finishSummary}` : ""}`,
+      detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.productLabel}${row.finishSummary ? ` | ${row.finishSummary}` : ""}${row.artCreationFee > 0 ? ` | Arte/edição: ${formatCurrency(row.artCreationFee)}` : ""}`,
       total: row.total,
     })),
   ];
@@ -2474,7 +2505,7 @@ function createQuoteText(state, workbook, colorWorkbook, m2Workbook) {
       text: `- ${row.description || `Impresso ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.paperType} | ${row.printMode}${row.bleedMode === "Com sangra" ? " | Com sangra" : ""} | ${formatCurrency(row.total)}`,
     })),
     ...m2Workbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || row.productLabel || `M² ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.finishSummary ? `${row.finishSummary} | ` : ""}${formatCurrency(row.total)}`,
+      text: `- ${row.description || row.productLabel || `M² ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.finishSummary ? `${row.finishSummary} | ` : ""}${row.artCreationFee > 0 ? `Arte/edição: ${formatCurrency(row.artCreationFee)} | ` : ""}${formatCurrency(row.total)}`,
     })),
   ];
 
@@ -3131,7 +3162,9 @@ async function initApp() {
             <td><span class="readonly-value subtle">${formatAreaM2(row.effectiveArea)}</span></td>
             <td><span class="readonly-value subtle">${escapeHtml(row.tierLabel)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.tierValue)}</span></td>
-            <td><input class="cell-input" name="finishingExtra" type="number" min="0" step="0.01" value="${escapeHtml(row.finishingExtra)}" placeholder="0,00"></td>
+            <td><span class="readonly-value subtle">${formatCurrency(row.configuredFinishExtraTotal || 0)}</span></td>
+            <td><input class="cell-input" name="extraCharge" type="number" min="0" step="0.01" value="${escapeHtml(row.extraCharge ?? 0)}" placeholder="0,00"></td>
+            <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
             <td><span class="readonly-value">${formatCurrency(row.total)}</span></td>
           </tr>
         `
@@ -3573,8 +3606,12 @@ async function initApp() {
       row.measureUnit = target.value === "m" ? "m" : "cm";
     } else if (field === "quantity") {
       row[field] = toWholeNumber(target.value);
-    } else if (field === "finishingExtra") {
-      row[field] = toMoneyNumber(target.value);
+    } else if (field === "extraCharge" || field === "artCreationFee" || field === "finishingExtra") {
+      if (field === "finishingExtra") {
+        row.extraCharge = toMoneyNumber(target.value);
+      } else {
+        row[field] = toMoneyNumber(target.value);
+      }
     } else {
       row[field] = target.value;
     }
