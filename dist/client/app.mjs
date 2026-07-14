@@ -2706,11 +2706,32 @@ async function initApp() {
     saveToStorage(STORAGE_KEYS.config, config);
   }
 
+  function createSharedStateSnapshot() {
+    return {
+      clients: deepClone(state.clients),
+      quoteHistory: deepClone(state.quoteHistory),
+    };
+  }
+
   function createSharedPayload() {
     return {
-      state: deepClone(state),
+      state: createSharedStateSnapshot(),
       config: deepClone(config),
     };
+  }
+
+  function applySharedStateSnapshot(sharedState) {
+    if (!sharedState || typeof sharedState !== "object") {
+      return;
+    }
+
+    if (Array.isArray(sharedState.clients)) {
+      state.clients = mergeState({ clients: sharedState.clients }).clients;
+    }
+
+    if (Array.isArray(sharedState.quoteHistory)) {
+      state.quoteHistory = mergeState({ quoteHistory: sharedState.quoteHistory }).quoteHistory;
+    }
   }
 
   function applySharedPayload(payload, successMessage) {
@@ -2718,7 +2739,7 @@ async function initApp() {
       return;
     }
 
-    Object.assign(state, mergeState(payload.state));
+    applySharedStateSnapshot(payload.state);
     Object.assign(config, mergeConfig(payload.config));
     persistLocalOnly();
     renderAll();
@@ -2822,6 +2843,10 @@ async function initApp() {
         sharedUpdatedAt = result.updatedAt || "";
         lastSharedSnapshot = JSON.stringify(result.payload);
         applySharedPayload(result.payload, "Base compartilhada conectada com sucesso.");
+        if (lastSharedSnapshot !== JSON.stringify(createSharedPayload())) {
+          lastSharedSnapshot = "";
+          await flushSharedSave(true);
+        }
         return;
       }
 

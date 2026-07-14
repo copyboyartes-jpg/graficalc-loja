@@ -5,8 +5,8 @@ $ErrorActionPreference = 'Stop'
 $projectId = 'appgprj_6a515a7e24b8819183b2e9bd948265dc'
 $remoteUrl = 'https://git.chatgpt-team.site/76804600-c670-4841-ad5a-d5dddee30694/appgprj_6a515a7e24b8819183b2e9bd948265dc.git'
 $branchName = 'main'
-$token = 'art_v1_04bd62503baa52db4cae6f659523d2a710c2c58f'
-$tokenExpiresLocal = '13/07/2026 13:47'
+$token = 'art_v1_1bb2a6e9efb0a1e67f0f1a4dd5dcd3e232100ab9'
+$tokenExpiresLocal = '14/07/2026 07:05'
 
 function Resolve-GitPath {
     $candidates = @(
