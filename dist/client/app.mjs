@@ -441,6 +441,7 @@ function createDefaultState() {
     clients: [],
     quoteHistory: [],
     paymentTerms: "",
+    productionDeadline: "",
     quoteNotes: "",
   };
 }
@@ -640,6 +641,7 @@ function mergeState(candidate) {
         }))
     : state.quoteHistory;
   state.paymentTerms = typeof candidate.paymentTerms === "string" ? candidate.paymentTerms : state.paymentTerms;
+  state.productionDeadline = typeof candidate.productionDeadline === "string" ? candidate.productionDeadline : state.productionDeadline;
   state.quoteNotes = typeof candidate.quoteNotes === "string" ? candidate.quoteNotes : state.quoteNotes;
 
   if (Array.isArray(candidate.rows) && candidate.rows.length > 0) {
@@ -2559,6 +2561,10 @@ function createQuoteHtml(state, workbook, colorWorkbook, m2Workbook) {
           <h3>Pagamento</h3>
           <p class="quote-muted">${escapeHtml(state.paymentTerms || "-")}</p>
         </div>
+        <div class="quote-box">
+          <h3>Prazo de produção</h3>
+          <p class="quote-muted">${escapeHtml(state.productionDeadline || "-")}</p>
+        </div>
       </div>
 
       <div class="quote-box">
@@ -2591,6 +2597,7 @@ function createQuoteText(state, workbook, colorWorkbook, m2Workbook) {
     `Contato: ${state.client.contact || "-"}`,
     `CNPJ cliente: ${state.client.cnpj || "-"}`,
     `Pagamento: ${state.paymentTerms || "-"}`,
+    `Prazo de produção: ${state.productionDeadline || "-"}`,
     "",
     "Itens:",
   ];
@@ -2972,6 +2979,7 @@ async function initApp() {
     document.getElementById("client-contact").value = state.client.contact;
     document.getElementById("client-cnpj").value = state.client.cnpj;
     document.getElementById("payment-terms").value = state.paymentTerms;
+    document.getElementById("production-deadline").value = state.productionDeadline;
     document.getElementById("quote-notes").value = state.quoteNotes;
     document.getElementById("company-name").value = state.company.name;
     document.getElementById("company-cnpj").value = state.company.cnpj;
@@ -4150,6 +4158,7 @@ async function initApp() {
     ["client-contact", "client", "contact"],
     ["client-cnpj", "client", "cnpj"],
     ["payment-terms", null, "paymentTerms"],
+    ["production-deadline", null, "productionDeadline"],
     ["quote-notes", null, "quoteNotes"],
     ["company-name", "company", "name"],
     ["company-cnpj", "company", "cnpj"],
