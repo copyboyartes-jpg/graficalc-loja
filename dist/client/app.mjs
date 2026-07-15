@@ -151,6 +151,16 @@ const M2_CATALOG = [
   { id: "ps2mm", label: "Chapa PS 2mm", configKey: "ps2mm" },
 ];
 
+const DEFAULT_M2_DESCRIPTIONS = {
+  "digital-cut": "Adesivo vinil com impressão digital",
+  "flat-cut": "Adesivo vinil com impressão digital",
+  perfurado: "Adesivo perfurado com impressão digital",
+  "uv-cut": "Adesivo vinil com impressão UV",
+  "uv-verniz": "Adesivo vinil com impressão UV",
+  ps1mm: "Chapa de PS 1mm com impressão UV direto na chapa",
+  ps2mm: "Chapa de PS 2mm com impressão UV direto na chapa",
+};
+
 const A4_WIDTH_MM = 210;
 const A4_HEIGHT_MM = 297;
 
@@ -370,6 +380,7 @@ function createDefaultRow(index) {
     bindingGroup: "",
     quantity: 0,
     pages: 0,
+    colorPages: 0,
     coverType: "Sem capa",
     coverPaper: "Sulfite 75g",
     backCoverType: "Sem contracapa",
@@ -396,7 +407,7 @@ function createDefaultM2Row(index) {
   return {
     id: `m2-row-${index + 1}`,
     productId: M2_CATALOG[0].id,
-    description: "",
+    description: DEFAULT_M2_DESCRIPTIONS[M2_CATALOG[0].id] || "",
     measureUnit: "cm",
     widthMm: 0,
     heightMm: 0,
@@ -406,6 +417,14 @@ function createDefaultM2Row(index) {
     extraCharge: 0,
     artCreationFee: 0,
   };
+}
+
+function getDefaultM2Description(productId) {
+  return DEFAULT_M2_DESCRIPTIONS[productId] || "";
+}
+
+function getM2RowDescription(row) {
+  return (row.description || "").trim() || getDefaultM2Description(row.productId) || row.productLabel || "";
 }
 
 function createDefaultState() {
@@ -650,6 +669,7 @@ function mergeState(candidate) {
       ...row,
       quantity: toWholeNumber(row?.quantity),
       pages: toWholeNumber(row?.pages),
+      colorPages: toWholeNumber(row?.colorPages),
       id: row?.id || `row-${index + 1}`,
     }));
   }
@@ -1041,6 +1061,66 @@ function isRowActive(row) {
   return Boolean(row.description?.trim() || Number(row.quantity) > 0 || Number(row.pages) > 0);
 }
 
+function getNormalizedColorPages(row) {
+  const totalPages = Math.max(0, toWholeNumber(row.pages));
+  const colorPages = Math.max(0, toWholeNumber(row.colorPages));
+  return Math.min(colorPages, totalPages);
+}
+
+function getPagesPerA4(pageCount, size) {
+  if (pageCount <= 0) {
+    return 0;
+  }
+  return size === "A5" ? Math.ceil(pageCount / 2) : pageCount;
+}
+
+function getInnerImpressionBreakdown(row) {
+  const copies = Math.max(0, row.quantity);
+  const totalPages = Math.max(0, row.pages);
+  const colorPages = getNormalizedColorPages(row);
+  if (copies <= 0 || totalPages <= 0) {
+    return {
+      totalImpressions: 0,
+      blackWhiteImpressions: 0,
+      colorImpressions: 0,
+      blackWhitePagesPerCopy: 0,
+      colorPagesPerCopy: 0,
+      normalizedColorPages: 0,
+    };
+  }
+
+  const fullColorMode = row.printType !== "Preto e branco" && colorPages === 0;
+  const colorPagesPerCopy = fullColorMode ? totalPages : colorPages;
+  const blackWhitePagesPerCopy = fullColorMode ? 0 : Math.max(0, totalPages - colorPagesPerCopy);
+  const colorImpressions = copies * getPagesPerA4(colorPagesPerCopy, row.size);
+  const blackWhiteImpressions = copies * getPagesPerA4(blackWhitePagesPerCopy, row.size);
+
+  return {
+    totalImpressions: colorImpressions + blackWhiteImpressions,
+    blackWhiteImpressions,
+    colorImpressions,
+    blackWhitePagesPerCopy,
+    colorPagesPerCopy,
+    normalizedColorPages: colorPages,
+  };
+}
+
+function buildApostilaPrintDetail(row) {
+  const totalPages = Math.max(0, toWholeNumber(row.pages));
+  const colorPages = getNormalizedColorPages(row);
+  const blackWhitePages = Math.max(0, totalPages - colorPages);
+
+  if (row.printType === "Preto e branco") {
+    return colorPages > 0 ? `Preto e branco | ${colorPages} coloridas sem tipo` : "Preto e branco";
+  }
+
+  if (colorPages > 0 && colorPages < totalPages) {
+    return `${blackWhitePages} PB + ${colorPages} coloridas (${row.printType})`;
+  }
+
+  return row.printType;
+}
+
 function isColorPrintRowActive(row) {
   return Boolean(row.description?.trim() || Number(row.quantity) > 0 || Number(row.widthMm) > 0 || Number(row.heightMm) > 0);
 }
@@ -1050,22 +1130,30 @@ function calculateWorkbook(state, config) {
     ...row,
     quantity: toWholeNumber(row.quantity),
     pages: toWholeNumber(row.pages),
+    colorPages: toWholeNumber(row.colorPages),
   }));
 
   const rowBase = rows.map((row) => {
-    const innerImpressions = getInnerImpressions(row);
+    const innerBreakdown = getInnerImpressionBreakdown(row);
     const bindingSheetsPerCopy = getBindingSheetsPerCopy(row);
     const coverImpressions = getCoverImpressions(row, "cover");
     const backImpressions = getCoverImpressions(row, "back");
-    return { row, innerImpressions, bindingSheetsPerCopy, coverImpressions, backImpressions };
+    return { row, innerBreakdown, bindingSheetsPerCopy, coverImpressions, backImpressions };
   });
 
   const aggregateInnerByKey = {};
   const aggregateCoverByPaper = {};
 
   for (const item of rowBase) {
-    const innerKey = getPrintAggregationKey(item.row.printType, item.row.printMode);
-    aggregateInnerByKey[innerKey] = (aggregateInnerByKey[innerKey] || 0) + item.innerImpressions;
+    const blackWhiteKey = getPrintAggregationKey("Preto e branco", item.row.printMode);
+    if (item.innerBreakdown.blackWhiteImpressions > 0) {
+      aggregateInnerByKey[blackWhiteKey] = (aggregateInnerByKey[blackWhiteKey] || 0) + item.innerBreakdown.blackWhiteImpressions;
+    }
+
+    if (item.innerBreakdown.colorImpressions > 0 && item.row.printType !== "Preto e branco") {
+      const colorKey = getPrintAggregationKey(item.row.printType, item.row.printMode);
+      aggregateInnerByKey[colorKey] = (aggregateInnerByKey[colorKey] || 0) + item.innerBreakdown.colorImpressions;
+    }
 
     if (item.coverImpressions > 0) {
       aggregateCoverByPaper[item.row.coverPaper] = (aggregateCoverByPaper[item.row.coverPaper] || 0) + item.coverImpressions;
@@ -1144,9 +1232,17 @@ function calculateWorkbook(state, config) {
   }
 
   const computedRows = rowBase.map((item, index) => {
-    const { row, innerImpressions, bindingSheetsPerCopy, coverImpressions, backImpressions } = item;
-    const effectiveInnerQty =
-      state.calcMode === "Somar quantidades" ? aggregateInnerByKey[getPrintAggregationKey(row.printType, row.printMode)] || 0 : innerImpressions;
+    const { row, innerBreakdown, bindingSheetsPerCopy, coverImpressions, backImpressions } = item;
+    const effectiveBlackWhiteQty =
+      state.calcMode === "Somar quantidades"
+        ? aggregateInnerByKey[getPrintAggregationKey("Preto e branco", row.printMode)] || 0
+        : innerBreakdown.blackWhiteImpressions;
+    const effectiveColorQty =
+      row.printType !== "Preto e branco"
+        ? state.calcMode === "Somar quantidades"
+          ? aggregateInnerByKey[getPrintAggregationKey(row.printType, row.printMode)] || 0
+          : innerBreakdown.colorImpressions
+        : 0;
 
     const samePaper = row.coverPaper === row.backCoverPaper;
     const coverPricingQty =
@@ -1162,7 +1258,19 @@ function calculateWorkbook(state, config) {
           ? coverImpressions + backImpressions
           : backImpressions;
 
-    const innerTotal = getPrintTotalByType(row.printType, innerImpressions, effectiveInnerQty, config, row.printMode);
+    let innerTotal = 0;
+    if (innerBreakdown.blackWhiteImpressions > 0) {
+      innerTotal += getBlackWhiteTotal(innerBreakdown.blackWhiteImpressions, effectiveBlackWhiteQty, config, row.printMode);
+    }
+    if (innerBreakdown.colorImpressions > 0) {
+      if (row.printType === "Preto e branco") {
+        if (isRowActive(row)) {
+          warnings.push(`Item ${index + 1}: selecione "Colorido jato de tinta" ou "Colorido laser" para cobrar as páginas coloridas.`);
+        }
+      } else {
+        innerTotal += getPrintTotalByType(row.printType, innerBreakdown.colorImpressions, effectiveColorQty, config, row.printMode);
+      }
+    }
     const coverUnit = coverImpressions > 0 ? lookupTier(config.coverPricing[row.coverPaper], coverPricingQty) : 0;
     const backUnit = backImpressions > 0 ? lookupTier(config.coverPricing[row.backCoverPaper], backPricingQty) : 0;
     const coverTotal = coverImpressions * coverUnit;
@@ -1190,10 +1298,18 @@ function calculateWorkbook(state, config) {
     const total = innerTotal + coverTotal + backTotal + finishingTotal;
     const unitValue = row.quantity > 0 ? total / row.quantity : 0;
 
+    if (row.colorPages > row.pages && isRowActive(row)) {
+      warnings.push(`Item ${index + 1}: as páginas coloridas não podem ser maiores que o total de páginas. O app usou o limite da quantidade total.`);
+    }
+
     return {
       ...row,
       active: isRowActive(row),
-      innerImpressions,
+      innerImpressions: innerBreakdown.totalImpressions,
+      blackWhiteImpressions: innerBreakdown.blackWhiteImpressions,
+      colorImpressions: innerBreakdown.colorImpressions,
+      colorPages: innerBreakdown.normalizedColorPages,
+      blackWhitePages: innerBreakdown.blackWhitePagesPerCopy,
       bindingSheetsPerCopy,
       coverImpressions,
       backImpressions,
@@ -2489,7 +2605,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, m2Workbook) {
       return {
         kind: "Apostila",
         description: row.description,
-        detail: `${formatInteger(row.quantity)} apostilas | ${formatInteger(row.pages)} páginas | ${row.printType} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}`,
+        detail: `${formatInteger(row.quantity)} apostilas | ${formatInteger(row.pages)} páginas${row.colorPages > 0 ? ` (${formatInteger(row.blackWhitePages)} PB + ${formatInteger(row.colorPages)} coloridas)` : ""} | ${buildApostilaPrintDetail(row)} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}`,
         extraDetail: coverDetail,
         total: row.total,
       };
@@ -2502,7 +2618,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, m2Workbook) {
     })),
     ...m2Workbook.activeRows.map((row) => ({
       kind: "Cálculo de m²",
-      description: row.description || row.productLabel,
+      description: getM2RowDescription(row),
       detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.productLabel}${row.finishSummary ? ` | ${row.finishSummary}` : ""}${row.artCreationFee > 0 ? ` | Arte/edição: ${formatCurrency(row.artCreationFee)}` : ""}`,
       total: row.total,
     })),
@@ -2606,14 +2722,14 @@ function createQuoteText(state, workbook, colorWorkbook, m2Workbook) {
     ...workbook.activeRows.map((row, index) => {
       const coverDetail = buildApostilaCoverDetail(row);
       return {
-        text: `- ${row.description || `Apostila ${index + 1}`} | ${row.quantity} apostilas | ${row.pages} páginas | ${row.printType} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}${coverDetail ? ` | ${coverDetail}` : ""} | ${formatCurrency(row.total)}`,
+        text: `- ${row.description || `Apostila ${index + 1}`} | ${row.quantity} apostilas | ${row.pages} páginas${row.colorPages > 0 ? ` (${row.blackWhitePages} PB + ${row.colorPages} coloridas)` : ""} | ${buildApostilaPrintDetail(row)} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}${coverDetail ? ` | ${coverDetail}` : ""} | ${formatCurrency(row.total)}`,
       };
     }),
     ...colorWorkbook.activeRows.map((row, index) => ({
       text: `- ${row.description || `Impresso ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.paperType} | ${row.printMode} | ${formatCurrency(row.total)}`,
     })),
     ...m2Workbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || row.productLabel || `M² ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.finishSummary ? `${row.finishSummary} | ` : ""}${row.artCreationFee > 0 ? `Arte/edição: ${formatCurrency(row.artCreationFee)} | ` : ""}${formatCurrency(row.total)}`,
+      text: `- ${getM2RowDescription(row) || `M² ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.finishSummary ? `${row.finishSummary} | ` : ""}${row.artCreationFee > 0 ? `Arte/edição: ${formatCurrency(row.artCreationFee)} | ` : ""}${formatCurrency(row.total)}`,
     })),
   ];
 
@@ -3269,6 +3385,7 @@ async function initApp() {
             <td><input class="cell-input" name="bindingGroup" value="${escapeHtml(row.bindingGroup)}" placeholder="Ex.: Grupo A"></td>
             <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${escapeHtml(row.quantity)}"></td>
             <td><input class="cell-input" name="pages" type="number" min="0" step="1" value="${escapeHtml(row.pages)}"></td>
+            <td><input class="cell-input" name="colorPages" type="number" min="0" step="1" value="${escapeHtml(row.colorPages ?? 0)}"></td>
             <td><select class="cell-select" name="coverType">${buildOptions(OPTIONS.coverTypes, row.coverType)}</select></td>
             <td><select class="cell-select" name="coverPaper">${buildOptions(OPTIONS.coverPapers, row.coverPaper)}</select></td>
             <td><select class="cell-select" name="backCoverType">${buildOptions(OPTIONS.backCoverTypes, row.backCoverType)}</select></td>
@@ -3329,7 +3446,7 @@ async function initApp() {
             <td>
               ${createM2FinishPickerMarkup(row, config)}
             </td>
-            <td><input class="cell-input description" name="description" value="${escapeHtml(row.description)}" placeholder="${escapeHtml(row.productLabel)}"></td>
+            <td><input class="cell-input description" name="description" value="${escapeHtml(row.description)}" placeholder="${escapeHtml(getDefaultM2Description(row.productId) || row.productLabel)}"></td>
             <td>
               <select class="cell-select" name="measureUnit">
                 <option value="cm"${row.measureUnit === "cm" ? " selected" : ""}>cm</option>
@@ -3586,6 +3703,7 @@ async function initApp() {
       row.description = file.name.replace(/\.pdf$/i, "");
       row.quantity = 1;
       row.pages = pages || 0;
+      row.colorPages = 0;
       imported += 1;
     }
 
@@ -3741,7 +3859,7 @@ async function initApp() {
     if (!field || !row) {
       return;
     }
-    row[field] = field === "quantity" || field === "pages" ? toWholeNumber(target.value) : target.value;
+    row[field] = field === "quantity" || field === "pages" || field === "colorPages" ? toWholeNumber(target.value) : target.value;
     persist();
     renderRowsAndSummary();
   });
@@ -3786,7 +3904,16 @@ async function initApp() {
       return;
     }
 
-    if (field === "widthMm" || field === "heightMm") {
+    if (field === "productId") {
+      const previousProductId = row.productId;
+      const previousDefaultDescription = getDefaultM2Description(previousProductId);
+      const currentDescription = (row.description || "").trim();
+      row.productId = target.value;
+      const nextDefaultDescription = getDefaultM2Description(row.productId);
+      if (!currentDescription || currentDescription === previousDefaultDescription) {
+        row.description = nextDefaultDescription;
+      }
+    } else if (field === "widthMm" || field === "heightMm") {
       row[field] = toDecimalNumber(target.value);
     } else if (field === "measureUnit") {
       row.measureUnit = target.value === "m" ? "m" : "cm";
