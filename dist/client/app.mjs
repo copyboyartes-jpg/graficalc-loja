@@ -2747,6 +2747,12 @@ async function initApp() {
     fillClientRecordForm();
   }
 
+  function buildQuoteDocumentTitle() {
+    const clientName = (state.client.name || "").trim();
+    const safeClientName = clientName.replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim();
+    return safeClientName ? `Orçamento - ${safeClientName}` : "Orçamento";
+  }
+
   function persistLocalOnly() {
     saveToStorage(STORAGE_KEYS.state, state);
     saveToStorage(STORAGE_KEYS.config, config);
@@ -4243,8 +4249,17 @@ async function initApp() {
   });
 
   document.getElementById("print-quote-button").addEventListener("click", () => {
+    const previousTitle = document.title;
+    const restoreTitle = () => {
+      document.title = previousTitle;
+      window.removeEventListener("afterprint", restoreTitle);
+    };
+
+    document.title = buildQuoteDocumentTitle();
+    window.addEventListener("afterprint", restoreTitle);
     selectTab("orcamento");
     window.print();
+    setTimeout(restoreTitle, 1000);
   });
 
   document.getElementById("save-client-button").addEventListener("click", () => {
