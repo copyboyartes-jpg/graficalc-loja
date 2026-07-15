@@ -1110,12 +1110,12 @@ function buildApostilaPrintDetail(row) {
   const colorPages = getNormalizedColorPages(row);
   const blackWhitePages = Math.max(0, totalPages - colorPages);
 
-  if (row.printType === "Preto e branco") {
-    return colorPages > 0 ? `Preto e branco | ${colorPages} coloridas sem tipo` : "Preto e branco";
+  if (colorPages > 0) {
+    return `${blackWhitePages} PB + ${colorPages} coloridas (tabela da capa em Sulfite 75g)`;
   }
 
-  if (colorPages > 0 && colorPages < totalPages) {
-    return `${blackWhitePages} PB + ${colorPages} coloridas (${row.printType})`;
+  if (row.printType === "Preto e branco") {
+    return "Preto e branco";
   }
 
   return row.printType;
@@ -1143,6 +1143,7 @@ function calculateWorkbook(state, config) {
 
   const aggregateInnerByKey = {};
   const aggregateCoverByPaper = {};
+  let aggregateColorPagesOnSulfite = 0;
 
   for (const item of rowBase) {
     const blackWhiteKey = getPrintAggregationKey("Preto e branco", item.row.printMode);
@@ -1150,7 +1151,9 @@ function calculateWorkbook(state, config) {
       aggregateInnerByKey[blackWhiteKey] = (aggregateInnerByKey[blackWhiteKey] || 0) + item.innerBreakdown.blackWhiteImpressions;
     }
 
-    if (item.innerBreakdown.colorImpressions > 0 && item.row.printType !== "Preto e branco") {
+    if (item.innerBreakdown.colorImpressions > 0 && item.innerBreakdown.normalizedColorPages > 0) {
+      aggregateColorPagesOnSulfite += item.innerBreakdown.colorImpressions;
+    } else if (item.innerBreakdown.colorImpressions > 0 && item.row.printType !== "Preto e branco") {
       const colorKey = getPrintAggregationKey(item.row.printType, item.row.printMode);
       aggregateInnerByKey[colorKey] = (aggregateInnerByKey[colorKey] || 0) + item.innerBreakdown.colorImpressions;
     }
@@ -1238,7 +1241,7 @@ function calculateWorkbook(state, config) {
         ? aggregateInnerByKey[getPrintAggregationKey("Preto e branco", row.printMode)] || 0
         : innerBreakdown.blackWhiteImpressions;
     const effectiveColorQty =
-      row.printType !== "Preto e branco"
+      row.printType !== "Preto e branco" && innerBreakdown.normalizedColorPages === 0
         ? state.calcMode === "Somar quantidades"
           ? aggregateInnerByKey[getPrintAggregationKey(row.printType, row.printMode)] || 0
           : innerBreakdown.colorImpressions
@@ -1263,10 +1266,12 @@ function calculateWorkbook(state, config) {
       innerTotal += getBlackWhiteTotal(innerBreakdown.blackWhiteImpressions, effectiveBlackWhiteQty, config, row.printMode);
     }
     if (innerBreakdown.colorImpressions > 0) {
-      if (row.printType === "Preto e branco") {
-        if (isRowActive(row)) {
-          warnings.push(`Item ${index + 1}: selecione "Colorido jato de tinta" ou "Colorido laser" para cobrar as páginas coloridas.`);
-        }
+      if (innerBreakdown.normalizedColorPages > 0) {
+        const sulfitePricingQty = state.calcMode === "Somar quantidades"
+          ? aggregateColorPagesOnSulfite
+          : innerBreakdown.colorImpressions;
+        const sulfiteUnit = lookupTier(config.coverPricing["Sulfite 75g"], sulfitePricingQty);
+        innerTotal += innerBreakdown.colorImpressions * sulfiteUnit;
       } else {
         innerTotal += getPrintTotalByType(row.printType, innerBreakdown.colorImpressions, effectiveColorQty, config, row.printMode);
       }
