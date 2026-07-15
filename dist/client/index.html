@@ -402,16 +402,39 @@
           <article class="panel">
             <div class="panel-heading">
               <div>
-                <h2>Salvar cliente atual</h2>
-                <p class="panel-copy">Guarde contatos para reutilizar em novos orçamentos.</p>
+                <h2>Cadastro de contatos</h2>
+                <p class="panel-copy">Cadastre, altere, salve e exclua contatos para reutilizar em qualquer orçamento.</p>
               </div>
             </div>
 
-            <div class="toolbar">
-              <button id="save-client-button" class="button button-primary" type="button">Salvar cliente atual</button>
+            <div class="quote-form-grid">
+              <label>
+                <span>Nome / Razão social</span>
+                <input id="client-record-name" type="text">
+              </label>
+              <label>
+                <span>Contato</span>
+                <input id="client-record-contact" type="text">
+              </label>
+              <label>
+                <span>CNPJ</span>
+                <input id="client-record-cnpj" type="text">
+              </label>
+              <label class="full-width">
+                <span>Observações internas</span>
+                <textarea id="client-record-notes" rows="4"></textarea>
+              </label>
             </div>
 
-            <p class="helper-text">Os dados são puxados da aba de orçamento e ficam guardados na base compartilhada.</p>
+            <div class="toolbar">
+              <button id="save-client-button" class="button button-primary" type="button">Salvar contato</button>
+              <button id="new-client-button" class="button" type="button">Novo contato</button>
+              <button id="load-current-client-button" class="button" type="button">Usar dados do orçamento atual</button>
+            </div>
+
+            <p class="helper-text status-note" id="clients-feedback">
+              Os contatos salvos aqui ficam compartilhados entre os computadores. O preenchimento do formulário não é compartilhado até você salvar.
+            </p>
           </article>
 
           <article class="panel">
@@ -580,7 +603,7 @@
     </div>
   </div>
 
-  <script src="./app.mjs?v=c71752b1d735"></script>
+  <script src="./app.mjs?v=37b6ba3a3561"></script>
 </body>
 </html>
 

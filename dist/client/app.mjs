@@ -2676,9 +2676,15 @@ async function initApp() {
   const confirmModalMessage = document.getElementById("confirm-modal-message");
   const confirmModalConfirm = document.getElementById("confirm-modal-confirm");
   const confirmModalCancel = document.getElementById("confirm-modal-cancel");
+  const clientRecordName = document.getElementById("client-record-name");
+  const clientRecordContact = document.getElementById("client-record-contact");
+  const clientRecordCnpj = document.getElementById("client-record-cnpj");
+  const clientRecordNotes = document.getElementById("client-record-notes");
+  const clientsFeedback = document.getElementById("clients-feedback");
 
   const tabButtons = [...document.querySelectorAll(".tab-button")];
   const tabPanels = [...document.querySelectorAll(".tab-panel")];
+  let activeClientEditorId = "";
 
   function setStatusMessage(element, message, tone = "neutral") {
     if (!element) {
@@ -2704,8 +2710,41 @@ async function initApp() {
     setStatusMessage(colorFeedback, message, tone);
   }
 
+  function setClientsFeedback(message, tone = "neutral") {
+    setStatusMessage(clientsFeedback, message, tone);
+  }
+
   function setSyncStatus(message, tone = "neutral") {
     setStatusMessage(syncStatus, message, tone);
+  }
+
+  function readClientRecordForm() {
+    return {
+      name: clientRecordName?.value.trim() || "",
+      contact: clientRecordContact?.value.trim() || "",
+      cnpj: clientRecordCnpj?.value.trim() || "",
+      notes: clientRecordNotes?.value.trim() || "",
+    };
+  }
+
+  function fillClientRecordForm(client = {}) {
+    if (clientRecordName) {
+      clientRecordName.value = client.name || "";
+    }
+    if (clientRecordContact) {
+      clientRecordContact.value = client.contact || "";
+    }
+    if (clientRecordCnpj) {
+      clientRecordCnpj.value = client.cnpj || "";
+    }
+    if (clientRecordNotes) {
+      clientRecordNotes.value = client.notes || "";
+    }
+  }
+
+  function resetClientRecordForm() {
+    activeClientEditorId = "";
+    fillClientRecordForm();
   }
 
   function persistLocalOnly() {
@@ -3149,15 +3188,15 @@ async function initApp() {
                   <p class="list-meta">Criado em ${escapeHtml(formatDateTime(client.createdAt) || "data indisponível")}</p>
                 </div>
                 <div class="list-actions">
-                  <button class="button button-primary" type="button" data-client-action="load" data-client-id="${escapeHtml(client.id)}">Carregar</button>
-                  <button class="button" type="button" data-client-action="duplicate" data-client-id="${escapeHtml(client.id)}">Duplicar</button>
+                  <button class="button button-primary" type="button" data-client-action="load" data-client-id="${escapeHtml(client.id)}">Usar no orçamento</button>
+                  <button class="button" type="button" data-client-action="edit" data-client-id="${escapeHtml(client.id)}">Editar</button>
                   <button class="button button-danger" type="button" data-client-action="delete" data-client-id="${escapeHtml(client.id)}">Excluir</button>
                 </div>
               </article>
             `
           )
           .join("")
-      : `<div class="empty-state"><strong>Nenhum cliente salvo ainda</strong><span>Quando preencher um orçamento, use "Salvar cliente atual" para criar sua base compartilhada de contatos.</span></div>`;
+      : `<div class="empty-state"><strong>Nenhum cliente salvo ainda</strong><span>Preencha o cadastro ao lado ou use os dados do orçamento atual para montar sua base compartilhada de contatos.</span></div>`;
   }
 
   function renderHistoryTab() {
@@ -4209,19 +4248,19 @@ async function initApp() {
   });
 
   document.getElementById("save-client-button").addEventListener("click", () => {
-    const clientName = state.client.name.trim();
+    const formValues = readClientRecordForm();
+    const clientName = formValues.name;
     if (!clientName) {
-      setMainFeedback("Digite o nome do cliente antes de salvar na base compartilhada.", "warning");
+      setClientsFeedback("Digite o nome do contato antes de salvar.", "warning");
       return;
     }
 
-    const existingIndex = state.clients.findIndex((client) => client.name.trim().toLowerCase() === clientName.toLowerCase());
+    const existingIndex = state.clients.findIndex((client) =>
+      activeClientEditorId ? client.id === activeClientEditorId : client.name.trim().toLowerCase() === clientName.toLowerCase()
+    );
     const payload = {
       id: existingIndex >= 0 ? state.clients[existingIndex].id : `client-${Date.now()}`,
-      name: state.client.name.trim(),
-      contact: state.client.contact.trim(),
-      cnpj: state.client.cnpj.trim(),
-      notes: state.quoteNotes.trim(),
+      ...formValues,
       createdAt: existingIndex >= 0 ? state.clients[existingIndex].createdAt : new Date().toISOString(),
     };
 
@@ -4231,9 +4270,27 @@ async function initApp() {
       state.clients.unshift(payload);
     }
 
+    activeClientEditorId = payload.id;
+    fillClientRecordForm(payload);
     persist();
     renderClientsTab();
-    setMainFeedback("Cliente salvo na base compartilhada com sucesso.", "success");
+    setClientsFeedback(existingIndex >= 0 ? "Contato atualizado com sucesso." : "Contato salvo com sucesso.", "success");
+  });
+
+  document.getElementById("new-client-button").addEventListener("click", () => {
+    resetClientRecordForm();
+    setClientsFeedback("Formulário limpo para cadastrar um novo contato.", "success");
+  });
+
+  document.getElementById("load-current-client-button").addEventListener("click", () => {
+    activeClientEditorId = "";
+    fillClientRecordForm({
+      name: state.client.name,
+      contact: state.client.contact,
+      cnpj: state.client.cnpj,
+      notes: state.quoteNotes,
+    });
+    setClientsFeedback("Dados do orçamento atual carregados no formulário. Agora é só salvar o contato.", "success");
   });
 
   document.getElementById("save-history-button").addEventListener("click", () => {
@@ -4274,18 +4331,13 @@ async function initApp() {
       state.client.contact = client.contact;
       state.client.cnpj = client.cnpj;
       state.quoteNotes = client.notes || state.quoteNotes;
-      persist();
+      persistLocalOnly();
       renderAll();
       setMainFeedback("Cliente carregado no orçamento atual.", "success");
-    } else if (button.dataset.clientAction === "duplicate") {
-      state.clients.unshift({
-        ...client,
-        id: `client-${Date.now()}`,
-        name: `${client.name} (cópia)`,
-        createdAt: new Date().toISOString(),
-      });
-      persist();
-      renderClientsTab();
+    } else if (button.dataset.clientAction === "edit") {
+      activeClientEditorId = client.id;
+      fillClientRecordForm(client);
+      setClientsFeedback(`Contato "${client.name || "Sem nome"}" carregado para edição.`, "success");
     } else if (button.dataset.clientAction === "delete") {
       if (!(await confirmAppAction({
         kicker: "Exclusão",
@@ -4298,9 +4350,12 @@ async function initApp() {
         return;
       }
       state.clients = state.clients.filter((item) => item.id !== client.id);
+      if (activeClientEditorId === client.id) {
+        resetClientRecordForm();
+      }
       persist();
       renderClientsTab();
-      setMainFeedback("Cliente excluído da base compartilhada.", "warning");
+      setClientsFeedback("Contato excluído da base compartilhada.", "warning");
     }
   });
 
