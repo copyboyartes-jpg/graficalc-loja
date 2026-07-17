@@ -1,4 +1,14 @@
-PASSO A PASSO
+PASSO A PASSO ATUALIZADO
+
+Este fluxo foi recriado em 17/07/2026 porque o token anterior venceu em 14/07/2026 07:05.
+
+OBJETIVO DESTA ETAPA
+
+- Gerar o pacote atualizado
+- Criar ou reaproveitar o commit final local
+- Mostrar para voce qual commit deve ser enviado ao Codex
+
+COMO FAZER
 
 1. Abra esta pasta:
 C:\Users\Usuário\Documents\Codex\2026-07-08\oi\online-private-site
@@ -6,11 +16,16 @@ C:\Users\Usuário\Documents\Codex\2026-07-08\oi\online-private-site
 2. Dê duplo clique em:
 publicar-site-privado.cmd
 
-3. Espere terminar.
+3. Espere o processo terminar.
 
-4. Quando aparecer o commit final, volte para o Codex e me envie esse commit.
+4. Abra o arquivo:
+resultado-publicacao.txt
 
-Observacao importante:
+5. Copie o valor mostrado na linha "Commit:".
 
-- Este token foi gerado para uso imediato e vence em 10/07/2026 as 18:29.
-- Se aparecer erro dizendo que o token venceu, me avise que eu gero outro.
+6. Volte para o Codex e envie esse commit para finalizar a publicacao online.
+
+OBSERVACAO IMPORTANTE
+
+- Agora este fluxo nao depende de token salvo no arquivo.
+- Se no futuro for necessario fazer o envio tecnico pela mesma pasta, o script aceita um token novo por parametro, sem gravar o token no projeto.
