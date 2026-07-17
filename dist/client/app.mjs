@@ -187,6 +187,183 @@ const RESIN_MATERIAL_LABELS = {
   "holo-silver": "Adesivo holográfico prateado",
 };
 
+const READY_PRODUCT_CATALOG = [
+  {
+    id: "Cordão de crachá liso",
+    label: "Cordão de crachá liso",
+    category: "Cordões",
+    pricingMode: "plainBadge",
+  },
+  {
+    id: "Cordão estampado 20mm com jacaré",
+    label: "Cordão estampado 20mm com jacaré",
+    category: "Cordões",
+    pricingMode: "printedBadge",
+  },
+  {
+    id: "Cordão estampado 20mm com mosquetão",
+    label: "Cordão estampado 20mm com mosquetão",
+    category: "Cordões",
+    pricingMode: "printedBadge",
+  },
+  {
+    id: "P10 | Área 10x27mm",
+    label: "P10 | Área 10x27mm",
+    category: "Carimbos automáticos",
+    unitPrice: 39,
+  },
+  {
+    id: "P20 | Área 38x14mm",
+    label: "P20 | Área 38x14mm",
+    category: "Carimbos automáticos",
+    unitPrice: 40,
+  },
+  {
+    id: "P30 | Área 47x18mm",
+    label: "P30 | Área 47x18mm",
+    category: "Carimbos automáticos",
+    unitPrice: 45,
+  },
+  {
+    id: "P40 | Área 58x22mm",
+    label: "P40 | Área 58x22mm",
+    category: "Carimbos automáticos",
+    unitPrice: 49,
+  },
+  {
+    id: "P15 | Área 69x10mm",
+    label: "P15 | Área 69x10mm",
+    category: "Carimbos automáticos",
+    unitPrice: 63,
+  },
+  {
+    id: "P25 | Área 75x15mm",
+    label: "P25 | Área 75x15mm",
+    category: "Carimbos automáticos",
+    unitPrice: 63,
+  },
+  {
+    id: "P60 | Área 60x40mm",
+    label: "P60 | Área 60x40mm",
+    category: "Carimbos automáticos",
+    unitPrice: 83.6,
+  },
+  {
+    id: "P50 | Área 75x37mm",
+    label: "P50 | Área 75x37mm",
+    category: "Carimbos automáticos",
+    unitPrice: 83.6,
+  },
+  {
+    id: "Automático | Área 76x37mm",
+    label: "Automático | Área 76x37mm",
+    category: "Carimbos automáticos",
+    unitPrice: 83.6,
+  },
+  {
+    id: "Madeira | Área 65x40mm",
+    label: "Madeira | Área 65x40mm",
+    category: "Carimbos de madeira",
+    unitPrice: 21.5,
+  },
+  {
+    id: "Madeira | Área 70x25mm",
+    label: "Madeira | Área 70x25mm",
+    category: "Carimbos de madeira",
+    unitPrice: 21.5,
+  },
+  {
+    id: "Madeira | Área 70x15mm",
+    label: "Madeira | Área 70x15mm",
+    category: "Carimbos de madeira",
+    unitPrice: 20,
+  },
+  {
+    id: "Madeira | Área 70x6mm",
+    label: "Madeira | Área 70x6mm",
+    category: "Carimbos de madeira",
+    unitPrice: 20,
+  },
+  {
+    id: "Madeira | Área 50x20mm",
+    label: "Madeira | Área 50x20mm",
+    category: "Carimbos de madeira",
+    unitPrice: 17.5,
+  },
+  {
+    id: "Madeira | Área 50x15mm",
+    label: "Madeira | Área 50x15mm",
+    category: "Carimbos de madeira",
+    unitPrice: 17.5,
+  },
+  {
+    id: "Madeira | Área 30x6mm",
+    label: "Madeira | Área 30x6mm",
+    category: "Carimbos de madeira",
+    unitPrice: 16.5,
+  },
+  {
+    id: "Carimbo redondo 15mm",
+    label: "Carimbo redondo 15mm",
+    category: "Carimbos redondos",
+    unitPrice: 19,
+  },
+  {
+    id: "Carimbo redondo 20mm",
+    label: "Carimbo redondo 20mm",
+    category: "Carimbos redondos",
+    unitPrice: 19,
+  },
+  {
+    id: "Carimbo redondo 30mm",
+    label: "Carimbo redondo 30mm",
+    category: "Carimbos redondos",
+    unitPrice: 20,
+  },
+  {
+    id: "Carimbo redondo 35mm",
+    label: "Carimbo redondo 35mm",
+    category: "Carimbos redondos",
+    unitPrice: 20,
+  },
+  {
+    id: "Carimbo redondo 45mm",
+    label: "Carimbo redondo 45mm",
+    category: "Carimbos redondos",
+    unitPrice: 23,
+  },
+  {
+    id: "Carimbo redondo 50mm",
+    label: "Carimbo redondo 50mm",
+    category: "Carimbos redondos",
+    unitPrice: 23,
+  },
+  {
+    id: "Carimbo redondo 55mm",
+    label: "Carimbo redondo 55mm",
+    category: "Carimbos redondos",
+    unitPrice: 23,
+  },
+  {
+    id: "Só película",
+    label: "Só película",
+    category: "Acessórios de carimbo",
+    unitPrice: 13.5,
+  },
+  {
+    id: "Almofada",
+    label: "Almofada",
+    category: "Acessórios de carimbo",
+    unitPrice: 21,
+  },
+  {
+    id: "Tinta",
+    label: "Tinta",
+    category: "Acessórios de carimbo",
+    unitPrice: 16,
+  },
+];
+
 function createDefaultConfig() {
   return {
     printPricing: {
@@ -487,7 +664,7 @@ function createDefaultCredentialRow(index) {
 function createDefaultReadyProductRow(index) {
   return {
     id: `ready-product-row-${index + 1}`,
-    productType: OPTIONS.readyProducts[0],
+    productType: READY_PRODUCT_CATALOG[0]?.id || "",
     description: "",
     quantity: 0,
   };
@@ -1335,23 +1512,19 @@ function getReadyProductSelection(config, productType, quantity = 0) {
   const pricing = config?.credentialLanyardPricing || {};
   const printedTiers = Array.isArray(pricing.printed) ? pricing.printed : [];
   const printedUnit = lookupTier(printedTiers, Math.max(1, Number(quantity || 0)));
-  const options = [
-    {
-      id: "Cordão de crachá liso",
-      label: "Cordão de crachá liso",
-      unitPrice: toMoneyNumber(pricing.plainBadge),
-    },
-    {
-      id: "Cordão estampado 20mm com jacaré",
-      label: "Cordão estampado 20mm com jacaré",
-      unitPrice: toMoneyNumber(printedUnit),
-    },
-    {
-      id: "Cordão estampado 20mm com mosquetão",
-      label: "Cordão estampado 20mm com mosquetão",
-      unitPrice: toMoneyNumber(printedUnit),
-    },
-  ];
+  const options = READY_PRODUCT_CATALOG.map((item) => {
+    let unitPrice = toMoneyNumber(item.unitPrice);
+    if (item.pricingMode === "plainBadge") {
+      unitPrice = toMoneyNumber(pricing.plainBadge);
+    } else if (item.pricingMode === "printedBadge") {
+      unitPrice = toMoneyNumber(printedUnit);
+    }
+
+    return {
+      ...item,
+      unitPrice,
+    };
+  });
   return options.find((item) => item.id === productType) || options[0];
 }
 
@@ -2184,6 +2357,31 @@ function buildOptions(options, currentValue) {
     .join("");
 }
 
+function buildReadyProductOptions(currentValue) {
+  const grouped = READY_PRODUCT_CATALOG.reduce((accumulator, item) => {
+    if (!accumulator[item.category]) {
+      accumulator[item.category] = [];
+    }
+    accumulator[item.category].push(item);
+    return accumulator;
+  }, {});
+
+  return Object.entries(grouped)
+    .map(
+      ([category, items]) => `
+        <optgroup label="${escapeHtml(category)}">
+          ${items
+            .map(
+              (item) =>
+                `<option value="${escapeHtml(item.id)}"${item.id === currentValue ? " selected" : ""}>${escapeHtml(item.label)}</option>`
+            )
+            .join("")}
+        </optgroup>
+      `
+    )
+    .join("");
+}
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -2546,7 +2744,7 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
   const produtosProntosCards = [
     createConfigCardMarkup(
       "Cordões e produtos vendidos separadamente",
-      "Esses valores aparecem na aba de produtos prontos para orçar itens avulsos.",
+      "Esses valores aparecem na aba de produtos prontos para orçar itens avulsos. Os cordões seguem a configuração abaixo e os carimbos usam a tabela fixa cadastrada no sistema.",
       createCredentialLanyardPricingMarkup(config.credentialLanyardPricing)
     ),
   ];
@@ -4504,7 +4702,7 @@ async function initApp() {
         (row, index) => `
           <tr class="${row.active ? "" : "is-empty"}" data-ready-row-index="${index}">
             <td><strong>${String(index + 1).padStart(2, "0")}</strong></td>
-            <td><select class="cell-select" name="productType">${buildOptions(OPTIONS.readyProducts, row.productType)}</select></td>
+            <td><select class="cell-select" name="productType">${buildReadyProductOptions(row.productType)}</select></td>
             <td><input class="cell-input description" name="description" value="${escapeHtml(row.description === row.productLabel ? "" : row.description)}" placeholder="${escapeHtml(row.productLabel)}"></td>
             <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${escapeHtml(row.quantity)}" placeholder="0"></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.unitPrice)}</span></td>
@@ -4516,11 +4714,11 @@ async function initApp() {
 
     readyWarningList.innerHTML = readyWorkbook.warnings.length
       ? readyWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
-      : `<div class="warning-item is-success">Sem alertas no momento. Os valores desta aba usam a mesma base comercial dos cordões configurados no sistema.</div>`;
+      : `<div class="warning-item is-success">Sem alertas no momento. Esta aba mistura cordões configuráveis com carimbos e acessórios prontos para venda.</div>`;
     setReadyFeedback(
       readyWorkbook.activeRows.length > 0
         ? "Produtos prontos atualizados com sucesso."
-        : "Use esta aba para vender cordões e outros itens prontos por unidade, separados da credencial.",
+        : "Use esta aba para vender cordões, carimbos e outros itens prontos por unidade, separados da credencial.",
       readyWorkbook.activeRows.length > 0 ? "success" : "neutral"
     );
 
