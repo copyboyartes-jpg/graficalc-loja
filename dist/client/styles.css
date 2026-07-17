@@ -852,6 +852,36 @@ textarea {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
+.credential-budget-table {
+  min-width: 1760px;
+}
+
+.credential-budget-table .cell-input.description {
+  min-width: 180px;
+}
+
+.credential-budget-table .readonly-value {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 7px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(31, 42, 47, 0.08);
+}
+
+.credential-budget-table .readonly-value.subtle {
+  color: var(--muted-strong);
+}
+
+.ready-products-table {
+  min-width: 980px;
+}
+
+.ready-products-table .cell-input.description {
+  min-width: 220px;
+}
+
 .m2-budget-table {
   min-width: 1820px;
 }

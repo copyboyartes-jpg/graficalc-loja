@@ -35,6 +35,19 @@ const OPTIONS = {
     "Metalizado branco",
     "Metalizado amarelo",
   ],
+  credentialMaterials: [
+    "Couche 250g",
+    "Couche 300g",
+    "Offset 240g",
+    "PS 1mm",
+    "PS 2mm",
+  ],
+  credentialLamination: ["Sem laminação", "Com laminação"],
+  readyProducts: [
+    "Cordão de crachá liso",
+    "Cordão estampado 20mm com jacaré",
+    "Cordão estampado 20mm com mosquetão",
+  ],
   spiralOptions: ["Completa", "Sem capas plásticas"],
   calcModes: ["Independente", "Somar quantidades"],
   m2CalcModes: ["Independente", "Somar materiais iguais"],
@@ -295,6 +308,16 @@ function createDefaultConfig() {
         { min: 301, value: 4.4, label: "Acima de 300 (assumido)" },
       ],
     },
+    credentialLanyardPricing: {
+      roundWhite2mm: 0.75,
+      plainBadge: 2.75,
+      printed: [
+        { min: 1, value: 8.0, label: "Até 19" },
+        { min: 20, value: 6.5, label: "20 a 29" },
+        { min: 30, value: 5.0, label: "30 a 49" },
+        { min: 50, value: 4.0, label: "50 ou mais" },
+      ],
+    },
     cutPricing: {
       upToFiveSheets: [
         { minUp: 1, value: 2.0, label: "Ate 11 por folha" },
@@ -447,6 +470,28 @@ function createDefaultM2Row(index) {
   };
 }
 
+function createDefaultCredentialRow(index) {
+  return {
+    id: `credential-row-${index + 1}`,
+    description: "",
+    materialType: "Couche 250g",
+    lamination: "Sem laminação",
+    lanyardType: "none",
+    widthCm: 0,
+    heightCm: 0,
+    quantity: 0,
+  };
+}
+
+function createDefaultReadyProductRow(index) {
+  return {
+    id: `ready-product-row-${index + 1}`,
+    productType: OPTIONS.readyProducts[0],
+    description: "",
+    quantity: 0,
+  };
+}
+
 function createDefaultResinRow(index) {
   return {
     id: `resin-row-${index + 1}`,
@@ -483,6 +528,8 @@ function createDefaultState() {
     },
     rows: Array.from({ length: 5 }, (_, index) => createDefaultRow(index)),
     colorPrintItems: Array.from({ length: 5 }, (_, index) => createDefaultColorPrintRow(index)),
+    credentialItems: Array.from({ length: 5 }, (_, index) => createDefaultCredentialRow(index)),
+    readyProductItems: Array.from({ length: 5 }, (_, index) => createDefaultReadyProductRow(index)),
     m2Items: Array.from({ length: 5 }, (_, index) => createDefaultM2Row(index)),
     resinItems: Array.from({ length: 5 }, (_, index) => createDefaultResinRow(index)),
     client: {
@@ -628,6 +675,16 @@ function mergeConfig(candidate) {
     }
   }
 
+  if (candidate.credentialLanyardPricing && typeof candidate.credentialLanyardPricing === "object") {
+    merged.credentialLanyardPricing = {
+      ...merged.credentialLanyardPricing,
+      ...candidate.credentialLanyardPricing,
+      printed: Array.isArray(candidate.credentialLanyardPricing.printed)
+        ? candidate.credentialLanyardPricing.printed
+        : merged.credentialLanyardPricing.printed,
+    };
+  }
+
   if (candidate.cutPricing && typeof candidate.cutPricing === "object") {
     if (Array.isArray(candidate.cutPricing.upToFiveSheets)) {
       merged.cutPricing.upToFiveSheets = candidate.cutPricing.upToFiveSheets;
@@ -742,6 +799,26 @@ function mergeState(candidate) {
         ? ""
         : toMoneyNumber(row?.cutPriceOverride),
       id: row?.id || `color-row-${index + 1}`,
+    }));
+  }
+
+  if (Array.isArray(candidate.credentialItems) && candidate.credentialItems.length > 0) {
+    state.credentialItems = candidate.credentialItems.map((row, index) => ({
+      ...createDefaultCredentialRow(index),
+      ...row,
+      widthCm: toDecimalNumber(row?.widthCm),
+      heightCm: toDecimalNumber(row?.heightCm),
+      quantity: toWholeNumber(row?.quantity),
+      id: row?.id || `credential-row-${index + 1}`,
+    }));
+  }
+
+  if (Array.isArray(candidate.readyProductItems) && candidate.readyProductItems.length > 0) {
+    state.readyProductItems = candidate.readyProductItems.map((row, index) => ({
+      ...createDefaultReadyProductRow(index),
+      ...row,
+      quantity: toWholeNumber(row?.quantity),
+      id: row?.id || `ready-product-row-${index + 1}`,
     }));
   }
 
@@ -1201,6 +1278,269 @@ function buildApostilaPrintDetail(row) {
 
 function isColorPrintRowActive(row) {
   return Boolean(row.description?.trim() || Number(row.quantity) > 0 || Number(row.widthMm) > 0 || Number(row.heightMm) > 0);
+}
+
+function isCredentialRowActive(row) {
+  return Boolean(row.description?.trim() || Number(row.quantity) > 0 || Number(row.widthCm) > 0 || Number(row.heightCm) > 0);
+}
+
+function getCredentialMaterialConfig(materialType) {
+  const material = materialType || "Couche 250g";
+  if (material === "PS 1mm") {
+    return { label: material, pricingMode: "m2", pricingKey: "ps1mm" };
+  }
+  if (material === "PS 2mm") {
+    return { label: material, pricingMode: "m2", pricingKey: "ps2mm" };
+  }
+  return { label: material, pricingMode: "a4", paperType: material };
+}
+
+function getCredentialLaminationPrice(config) {
+  const finishes = Array.isArray(config.m2Finishes) ? config.m2Finishes : [];
+  const lamination = finishes.find((finish) => String(finish.id || "").toLowerCase() === "laminacao")
+    || finishes.find((finish) => String(finish.label || "").trim().toLowerCase() === "laminação".toLowerCase())
+    || finishes.find((finish) => String(finish.label || "").trim().toLowerCase() === "laminacao");
+  return toMoneyNumber(lamination?.price);
+}
+
+function getCredentialLanyardOptions(config, quantity = 0) {
+  const pricing = config?.credentialLanyardPricing || {};
+  return [
+    {
+      id: "none",
+      label: "Sem cordão",
+      hint: "Use esta opção quando a credencial for entregue sem acessório.",
+      unitPrice: 0,
+    },
+    {
+      id: "round-white-2mm",
+      label: "Cordão Roliço branco 2mm",
+      hint: `${formatCurrency(pricing.roundWhite2mm)} por unidade`,
+      unitPrice: toMoneyNumber(pricing.roundWhite2mm),
+    },
+  ];
+}
+
+function getCredentialLanyardSelection(config, lanyardType, quantity = 0) {
+  const options = getCredentialLanyardOptions(config, quantity);
+  return options.find((item) => item.id === lanyardType) || options[0];
+}
+
+function isReadyProductRowActive(row) {
+  return Boolean(row.description?.trim() || Number(row.quantity) > 0);
+}
+
+function getReadyProductSelection(config, productType, quantity = 0) {
+  const pricing = config?.credentialLanyardPricing || {};
+  const printedTiers = Array.isArray(pricing.printed) ? pricing.printed : [];
+  const printedUnit = lookupTier(printedTiers, Math.max(1, Number(quantity || 0)));
+  const options = [
+    {
+      id: "Cordão de crachá liso",
+      label: "Cordão de crachá liso",
+      unitPrice: toMoneyNumber(pricing.plainBadge),
+    },
+    {
+      id: "Cordão estampado 20mm com jacaré",
+      label: "Cordão estampado 20mm com jacaré",
+      unitPrice: toMoneyNumber(printedUnit),
+    },
+    {
+      id: "Cordão estampado 20mm com mosquetão",
+      label: "Cordão estampado 20mm com mosquetão",
+      unitPrice: toMoneyNumber(printedUnit),
+    },
+  ];
+  return options.find((item) => item.id === productType) || options[0];
+}
+
+function getCredentialMinimumBand(pricing) {
+  if (!Array.isArray(pricing)) {
+    return null;
+  }
+  return pricing.find((tier) => String(tier.label || "").toLowerCase().includes("valor minimo")) || null;
+}
+
+function calculateCredentialWorkbook(state, config) {
+  const warnings = [];
+  const laminationPricePerM2 = getCredentialLaminationPrice(config);
+
+  const rows = state.credentialItems.map((row, index) => {
+    const widthCm = toDecimalNumber(row.widthCm);
+    const heightCm = toDecimalNumber(row.heightCm);
+    const quantity = toWholeNumber(row.quantity);
+    const active = isCredentialRowActive(row);
+    const material = getCredentialMaterialConfig(row.materialType);
+    const lanyard = getCredentialLanyardSelection(config, row.lanyardType, quantity);
+    const widthMm = widthCm * 10;
+    const heightMm = heightCm * 10;
+    const areaM2 = (widthCm * heightCm * quantity) / 10000;
+    const laminationSelected = row.lamination === "Com laminação";
+    const lanyardTotal = quantity * lanyard.unitPrice;
+
+    const baseRow = {
+      ...row,
+      active,
+      valid: false,
+      widthCm,
+      heightCm,
+      quantity,
+      materialType: material.label,
+      materialLabel: material.label,
+      lanyardType: lanyard.id,
+      lanyardLabel: lanyard.label,
+      lanyardUnitPrice: lanyard.unitPrice,
+      areaM2,
+      itemsPerSheet: 0,
+      sheetsNeeded: 0,
+      rotated: false,
+      sheetPrice: 0,
+      pricePerM2: 0,
+      tierLabel: "-",
+      baseTotal: 0,
+      laminationTotal: 0,
+      lanyardTotal,
+      total: 0,
+      unitValue: 0,
+      warning: "",
+    };
+
+    if (!active) {
+      return baseRow;
+    }
+
+    if (widthCm <= 0 || heightCm <= 0 || quantity <= 0) {
+      return {
+        ...baseRow,
+        warning: `Credencial ${index + 1}: preencha largura, altura e quantidade maiores que zero.`,
+      };
+    }
+
+    if (material.pricingMode === "a4") {
+      if ((widthMm > A4_WIDTH_MM && widthMm > A4_HEIGHT_MM) || (heightMm > A4_HEIGHT_MM && heightMm > A4_WIDTH_MM)) {
+        return {
+          ...baseRow,
+          warning: `Credencial ${index + 1}: o tamanho informado não cabe em uma folha A4.`,
+        };
+      }
+
+      const fit = getBestFitOnA4(widthMm, heightMm);
+      if (!fit.itemsPerSheet) {
+        return {
+          ...baseRow,
+          warning: `Credencial ${index + 1}: não foi possível encaixar essa medida em uma folha A4.`,
+        };
+      }
+
+      const sheetsNeeded = Math.ceil(quantity / fit.itemsPerSheet);
+      const pricingKey = getColorPaperPricingKey(material.paperType);
+      const pricing = config.colorPrintPricing?.[pricingKey] || [];
+      const sheetPrice = lookupTier(pricing, sheetsNeeded);
+      const baseTotal = sheetsNeeded * sheetPrice;
+      const laminationTotal = laminationSelected ? areaM2 * laminationPricePerM2 : 0;
+      const total = baseTotal + laminationTotal + lanyardTotal;
+
+      return {
+        ...baseRow,
+        valid: true,
+        itemsPerSheet: fit.itemsPerSheet,
+        sheetsNeeded,
+        rotated: fit.rotated,
+        sheetPrice,
+        baseTotal,
+        laminationTotal,
+        lanyardTotal,
+        total,
+        unitValue: quantity > 0 ? total / quantity : 0,
+        tierLabel: `${fit.itemsPerSheet} por A4`,
+      };
+    }
+
+    const pricing = config.m2Pricing?.[material.pricingKey] || [];
+    const minimumBand = getCredentialMinimumBand(pricing);
+    const tier = getM2PricingBand(pricing, areaM2);
+    const pricePerM2 = toMoneyNumber(tier?.value);
+    const minimumValue = toMoneyNumber(minimumBand?.value);
+    const baseSubtotal = areaM2 * pricePerM2;
+    const baseTotal = Math.max(minimumValue, baseSubtotal);
+    const laminationTotal = laminationSelected ? areaM2 * laminationPricePerM2 : 0;
+    const total = baseTotal + laminationTotal + lanyardTotal;
+
+    return {
+      ...baseRow,
+      valid: true,
+      pricePerM2,
+      baseTotal,
+      laminationTotal,
+      lanyardTotal,
+      total,
+      unitValue: quantity > 0 ? total / quantity : 0,
+      tierLabel: tier?.label || "-",
+    };
+  });
+
+  rows.forEach((row) => {
+    if (row.warning) {
+      warnings.push(row.warning);
+    }
+  });
+
+  const activeRows = rows.filter((row) => row.active && row.valid);
+  const totalQuantity = activeRows.reduce((sum, row) => sum + row.quantity, 0);
+  const totalGeneral = activeRows.reduce((sum, row) => sum + row.total, 0);
+
+  return {
+    rows,
+    activeRows,
+    warnings,
+    totals: {
+      activeLines: activeRows.length,
+      totalQuantity,
+      totalGeneral,
+      averageValue: totalQuantity > 0 ? totalGeneral / totalQuantity : 0,
+    },
+  };
+}
+
+function calculateReadyProductWorkbook(state, config) {
+  const rows = state.readyProductItems.map((row, index) => {
+    const quantity = toWholeNumber(row.quantity);
+    const active = isReadyProductRowActive(row);
+    const product = getReadyProductSelection(config, row.productType, quantity);
+    const description = (row.description || "").trim();
+    const total = quantity * product.unitPrice;
+
+    return {
+      ...row,
+      active,
+      valid: active ? quantity > 0 : false,
+      quantity,
+      productType: product.label,
+      productLabel: product.label,
+      description: description || product.label,
+      unitPrice: product.unitPrice,
+      total,
+      unitValue: quantity > 0 ? total / quantity : 0,
+      warning: active && quantity <= 0 ? `Produto pronto ${index + 1}: informe uma quantidade maior que zero.` : "",
+    };
+  });
+
+  const activeRows = rows.filter((row) => row.active && row.valid);
+  const warnings = rows.filter((row) => row.warning).map((row) => row.warning);
+  const totalQuantity = activeRows.reduce((sum, row) => sum + row.quantity, 0);
+  const totalGeneral = activeRows.reduce((sum, row) => sum + row.total, 0);
+
+  return {
+    rows,
+    activeRows,
+    warnings,
+    totals: {
+      activeLines: activeRows.length,
+      totalQuantity,
+      totalGeneral,
+      averageValue: totalQuantity > 0 ? totalGeneral / totalQuantity : 0,
+    },
+  };
 }
 
 function calculateWorkbook(state, config) {
@@ -1866,6 +2206,18 @@ function ensureColorRowCount(state, minimumCount) {
   }
 }
 
+function ensureCredentialRowCount(state, minimumCount) {
+  while (state.credentialItems.length < minimumCount) {
+    state.credentialItems.push(createDefaultCredentialRow(state.credentialItems.length));
+  }
+}
+
+function ensureReadyProductRowCount(state, minimumCount) {
+  while (state.readyProductItems.length < minimumCount) {
+    state.readyProductItems.push(createDefaultReadyProductRow(state.readyProductItems.length));
+  }
+}
+
 function ensureM2RowCount(state, minimumCount) {
   while (state.m2Items.length < minimumCount) {
     state.m2Items.push(createDefaultM2Row(state.m2Items.length));
@@ -2095,6 +2447,11 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
           )
         ),
       ].join("")
+    ),
+    createConfigCardMarkup(
+      "Cordões e produtos prontos",
+      "Configure aqui os cordões usados na credencial e os itens vendidos separadamente na aba de produtos prontos.",
+      createCredentialLanyardPricingMarkup(config.credentialLanyardPricing)
     ),
     createConfigCardMarkup(
       "Tabela de cortes",
@@ -2453,6 +2810,53 @@ function createResinConfigMarkup(resinPricing) {
   ].join("");
 }
 
+function createCredentialLanyardPricingMarkup(credentialLanyardPricing) {
+  const pricing = credentialLanyardPricing || {};
+  return [
+    createInlineConfigBlockMarkup(
+      "Cordões fixos",
+      `
+        <div class="config-grid compact-grid">
+          <label>
+            <span>Cordão roliço branco 2mm (R$ / un)</span>
+            <input data-config-prefix="credential-lanyard-fixed" data-config-row="0" data-config-key="roundWhite2mm" type="number" step="0.01" value="${escapeHtml(pricing.roundWhite2mm)}">
+          </label>
+          <label>
+            <span>Cordão de crachá liso (R$ / un)</span>
+            <input data-config-prefix="credential-lanyard-fixed" data-config-row="0" data-config-key="plainBadge" type="number" step="0.01" value="${escapeHtml(pricing.plainBadge)}">
+          </label>
+        </div>
+      `,
+      "Use estes campos para os modelos com valor fixo por unidade."
+    ),
+    createInlineConfigBlockMarkup(
+      "Cordão estampado 20mm",
+      `
+        <div class="preset-card-head">
+          <div>
+            <strong>Faixas de preço</strong>
+            <span class="helper-text">A mesma tabela vale para jacaré e mosquetão.</span>
+          </div>
+          <div class="toolbar">
+            <button class="button button-small" type="button" data-add-credential-lanyard-band>Adicionar faixa</button>
+          </div>
+        </div>
+        ${createTableMarkup(
+          ["Qtd mínima", "Valor", "Faixa"],
+          pricing.printed || [],
+          "credential-lanyard-printed",
+          [
+            { key: "min", type: "number", step: "1" },
+            { key: "value", type: "number", step: "0.01" },
+            { key: "label", type: "text" },
+          ]
+        )}
+      `,
+      "Essas faixas são usadas quando a credencial for vendida com cordão estampado."
+    ),
+  ].join("");
+}
+
 function createM2PricingMarkup(m2Pricing) {
   const rows = M2_CATALOG.map((product) => {
     const bands = m2Pricing?.[product.configKey] || [];
@@ -2645,6 +3049,7 @@ function getConfigArrayByPrefix(config, prefix) {
   if (prefix === "spiral") return config.spiralPricing;
   if (prefix === "cut-up5") return config.cutPricing.upToFiveSheets;
   if (prefix === "cut-above5") return config.cutPricing;
+  if (prefix === "credential-lanyard-printed") return config.credentialLanyardPricing?.printed;
   if (prefix.startsWith("m2-")) return config.m2Pricing[prefix.slice(3)];
   if (prefix.startsWith("color-")) return config.colorPrintPricing[prefix.slice(6)];
   if (prefix.startsWith("cover-")) {
@@ -2927,7 +3332,7 @@ function calculateResinWorkbook(state, config) {
   };
 }
 
-function createQuoteHtml(state, workbook, colorWorkbook, m2Workbook, resinWorkbook) {
+function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, m2Workbook, resinWorkbook) {
   const dateText = new Intl.DateTimeFormat("pt-BR").format(new Date());
   const quoteEntries = [
     ...workbook.activeRows.map((row) => {
@@ -2946,6 +3351,19 @@ function createQuoteHtml(state, workbook, colorWorkbook, m2Workbook, resinWorkbo
       detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.paperType} | ${row.printMode}`,
       total: row.total,
     })),
+    ...credentialWorkbook.activeRows.map((row) => ({
+      kind: "Credencial",
+      description: row.description || "Credencial",
+      detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthCm)} x ${formatMeasure(row.heightCm)} cm | ${row.materialLabel}${row.lamination === "Com laminação" ? " | Com laminação" : ""}${row.lanyardType !== "none" ? ` | ${row.lanyardLabel}` : ""}`,
+      extraDetail: row.itemsPerSheet > 0 ? `${formatInteger(row.itemsPerSheet)} por A4 | ${formatInteger(row.sheetsNeeded)} folha(s) A4` : `Área total: ${formatAreaM2(row.areaM2)} m²`,
+      total: row.total,
+    })),
+    ...readyWorkbook.activeRows.map((row) => ({
+      kind: "Produto pronto",
+      description: row.description || row.productLabel,
+      detail: `${formatInteger(row.quantity)} unidades | ${row.productLabel}`,
+      total: row.total,
+    })),
     ...m2Workbook.activeRows.map((row) => ({
       kind: "Cálculo de m²",
       description: getM2RowDescription(row),
@@ -2960,8 +3378,8 @@ function createQuoteHtml(state, workbook, colorWorkbook, m2Workbook, resinWorkbo
       total: row.total,
     })),
   ];
-  const combinedTotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
-  const combinedUnits = workbook.totals.totalQuantity + colorWorkbook.totals.totalQuantity + m2Workbook.totals.totalQuantity + resinWorkbook.totals.totalQuantity;
+  const combinedTotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
+  const combinedUnits = workbook.totals.totalQuantity + colorWorkbook.totals.totalQuantity + credentialWorkbook.totals.totalQuantity + readyWorkbook.totals.totalQuantity + m2Workbook.totals.totalQuantity + resinWorkbook.totals.totalQuantity;
   const lineItemsMarkup = quoteEntries.length
     ? quoteEntries
         .map(
@@ -3038,7 +3456,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, m2Workbook, resinWorkbo
   `;
 }
 
-function createQuoteText(state, workbook, colorWorkbook, m2Workbook, resinWorkbook) {
+function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, m2Workbook, resinWorkbook) {
   const dateText = new Intl.DateTimeFormat("pt-BR").format(new Date());
   const lines = [
     `ORÇAMENTO | ${state.company.name || "Sua empresa"}`,
@@ -3065,6 +3483,12 @@ function createQuoteText(state, workbook, colorWorkbook, m2Workbook, resinWorkbo
     ...colorWorkbook.activeRows.map((row, index) => ({
       text: `- ${row.description || `Impresso ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.paperType} | ${row.printMode} | ${formatCurrency(row.total)}`,
     })),
+    ...credentialWorkbook.activeRows.map((row, index) => ({
+      text: `- ${row.description || `Credencial ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthCm)} x ${formatMeasure(row.heightCm)} cm | ${row.materialLabel}${row.lamination === "Com laminação" ? " | Com laminação" : ""}${row.lanyardType !== "none" ? ` | ${row.lanyardLabel}` : ""} | ${formatCurrency(row.total)}`,
+    })),
+    ...readyWorkbook.activeRows.map((row, index) => ({
+      text: `- ${row.description || `Produto pronto ${index + 1}`} | ${row.quantity} unidades | ${row.productLabel} | ${formatCurrency(row.total)}`,
+    })),
     ...m2Workbook.activeRows.map((row, index) => ({
       text: `- ${getM2RowDescription(row) || `M² ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.finishSummary ? `${row.finishSummary} | ` : ""}${row.artCreationFee > 0 ? `Arte/edição: ${formatCurrency(row.artCreationFee)} | ` : ""}${formatCurrency(row.total)}`,
     })),
@@ -3079,7 +3503,7 @@ function createQuoteText(state, workbook, colorWorkbook, m2Workbook, resinWorkbo
     quoteEntries.forEach((entry) => lines.push(entry.text));
   }
 
-  lines.push("", `Total geral: ${formatCurrency(workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral)}`);
+  lines.push("", `Total geral: ${formatCurrency(workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral)}`);
 
   if (state.quoteNotes?.trim()) {
     lines.push("", "Observações:", state.quoteNotes.trim());
@@ -3105,18 +3529,26 @@ async function initApp() {
   const selectedRowIds = new Set();
   ensureRowCount(state, 5);
   ensureColorRowCount(state, 5);
+  ensureCredentialRowCount(state, 5);
+  ensureReadyProductRowCount(state, 5);
   ensureM2RowCount(state, 5);
   ensureResinRowCount(state, 5);
   state.rows = trimEmptyRows(state.rows, 5, isRowActive);
   state.colorPrintItems = trimEmptyRows(state.colorPrintItems, 5, isColorPrintRowActive);
+  state.credentialItems = trimEmptyRows(state.credentialItems, 5, isCredentialRowActive);
+  state.readyProductItems = trimEmptyRows(state.readyProductItems, 5, isReadyProductRowActive);
   state.m2Items = trimEmptyRows(state.m2Items, 5, (row) => Boolean(row.description?.trim() || Number(row.quantity) > 0 || Number(row.widthMm) > 0 || Number(row.heightMm) > 0));
   state.resinItems = trimEmptyRows(state.resinItems, 5, isResinRowActive);
 
   const rowsTableBody = document.getElementById("rows-table-body");
   const colorRowsTableBody = document.getElementById("color-rows-table-body");
+  const credentialRowsTableBody = document.getElementById("credential-rows-table-body");
+  const readyRowsTableBody = document.getElementById("ready-rows-table-body");
   const resinRowsTableBody = document.getElementById("resin-rows-table-body");
   const warningList = document.getElementById("warning-list");
   const colorWarningList = document.getElementById("color-warning-list");
+  const credentialWarningList = document.getElementById("credential-warning-list");
+  const readyWarningList = document.getElementById("ready-warning-list");
   const m2WarningList = document.getElementById("m2-warning-list");
   const resinWarningList = document.getElementById("resin-warning-list");
   const configSections = document.getElementById("config-sections");
@@ -3126,6 +3558,8 @@ async function initApp() {
   const quotePreview = document.getElementById("quote-preview");
   const feedback = document.getElementById("import-feedback");
   const colorFeedback = document.getElementById("color-feedback");
+  const credentialFeedback = document.getElementById("credential-feedback");
+  const readyFeedback = document.getElementById("ready-feedback");
   const resinFeedback = document.getElementById("resin-feedback");
   const configStatus = document.getElementById("config-status");
   const syncStatus = document.getElementById("sync-status");
@@ -3169,6 +3603,14 @@ async function initApp() {
 
   function setColorFeedback(message, tone = "neutral") {
     setStatusMessage(colorFeedback, message, tone);
+  }
+
+  function setCredentialFeedback(message, tone = "neutral") {
+    setStatusMessage(credentialFeedback, message, tone);
+  }
+
+  function setReadyFeedback(message, tone = "neutral") {
+    setStatusMessage(readyFeedback, message, tone);
   }
 
   function setResinFeedback(message, tone = "neutral") {
@@ -3454,6 +3896,8 @@ async function initApp() {
         setConfigStatus("Digite a senha para acessar a configuração.", "warning");
         focusConfigPasswordField();
       }
+    } else if (tabName === "credenciais" || tabName === "produtos-prontos") {
+      lastConfigSourceTab = "impressos";
     } else if (tabName === "calculo" || tabName === "impressos" || tabName === "m2" || tabName === "resinados") {
       lastConfigSourceTab = tabName;
     }
@@ -3701,6 +4145,8 @@ async function initApp() {
   function renderRowsAndSummary() {
     const workbook = calculateWorkbook(state, config);
     const colorWorkbook = calculateColorPrintWorkbook(state, config);
+    const credentialWorkbook = calculateCredentialWorkbook(state, config);
+    const readyWorkbook = calculateReadyProductWorkbook(state, config);
     const m2Workbook = calculateM2WorkbookFromConfig(state, config);
     const resinWorkbook = calculateResinWorkbook(state, config);
     const m2Catalog = getM2Catalog(config);
@@ -3714,6 +4160,16 @@ async function initApp() {
     document.getElementById("color-summary-quantity").textContent = formatInteger(colorWorkbook.totals.totalQuantity);
     document.getElementById("color-summary-total").textContent = formatCurrency(colorWorkbook.totals.totalGeneral);
     document.getElementById("color-summary-average").textContent = formatCurrency(colorWorkbook.totals.averageValue);
+
+    document.getElementById("credential-summary-active").textContent = formatInteger(credentialWorkbook.totals.activeLines);
+    document.getElementById("credential-summary-quantity").textContent = formatInteger(credentialWorkbook.totals.totalQuantity);
+    document.getElementById("credential-summary-total").textContent = formatCurrency(credentialWorkbook.totals.totalGeneral);
+    document.getElementById("credential-summary-average").textContent = formatCurrency(credentialWorkbook.totals.averageValue);
+
+    document.getElementById("ready-summary-active").textContent = formatInteger(readyWorkbook.totals.activeLines);
+    document.getElementById("ready-summary-quantity").textContent = formatInteger(readyWorkbook.totals.totalQuantity);
+    document.getElementById("ready-summary-total").textContent = formatCurrency(readyWorkbook.totals.totalGeneral);
+    document.getElementById("ready-summary-average").textContent = formatCurrency(readyWorkbook.totals.averageValue);
 
     document.getElementById("m2-summary-active").textContent = formatInteger(m2Workbook.totals.activeLines);
     document.getElementById("m2-summary-quantity").textContent = formatInteger(m2Workbook.totals.totalQuantity);
@@ -3783,8 +4239,75 @@ async function initApp() {
       )
       .join("");
 
+    credentialRowsTableBody.innerHTML = credentialWorkbook.rows
+      .map(
+        (row, index) => `
+          <tr class="${row.active ? "" : "is-empty"}" data-credential-row-index="${index}">
+            <td><strong>${String(index + 1).padStart(2, "0")}</strong></td>
+            <td><input class="cell-input description" name="description" value="${escapeHtml(row.description)}" placeholder="Ex.: Credencial evento"></td>
+            <td><select class="cell-select" name="materialType">${buildOptions(OPTIONS.credentialMaterials, row.materialType)}</select></td>
+            <td><select class="cell-select" name="lamination">${buildOptions(OPTIONS.credentialLamination, row.lamination)}</select></td>
+            <td>
+              <div class="finish-picker">
+                <button class="button finish-picker-button" type="button" data-credential-lanyard-toggle>
+                  <span>${escapeHtml(row.lanyardLabel || "Sem cordão")}</span>
+                  <span class="finish-picker-chevron">▾</span>
+                </button>
+              </div>
+            </td>
+            <td><input class="cell-input" name="widthCm" type="number" min="0" step="0.1" value="${escapeHtml(row.widthCm)}" placeholder="0,0"></td>
+            <td><input class="cell-input" name="heightCm" type="number" min="0" step="0.1" value="${escapeHtml(row.heightCm)}" placeholder="0,0"></td>
+            <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${escapeHtml(row.quantity)}" placeholder="0"></td>
+            <td><span class="readonly-value subtle">${formatAreaM2(row.areaM2)}</span></td>
+            <td><span class="readonly-value subtle">${row.itemsPerSheet > 0 ? formatInteger(row.itemsPerSheet) : "-"}</span></td>
+            <td><span class="readonly-value subtle">${row.sheetsNeeded > 0 ? formatInteger(row.sheetsNeeded) : "-"}</span></td>
+            <td><span class="readonly-value subtle">${formatCurrency(row.baseTotal)}</span></td>
+            <td><span class="readonly-value subtle">${formatCurrency(row.laminationTotal)}</span></td>
+            <td><span class="readonly-value subtle">${formatCurrency(row.lanyardTotal)}</span></td>
+            <td><span class="readonly-value">${formatCurrency(row.total)}</span></td>
+            <td><span class="readonly-value subtle">${formatCurrency(row.unitValue)}</span></td>
+          </tr>
+        `
+      )
+      .join("");
+
     warningList.innerHTML = workbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("");
     colorWarningList.innerHTML = colorWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("");
+    credentialWarningList.innerHTML = credentialWorkbook.warnings.length
+      ? credentialWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
+      : `<div class="warning-item is-success">Sem alertas no momento. Couche e offset puxam a base dos impressos coloridos. PS, laminação e cordões usam as bases já configuradas no sistema.</div>`;
+    setCredentialFeedback(
+      credentialWorkbook.activeRows.length > 0
+        ? "Cálculo de credenciais atualizado com sucesso."
+        : "Use esta aba para calcular várias credenciais no mesmo orçamento, reaproveitando os preços que já estão configurados no sistema.",
+      credentialWorkbook.activeRows.length > 0 ? "success" : "neutral"
+    );
+
+    readyRowsTableBody.innerHTML = readyWorkbook.rows
+      .map(
+        (row, index) => `
+          <tr class="${row.active ? "" : "is-empty"}" data-ready-row-index="${index}">
+            <td><strong>${String(index + 1).padStart(2, "0")}</strong></td>
+            <td><select class="cell-select" name="productType">${buildOptions(OPTIONS.readyProducts, row.productType)}</select></td>
+            <td><input class="cell-input description" name="description" value="${escapeHtml(row.description === row.productLabel ? "" : row.description)}" placeholder="${escapeHtml(row.productLabel)}"></td>
+            <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${escapeHtml(row.quantity)}" placeholder="0"></td>
+            <td><span class="readonly-value subtle">${formatCurrency(row.unitPrice)}</span></td>
+            <td><span class="readonly-value">${formatCurrency(row.total)}</span></td>
+          </tr>
+        `
+      )
+      .join("");
+
+    readyWarningList.innerHTML = readyWorkbook.warnings.length
+      ? readyWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
+      : `<div class="warning-item is-success">Sem alertas no momento. Os valores desta aba usam a mesma base comercial dos cordões configurados no sistema.</div>`;
+    setReadyFeedback(
+      readyWorkbook.activeRows.length > 0
+        ? "Produtos prontos atualizados com sucesso."
+        : "Use esta aba para vender cordões e outros itens prontos por unidade, separados da credencial.",
+      readyWorkbook.activeRows.length > 0 ? "success" : "neutral"
+    );
+
     m2WarningList.innerHTML = m2Workbook.warnings.length
       ? m2Workbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
       : `<div class="warning-item is-success">Sem alertas no momento. Preencha as medidas e acabamentos para o app montar o valor final com segurança.</div>`;
@@ -3858,8 +4381,8 @@ async function initApp() {
       ? resinWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
       : `<div class="warning-item is-success">Sem alertas no momento. Você pode montar várias medidas de resinados no mesmo orçamento por aqui.</div>`;
 
-    quotePreview.innerHTML = createQuoteHtml(state, workbook, colorWorkbook, m2Workbook, resinWorkbook);
-    return { workbook, colorWorkbook, m2Workbook, resinWorkbook };
+    quotePreview.innerHTML = createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, m2Workbook, resinWorkbook);
+    return { workbook, colorWorkbook, credentialWorkbook, readyWorkbook, m2Workbook, resinWorkbook };
   }
 
   function closeM2FinishPopover() {
@@ -3867,6 +4390,102 @@ async function initApp() {
     if (existing) {
       existing.remove();
     }
+  }
+
+  function closeCredentialLanyardPopover() {
+    const existing = document.getElementById("credential-lanyard-popover");
+    if (existing) {
+      existing.remove();
+    }
+  }
+
+  function openCredentialLanyardPopover(rowIndex, anchor) {
+    const row = state.credentialItems[rowIndex];
+    if (!row || !anchor) {
+      return;
+    }
+
+    closeCredentialLanyardPopover();
+
+    const quantity = toWholeNumber(row.quantity);
+    const options = getCredentialLanyardOptions(config, quantity);
+    const selected = getCredentialLanyardSelection(config, row.lanyardType, quantity);
+    const popover = document.createElement("div");
+    popover.id = "credential-lanyard-popover";
+    popover.className = "finish-popover";
+    popover.innerHTML = `
+      <div class="finish-popover-header">
+        <div class="finish-popover-title">
+          <strong>Cordão da credencial</strong>
+          <span>Escolha o modelo que será somado automaticamente ao valor desta linha.</span>
+        </div>
+        <button type="button" class="button finish-popover-close" data-credential-lanyard-close>Fechar</button>
+      </div>
+      <div class="finish-popover-list">
+        ${options.map((option) => `
+          <label class="finish-picker-option${option.id === "none" ? " is-none" : ""}">
+            <input type="radio" name="credential-lanyard-option" value="${escapeHtml(option.id)}"${selected.id === option.id ? " checked" : ""} data-credential-lanyard-option>
+            <div class="finish-picker-option-body">
+              <div class="finish-option-copy">
+                <span class="finish-option-label">${escapeHtml(option.label)}</span>
+                <small>${escapeHtml(option.hint)}</small>
+              </div>
+            </div>
+          </label>
+        `).join("")}
+      </div>
+      <div class="finish-popover-footer">
+        <span class="finish-popover-summary">${quantity > 0 ? `${formatInteger(quantity)} un na linha` : "Defina a quantidade para calcular a faixa certa"}</span>
+        <button type="button" class="button finish-popover-clear" data-credential-lanyard-clear>Sem cordão</button>
+      </div>
+    `;
+
+    document.body.appendChild(popover);
+
+    const rect = anchor.getBoundingClientRect();
+    popover.style.position = "fixed";
+    popover.style.visibility = "hidden";
+    popover.style.top = "12px";
+    popover.style.left = "12px";
+    const popoverRect = popover.getBoundingClientRect();
+    const spacing = 12;
+    const fitsBelow = rect.bottom + spacing + popoverRect.height <= window.innerHeight - spacing;
+    const top = fitsBelow
+      ? rect.bottom + spacing
+      : Math.max(spacing, rect.top - popoverRect.height - spacing);
+    const left = Math.min(
+      Math.max(spacing, rect.left),
+      Math.max(spacing, window.innerWidth - popoverRect.width - spacing)
+    );
+    popover.style.position = "fixed";
+    popover.style.top = `${top}px`;
+    popover.style.left = `${left}px`;
+    popover.style.visibility = "visible";
+    popover.dataset.rowIndex = String(rowIndex);
+
+    popover.addEventListener("change", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement) || target.type !== "radio") {
+        return;
+      }
+      row.lanyardType = target.value || "none";
+      persistLocalOnly();
+      renderRowsAndSummary();
+      closeCredentialLanyardPopover();
+    });
+
+    popover.addEventListener("click", (event) => {
+      if (event.target.closest("[data-credential-lanyard-close]")) {
+        closeCredentialLanyardPopover();
+        return;
+      }
+      if (event.target.closest("[data-credential-lanyard-clear]")) {
+        row.lanyardType = "none";
+        persistLocalOnly();
+        renderRowsAndSummary();
+        closeCredentialLanyardPopover();
+      }
+    });
   }
 
   function openM2FinishPopover(rowIndex, anchor) {
@@ -4132,6 +4751,18 @@ async function initApp() {
     renderRowsAndSummary();
   });
 
+  document.getElementById("add-credential-row-button").addEventListener("click", () => {
+    state.credentialItems.push(createDefaultCredentialRow(state.credentialItems.length));
+    persistLocalOnly();
+    renderRowsAndSummary();
+  });
+
+  document.getElementById("add-ready-row-button").addEventListener("click", () => {
+    state.readyProductItems.push(createDefaultReadyProductRow(state.readyProductItems.length));
+    persistLocalOnly();
+    renderRowsAndSummary();
+  });
+
   document.getElementById("add-m2-row-button").addEventListener("click", () => {
     state.m2Items.push(createDefaultM2Row(state.m2Items.length));
     persist();
@@ -4177,6 +4808,40 @@ async function initApp() {
     persist();
     renderRowsAndSummary();
     setColorFeedback("As linhas de impressos coloridos foram limpas.", "warning");
+  });
+
+  document.getElementById("clear-credential-rows-button").addEventListener("click", async () => {
+    if (!(await confirmAppAction({
+      kicker: "Limpeza",
+      title: "Limpar credenciais",
+      message: "Deseja realmente limpar todas as linhas da aba de credenciais?",
+      confirmLabel: "Limpar",
+      danger: true,
+    }))) {
+      setCredentialFeedback("A limpeza das credenciais foi cancelada.", "warning");
+      return;
+    }
+    state.credentialItems = Array.from({ length: 5 }, (_, index) => createDefaultCredentialRow(index));
+    persistLocalOnly();
+    renderRowsAndSummary();
+    setCredentialFeedback("As linhas de credenciais foram limpas.", "warning");
+  });
+
+  document.getElementById("clear-ready-rows-button").addEventListener("click", async () => {
+    if (!(await confirmAppAction({
+      kicker: "Limpeza",
+      title: "Limpar produtos prontos",
+      message: "Deseja realmente limpar todas as linhas da aba de produtos prontos?",
+      confirmLabel: "Limpar",
+      danger: true,
+    }))) {
+      setReadyFeedback("A limpeza dos produtos prontos foi cancelada.", "warning");
+      return;
+    }
+    state.readyProductItems = Array.from({ length: 5 }, (_, index) => createDefaultReadyProductRow(index));
+    persistLocalOnly();
+    renderRowsAndSummary();
+    setReadyFeedback("As linhas de produtos prontos foram limpas.", "warning");
   });
 
   document.getElementById("clear-m2-rows-button").addEventListener("click", async () => {
@@ -4327,6 +4992,61 @@ async function initApp() {
     renderRowsAndSummary();
   });
 
+  credentialRowsTableBody.addEventListener("change", (event) => {
+    const target = event.target;
+    const rowElement = target.closest("tr[data-credential-row-index]");
+    if (!rowElement) {
+      return;
+    }
+    const row = state.credentialItems[Number(rowElement.dataset.credentialRowIndex)];
+    const field = target.name;
+    if (!field || !row) {
+      return;
+    }
+    if (field === "quantity") {
+      row[field] = toWholeNumber(target.value);
+    } else if (field === "widthCm" || field === "heightCm") {
+      row[field] = toDecimalNumber(target.value);
+    } else {
+      row[field] = target.value;
+    }
+    persistLocalOnly();
+    renderRowsAndSummary();
+  });
+
+  readyRowsTableBody.addEventListener("change", (event) => {
+    const target = event.target;
+    const rowElement = target.closest("tr[data-ready-row-index]");
+    if (!rowElement) {
+      return;
+    }
+    const row = state.readyProductItems[Number(rowElement.dataset.readyRowIndex)];
+    const field = target.name;
+    if (!field || !row) {
+      return;
+    }
+    if (field === "quantity") {
+      row[field] = toWholeNumber(target.value);
+    } else {
+      row[field] = target.value;
+    }
+    persistLocalOnly();
+    renderRowsAndSummary();
+  });
+
+  credentialRowsTableBody.addEventListener("click", (event) => {
+    const toggle = event.target.closest("[data-credential-lanyard-toggle]");
+    if (!toggle) {
+      return;
+    }
+    event.preventDefault();
+    const rowElement = toggle.closest("tr[data-credential-row-index]");
+    if (!rowElement) {
+      return;
+    }
+    openCredentialLanyardPopover(Number(rowElement.dataset.credentialRowIndex), toggle);
+  });
+
   m2RowsTableBody.addEventListener("change", (event) => {
     const target = event.target;
     const rowElement = target.closest("tr[data-m2-row-index]");
@@ -4383,10 +5103,16 @@ async function initApp() {
   });
 
   document.addEventListener("click", (event) => {
-    if (event.target.closest("[data-finish-picker-toggle]") || event.target.closest("#m2-finish-popover")) {
+    if (
+      event.target.closest("[data-finish-picker-toggle]")
+      || event.target.closest("#m2-finish-popover")
+      || event.target.closest("[data-credential-lanyard-toggle]")
+      || event.target.closest("#credential-lanyard-popover")
+    ) {
       return;
     }
     closeM2FinishPopover();
+    closeCredentialLanyardPopover();
   });
 
   document.getElementById("apply-group-selected").addEventListener("click", () => {
@@ -4500,6 +5226,17 @@ async function initApp() {
       persist();
       renderRowsAndSummary();
       setConfigStatus("Acabamento de m² atualizado.", "success");
+      return;
+    }
+
+    if (prefix === "credential-lanyard-fixed") {
+      if (!config.credentialLanyardPricing) {
+        return;
+      }
+      config.credentialLanyardPricing[key] = toMoneyNumber(target.value);
+      persist();
+      renderRowsAndSummary();
+      setConfigStatus("Preço de cordão atualizado.", "success");
       return;
     }
 
@@ -4670,6 +5407,21 @@ async function initApp() {
         return;
       }
 
+      const addCredentialLanyardBandButton = event.target.closest("[data-add-credential-lanyard-band]");
+      if (addCredentialLanyardBandButton) {
+        const bands = config.credentialLanyardPricing?.printed || (config.credentialLanyardPricing.printed = []);
+        const lastBand = bands[bands.length - 1] || { min: 1, value: 0, label: "Nova faixa" };
+        bands.push({
+          min: Number(lastBand.min || 0) + 10,
+          value: Number(lastBand.value || 0),
+          label: "Nova faixa",
+        });
+        persist();
+        renderConfig();
+        setConfigStatus("Nova faixa criada para cordão estampado.", "success");
+        return;
+      }
+
       const addProductButton = event.target.closest("[data-add-catalog-product]");
       if (addProductButton) {
         const tab = addProductButton.dataset.addCatalogProduct;
@@ -4818,9 +5570,11 @@ async function initApp() {
   document.getElementById("copy-quote-button").addEventListener("click", async () => {
     const workbook = calculateWorkbook(state, config);
     const colorWorkbook = calculateColorPrintWorkbook(state, config);
+    const credentialWorkbook = calculateCredentialWorkbook(state, config);
+    const readyWorkbook = calculateReadyProductWorkbook(state, config);
     const m2Workbook = calculateM2WorkbookFromConfig(state, config);
     const resinWorkbook = calculateResinWorkbook(state, config);
-    const text = createQuoteText(state, workbook, colorWorkbook, m2Workbook, resinWorkbook);
+    const text = createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, m2Workbook, resinWorkbook);
     try {
       await navigator.clipboard.writeText(text);
       setMainFeedback("Resumo do orçamento copiado com sucesso.", "success");
@@ -4892,16 +5646,18 @@ async function initApp() {
   document.getElementById("save-history-button").addEventListener("click", () => {
     const workbook = calculateWorkbook(state, config);
     const colorWorkbook = calculateColorPrintWorkbook(state, config);
+    const credentialWorkbook = calculateCredentialWorkbook(state, config);
+    const readyWorkbook = calculateReadyProductWorkbook(state, config);
     const m2Workbook = calculateM2WorkbookFromConfig(state, config);
     const resinWorkbook = calculateResinWorkbook(state, config);
     const title = state.client.name.trim() || `Orçamento ${new Date().toLocaleDateString("pt-BR")}`;
-    const summary = createQuoteText(state, workbook, colorWorkbook, m2Workbook, resinWorkbook).split("\n").slice(0, 10).join(" • ");
+    const summary = createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, m2Workbook, resinWorkbook).split("\n").slice(0, 10).join(" • ");
 
     state.quoteHistory.unshift({
       id: `quote-${Date.now()}`,
       title,
       clientName: state.client.name.trim(),
-      total: workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral,
+      total: workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral,
       summary,
       createdAt: new Date().toISOString(),
     });

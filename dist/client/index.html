@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GrafiCalc | Orçamento Gráfico</title>
-  <link rel="stylesheet" href="./styles.css?v=9b87e7d341a0">
+  <link rel="stylesheet" href="./styles.css?v=6c53499a8c26">
 </head>
 <body>
   <div class="page-shell">
@@ -21,6 +21,8 @@
     <nav class="tab-bar" aria-label="Abas principais">
       <button class="tab-button is-active" data-tab-target="calculo">Cálculo de apostila</button>
       <button class="tab-button" data-tab-target="impressos">Impressos coloridos</button>
+      <button class="tab-button" data-tab-target="credenciais">Credenciais</button>
+      <button class="tab-button" data-tab-target="produtos-prontos">Produtos prontos</button>
       <button class="tab-button" data-tab-target="m2">Cálculo de m²</button>
       <button class="tab-button" data-tab-target="resinados">Resinados</button>
       <button class="tab-button" data-tab-target="configuracao">Configuração</button>
@@ -335,6 +337,130 @@
           </div>
 
           <div class="warning-list" id="m2-warning-list"></div>
+        </article>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="credenciais">
+        <div class="summary-grid">
+          <article class="summary-card">
+            <span class="summary-label">Linhas ativas</span>
+            <strong id="credential-summary-active">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Credenciais</span>
+            <strong id="credential-summary-quantity">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Total geral</span>
+            <strong id="credential-summary-total">R$ 0,00</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Valor médio</span>
+            <strong id="credential-summary-average">R$ 0,00</strong>
+          </article>
+        </div>
+
+        <article class="panel panel-table">
+          <div class="panel-heading">
+            <div>
+              <h2>Cálculo de credenciais</h2>
+              <p class="panel-copy">Informe altura, largura e quantidade para calcular o material base das credenciais. Couche e offset usam a tabela da aba de impressos coloridos. PS e laminação usam a base do cálculo de m².</p>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <button id="add-credential-row-button" class="button button-primary" type="button">Adicionar linha</button>
+            <button id="clear-credential-rows-button" class="button button-danger" type="button">Limpar linhas</button>
+          </div>
+
+          <p class="helper-text status-note" id="credential-feedback">
+            Use esta aba para calcular várias credenciais no mesmo orçamento, reaproveitando os preços que já estão configurados no sistema.
+          </p>
+
+          <div class="table-shell">
+            <table class="budget-table credential-budget-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Descrição</th>
+                  <th>Material base</th>
+                  <th>Laminação</th>
+                  <th>Cordão</th>
+                  <th>Largura (cm)</th>
+                  <th>Altura (cm)</th>
+                  <th>Quantidade</th>
+                  <th>Área total (m²)</th>
+                  <th>Por A4</th>
+                  <th>Folhas A4</th>
+                  <th>Valor base</th>
+                  <th>Laminação total</th>
+                  <th>Cordão total</th>
+                  <th>Total item</th>
+                  <th>Valor un.</th>
+                </tr>
+              </thead>
+              <tbody id="credential-rows-table-body"></tbody>
+            </table>
+          </div>
+
+          <div class="warning-list" id="credential-warning-list"></div>
+        </article>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="produtos-prontos">
+        <div class="summary-grid">
+          <article class="summary-card">
+            <span class="summary-label">Linhas ativas</span>
+            <strong id="ready-summary-active">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Unidades</span>
+            <strong id="ready-summary-quantity">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Total geral</span>
+            <strong id="ready-summary-total">R$ 0,00</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Valor médio</span>
+            <strong id="ready-summary-average">R$ 0,00</strong>
+          </article>
+        </div>
+
+        <article class="panel panel-table">
+          <div class="panel-heading">
+            <div>
+              <h2>Produtos prontos</h2>
+              <p class="panel-copy">Use esta aba para orçar produtos vendidos por unidade, separados da credencial.</p>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <button id="add-ready-row-button" class="button button-primary" type="button">Adicionar linha</button>
+            <button id="clear-ready-rows-button" class="button button-danger" type="button">Limpar linhas</button>
+          </div>
+
+          <p class="helper-text status-note" id="ready-feedback">
+            Os valores desta aba usam a base de preços dos cordões já configurada no sistema.
+          </p>
+
+          <div class="table-shell">
+            <table class="budget-table ready-products-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Produto</th>
+                  <th>Descrição</th>
+                  <th>Quantidade</th>
+                  <th>Valor un.</th>
+                  <th>Total item</th>
+                </tr>
+              </thead>
+              <tbody id="ready-rows-table-body"></tbody>
+            </table>
+          </div>
+
+          <div class="warning-list" id="ready-warning-list"></div>
         </article>
       </section>
 
@@ -671,7 +797,7 @@
     </div>
   </div>
 
-  <script src="./app.mjs?v=e3f5d91e1f97"></script>
+  <script src="./app.mjs?v=67f54af1ba2e"></script>
 </body>
 </html>
 
