@@ -2527,9 +2527,19 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
       ].join("")
     ),
     createConfigCardMarkup(
-      "Cordões e acessórios da credencial",
-      "Configure aqui os cordões usados diretamente na aba de credenciais.",
-      createCredentialLanyardPricingMarkup(config.credentialLanyardPricing)
+      "PS da credencial",
+      "Essas faixas controlam o cálculo das credenciais em PS 1mm e PS 2mm.",
+      createCredentialPsPricingMarkup(config.m2Pricing)
+    ),
+    createConfigCardMarkup(
+      "Laminação da credencial",
+      "Ajuste aqui o valor da laminação aplicado nas credenciais.",
+      createCredentialLaminationConfigMarkup(config.m2Finishes)
+    ),
+    createConfigCardMarkup(
+      "Cordão da credencial",
+      "Na aba de credenciais, deixe só o modelo roliço configurado aqui.",
+      createCredentialRoundLanyardPricingMarkup(config.credentialLanyardPricing)
     ),
   ];
 
@@ -2933,6 +2943,75 @@ function createCredentialLanyardPricingMarkup(credentialLanyardPricing) {
       "Essas faixas são usadas quando a credencial for vendida com cordão estampado."
     ),
   ].join("");
+}
+
+function createCredentialRoundLanyardPricingMarkup(credentialLanyardPricing) {
+  const pricing = credentialLanyardPricing || {};
+  return createInlineConfigBlockMarkup(
+    "Cordão da credencial",
+    `
+      <div class="config-grid compact-grid">
+        <label>
+          <span>Cordão roliço branco 2mm (R$ / un)</span>
+          <input data-config-prefix="credential-lanyard-fixed" data-config-row="0" data-config-key="roundWhite2mm" type="number" step="0.01" value="${escapeHtml(pricing.roundWhite2mm)}">
+        </label>
+      </div>
+    `,
+    "Este é o cordão usado diretamente na aba de credenciais."
+  );
+}
+
+function createCredentialPsPricingMarkup(m2Pricing) {
+  const products = [
+    { key: "ps1mm", label: "PS 1mm" },
+    { key: "ps2mm", label: "PS 2mm" },
+  ];
+
+  return products
+    .map((product) =>
+      createInlineConfigBlockMarkup(
+        product.label,
+        createTableMarkup(
+          ["Limite da faixa", "Valor", "Faixa"],
+          m2Pricing?.[product.key] || [],
+          `credential-${product.key}`,
+          [
+            { key: "min", type: "number", step: "0.01" },
+            { key: "value", type: "number", step: "0.01" },
+            { key: "label", type: "text" },
+          ]
+        ),
+        "Essas faixas abastecem o cálculo de credenciais em PS."
+      )
+    )
+    .join("");
+}
+
+function createCredentialLaminationConfigMarkup(m2Finishes) {
+  const finishes = Array.isArray(m2Finishes) ? m2Finishes : [];
+  const laminationIndex = finishes.findIndex((finish) =>
+    String(finish?.id || "").toLowerCase() === "laminacao"
+    || String(finish?.label || "").trim().toLowerCase() === "laminação".toLowerCase()
+    || String(finish?.label || "").trim().toLowerCase() === "laminacao"
+  );
+
+  if (laminationIndex === -1) {
+    return `<p class="helper-text">A laminação não foi localizada na base atual.</p>`;
+  }
+
+  const lamination = finishes[laminationIndex];
+  return createInlineConfigBlockMarkup(
+    "Laminação",
+    `
+      <div class="config-grid compact-grid">
+        <label>
+          <span>Valor da laminação (R$ por m²)</span>
+          <input data-config-prefix="m2-finish" data-config-row="${laminationIndex}" data-config-key="price" type="number" step="0.01" value="${escapeHtml(lamination.price)}">
+        </label>
+      </div>
+    `,
+    "Esse valor é usado quando a credencial for calculada com laminação."
+  );
 }
 
 function createM2PricingMarkup(m2Pricing) {
