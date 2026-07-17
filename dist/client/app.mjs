@@ -3211,6 +3211,10 @@ function getResinLayoutOption(pieceWidthMm, pieceHeightMm) {
   };
 }
 
+function formatResinMeasureCm(valueMm) {
+  return formatMeasure(toDecimalNumber(valueMm) / 10);
+}
+
 function calculateResinRow(source, config, index) {
   const widthMm = toDecimalNumber(source.widthMm);
   const heightMm = toDecimalNumber(source.heightMm);
@@ -3373,8 +3377,8 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
     ...resinWorkbook.activeRows.map((row) => ({
       kind: "Resinados",
       description: row.description,
-      detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} mm | ${row.materialLabel} | ${formatInteger(row.sheetsNeeded)} folha(s) A3 | ${formatInteger(row.piecesPerSheet)} por folha`,
-      extraDetail: `Com resina: ${formatMeasure(row.finalWidthMm)} x ${formatMeasure(row.finalHeightMm)} mm | ${row.orientation}`,
+      detail: `${formatInteger(row.quantity)} unidades | ${formatResinMeasureCm(row.widthMm)} x ${formatResinMeasureCm(row.heightMm)} cm | ${row.materialLabel} | ${formatInteger(row.sheetsNeeded)} folha(s) A3 | ${formatInteger(row.piecesPerSheet)} por folha`,
+      extraDetail: `Com resina: ${formatResinMeasureCm(row.finalWidthMm)} x ${formatResinMeasureCm(row.finalHeightMm)} cm | ${row.orientation}`,
       total: row.total,
     })),
   ];
@@ -3493,7 +3497,7 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
       text: `- ${getM2RowDescription(row) || `M² ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.finishSummary ? `${row.finishSummary} | ` : ""}${row.artCreationFee > 0 ? `Arte/edição: ${formatCurrency(row.artCreationFee)} | ` : ""}${formatCurrency(row.total)}`,
     })),
     ...resinWorkbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || `Resinado ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} mm | ${row.materialLabel} | ${row.sheetsNeeded} folha(s) A3 | ${row.piecesPerSheet} por folha | ${formatCurrency(row.total)}`,
+      text: `- ${row.description || `Resinado ${index + 1}`} | ${row.quantity} unidades | ${formatResinMeasureCm(row.widthMm)} x ${formatResinMeasureCm(row.heightMm)} cm | ${row.materialLabel} | ${row.sheetsNeeded} folha(s) A3 | ${row.piecesPerSheet} por folha | ${formatCurrency(row.total)}`,
     })),
   ];
 
@@ -3623,6 +3627,62 @@ async function initApp() {
 
   function setSyncStatus(message, tone = "neutral") {
     setStatusMessage(syncStatus, message, tone);
+  }
+
+  const customTabOrderSelector = [
+    'input:not([type="hidden"]):not([disabled]):not([readonly])',
+    "select:not([disabled])",
+    "textarea:not([disabled]):not([readonly])",
+    "button[data-credential-lanyard-toggle]:not([disabled])",
+    "button[data-m2-finish-toggle]:not([disabled])",
+  ].join(", ");
+
+  function getActiveTabPanel() {
+    return tabPanels.find((panel) => panel.classList.contains("is-active")) || null;
+  }
+
+  function isTabOrderElementVisible(element) {
+    if (!(element instanceof HTMLElement)) {
+      return false;
+    }
+
+    if (element.hidden || element.closest("[hidden]")) {
+      return false;
+    }
+
+    if (element.getAttribute("aria-hidden") === "true" || element.closest('[aria-hidden="true"]')) {
+      return false;
+    }
+
+    return element.offsetParent !== null || element === document.activeElement;
+  }
+
+  function getCustomTabOrderElements(panel) {
+    if (!(panel instanceof HTMLElement)) {
+      return [];
+    }
+
+    return [...panel.querySelectorAll(customTabOrderSelector)].filter((element) => isTabOrderElementVisible(element));
+  }
+
+  function shouldUseCustomTabOrder(target) {
+    if (!(target instanceof HTMLElement)) {
+      return false;
+    }
+
+    if (target.closest("#confirm-modal:not([hidden])")) {
+      return false;
+    }
+
+    if (target.closest("#credential-lanyard-popover") || target.closest("#m2-finish-popover")) {
+      return false;
+    }
+
+    if (target.isContentEditable || target.closest('[contenteditable="true"]')) {
+      return false;
+    }
+
+    return true;
   }
 
   function readClientRecordForm() {
@@ -4361,10 +4421,10 @@ async function initApp() {
                 <option value="holo-silver"${row.materialType === "holo-silver" ? " selected" : ""}>Adesivo holográfico prateado</option>
               </select>
             </td>
-            <td><input class="cell-input" name="widthMm" type="number" min="0" step="0.01" value="${escapeHtml(row.widthMm)}" placeholder="0"></td>
-            <td><input class="cell-input" name="heightMm" type="number" min="0" step="0.01" value="${escapeHtml(row.heightMm)}" placeholder="0"></td>
+            <td><input class="cell-input" name="widthMm" type="number" min="0" step="0.01" value="${row.widthMm > 0 ? escapeHtml(row.widthMm / 10) : ""}" placeholder="0,0"></td>
+            <td><input class="cell-input" name="heightMm" type="number" min="0" step="0.01" value="${row.heightMm > 0 ? escapeHtml(row.heightMm / 10) : ""}" placeholder="0,0"></td>
             <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${escapeHtml(row.quantity)}" placeholder="0"></td>
-            <td><span class="readonly-value subtle">${row.finalWidthMm > 0 && row.finalHeightMm > 0 ? `${formatMeasure(row.finalWidthMm)} x ${formatMeasure(row.finalHeightMm)} mm` : "-"}</span></td>
+            <td><span class="readonly-value subtle">${row.finalWidthMm > 0 && row.finalHeightMm > 0 ? `${formatResinMeasureCm(row.finalWidthMm)} x ${formatResinMeasureCm(row.finalHeightMm)} cm` : "-"}</span></td>
             <td><span class="readonly-value subtle">${escapeHtml(row.orientation || "-")}</span></td>
             <td><span class="readonly-value subtle">${formatInteger(row.piecesPerSheet || 0)}</span></td>
             <td><span class="readonly-value subtle">${formatInteger(row.sheetsNeeded || 0)}</span></td>
@@ -4728,6 +4788,37 @@ async function initApp() {
     });
   });
 
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Tab" || event.altKey || event.ctrlKey || event.metaKey) {
+      return;
+    }
+
+    const target = event.target;
+    if (!shouldUseCustomTabOrder(target)) {
+      return;
+    }
+
+    const activePanel = getActiveTabPanel();
+    if (!activePanel || !activePanel.contains(target)) {
+      return;
+    }
+
+    const editableElements = getCustomTabOrderElements(activePanel);
+    if (editableElements.length < 2) {
+      return;
+    }
+
+    const currentIndex = editableElements.indexOf(target);
+    if (currentIndex === -1) {
+      return;
+    }
+
+    event.preventDefault();
+    const direction = event.shiftKey ? -1 : 1;
+    const nextIndex = (currentIndex + direction + editableElements.length) % editableElements.length;
+    editableElements[nextIndex]?.focus();
+  });
+
   document.getElementById("import-button").addEventListener("click", () => {
     document.getElementById("pdf-input").click();
   });
@@ -4957,7 +5048,7 @@ async function initApp() {
     if (field === "quantity") {
       row[field] = toWholeNumber(target.value);
     } else if (field === "widthMm" || field === "heightMm") {
-      row[field] = toDecimalNumber(target.value);
+      row[field] = toDecimalNumber(target.value) * 10;
     } else {
       row[field] = target.value;
     }
