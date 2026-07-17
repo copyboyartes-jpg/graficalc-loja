@@ -358,122 +358,48 @@
           </article>
         </div>
 
-        <div class="workspace-grid">
-          <article class="panel">
-            <div class="panel-heading">
-              <div>
-                <h2>Calculadora de resinados</h2>
-                <p class="panel-copy">O cálculo usa sempre a folha A3 e soma 3 mm na largura e 3 mm na altura para a área de resina.</p>
-              </div>
-            </div>
-
-            <div class="quote-form-grid">
-              <label class="full-width">
-                <span>Descrição</span>
-                <input id="resin-description" type="text" placeholder="Ex.: Adesivo resinado vitrine">
-              </label>
-              <label>
-                <span>Tipo de adesivo</span>
-                <select id="resin-material">
-                  <option value="white">Adesivo branco</option>
-                  <option value="transparent">Adesivo transparente</option>
-                  <option value="holo-gold">Adesivo holográfico dourado</option>
-                  <option value="holo-silver">Adesivo holográfico prateado</option>
-                </select>
-              </label>
-              <label>
-                <span>Quantidade desejada</span>
-                <input id="resin-quantity" type="number" min="0" step="1" placeholder="Ex.: 500">
-              </label>
-              <label>
-                <span>Largura (mm)</span>
-                <input id="resin-width" type="number" min="0" step="0.01" placeholder="Ex.: 50">
-              </label>
-              <label>
-                <span>Altura (mm)</span>
-                <input id="resin-height" type="number" min="0" step="0.01" placeholder="Ex.: 30">
-              </label>
-            </div>
-
-            <div class="toolbar">
-              <button id="resin-calculate-button" class="button button-primary" type="button">Calcular</button>
-              <button id="resin-reset-button" class="button" type="button">Limpar</button>
-            </div>
-
-            <p class="helper-text status-note" id="resin-feedback">
-              Informe largura, altura e quantidade em milímetros para calcular os resinados.
-            </p>
-
-            <p class="helper-text">Regras da tabela: cálculo sempre em cima do A3, soma técnica de 3 mm para resina e melhor aproveitamento automático da folha.</p>
-          </article>
-
-          <article class="panel">
-            <div class="panel-heading">
-              <div>
-                <h2>Resumo técnico</h2>
-                <p class="panel-copy">O sistema compara a posição normal e girada para aproveitar melhor a folha A3.</p>
-              </div>
-            </div>
-
-            <div class="resin-detail-list">
-              <div class="resin-detail-row">
-                <span>Medida com resina</span>
-                <strong id="resin-detail-finished-size">0 x 0 mm</strong>
-              </div>
-              <div class="resin-detail-row">
-                <span>Melhor orientação</span>
-                <strong id="resin-detail-orientation">-</strong>
-              </div>
-              <div class="resin-detail-row">
-                <span>Encaixe na largura</span>
-                <strong id="resin-detail-fit-width">0</strong>
-              </div>
-              <div class="resin-detail-row">
-                <span>Encaixe na altura</span>
-                <strong id="resin-detail-fit-height">0</strong>
-              </div>
-              <div class="resin-detail-row">
-                <span>Sobra útil da folha</span>
-                <strong id="resin-detail-leftover">0 x 0 mm</strong>
-              </div>
-            </div>
-          </article>
-        </div>
-
         <article class="panel panel-table">
           <div class="panel-heading">
             <div>
-              <h2>Fechamento do cálculo</h2>
-              <p class="panel-copy">Use este quadro para conferir rapidamente a produção e o valor final do resinado.</p>
+              <h2>Orçamento de resinados</h2>
+              <p class="panel-copy">Adicione várias medidas na mesma aba. O sistema usa sempre a folha A3, soma 3 mm na largura e 3 mm na altura para a resina e escolhe automaticamente a melhor orientação.</p>
             </div>
           </div>
 
-          <div class="resin-result-grid">
-            <div class="resin-result-card">
-              <span>Quantidade pedida</span>
-              <strong id="resin-result-requested">0</strong>
-            </div>
-            <div class="resin-result-card">
-              <span>Produção total estimada</span>
-              <strong id="resin-result-produced">0</strong>
-            </div>
-            <div class="resin-result-card">
-              <span>Folhas A3 necessárias</span>
-              <strong id="resin-result-sheets">0</strong>
-            </div>
-            <div class="resin-result-card">
-              <span>Custo por folha</span>
-              <strong id="resin-result-sheet-price">R$ 0,00</strong>
-            </div>
-            <div class="resin-result-card">
-              <span>Valor mínimo</span>
-              <strong id="resin-result-minimum">R$ 0,00</strong>
-            </div>
-            <div class="resin-result-card">
-              <span>Total final</span>
-              <strong id="resin-result-total">R$ 0,00</strong>
-            </div>
+          <div class="toolbar">
+            <button id="add-resin-row-button" class="button button-primary" type="button">Adicionar linha</button>
+            <button id="clear-resin-rows-button" class="button button-danger" type="button">Limpar linhas</button>
           </div>
+
+          <p class="helper-text status-note" id="resin-feedback">
+            Preencha as linhas abaixo para calcular várias medidas de resinado no mesmo orçamento.
+          </p>
+
+          <div class="table-shell">
+            <table class="budget-table resin-budget-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Descrição</th>
+                  <th>Tipo de adesivo</th>
+                  <th>Largura (mm)</th>
+                  <th>Altura (mm)</th>
+                  <th>Quantidade</th>
+                  <th>Medida com resina</th>
+                  <th>Orientação</th>
+                  <th>Por A3</th>
+                  <th>Folhas A3</th>
+                  <th>Produção total</th>
+                  <th>Custo por folha</th>
+                  <th>Total item</th>
+                  <th>Valor un.</th>
+                </tr>
+              </thead>
+              <tbody id="resin-rows-table-body"></tbody>
+            </table>
+          </div>
+
+          <div class="warning-list" id="resin-warning-list"></div>
         </article>
       </section>
 
@@ -745,7 +671,7 @@
     </div>
   </div>
 
-  <script src="./app.mjs?v=23f246798bc1"></script>
+  <script src="./app.mjs?v=e3f5d91e1f97"></script>
 </body>
 </html>
 

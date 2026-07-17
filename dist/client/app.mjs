@@ -447,13 +447,14 @@ function createDefaultM2Row(index) {
   };
 }
 
-function createDefaultResinItem() {
+function createDefaultResinRow(index) {
   return {
+    id: `resin-row-${index + 1}`,
     description: "Adesivo resinado",
     materialType: "white",
-    widthMm: "",
-    heightMm: "",
-    quantity: "",
+    widthMm: 0,
+    heightMm: 0,
+    quantity: 0,
   };
 }
 
@@ -483,7 +484,7 @@ function createDefaultState() {
     rows: Array.from({ length: 5 }, (_, index) => createDefaultRow(index)),
     colorPrintItems: Array.from({ length: 5 }, (_, index) => createDefaultColorPrintRow(index)),
     m2Items: Array.from({ length: 5 }, (_, index) => createDefaultM2Row(index)),
-    resinItem: createDefaultResinItem(),
+    resinItems: Array.from({ length: 5 }, (_, index) => createDefaultResinRow(index)),
     client: {
       name: "",
       contact: "",
@@ -715,10 +716,6 @@ function mergeState(candidate) {
           createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString(),
         }))
     : state.quoteHistory;
-  state.resinItem = {
-    ...state.resinItem,
-    ...(candidate.resinItem || {}),
-  };
   state.paymentTerms = typeof candidate.paymentTerms === "string" ? candidate.paymentTerms : state.paymentTerms;
   state.productionDeadline = typeof candidate.productionDeadline === "string" ? candidate.productionDeadline : state.productionDeadline;
   state.quoteNotes = typeof candidate.quoteNotes === "string" ? candidate.quoteNotes : state.quoteNotes;
@@ -774,6 +771,27 @@ function mergeState(candidate) {
       productId: validM2Catalog.has(row?.productId) ? row.productId : M2_CATALOG[0].id,
       id: row?.id || `m2-row-${index + 1}`,
     }));
+  }
+
+  if (Array.isArray(candidate.resinItems) && candidate.resinItems.length > 0) {
+    state.resinItems = candidate.resinItems.map((row, index) => ({
+      ...createDefaultResinRow(index),
+      ...row,
+      widthMm: toDecimalNumber(row?.widthMm),
+      heightMm: toDecimalNumber(row?.heightMm),
+      quantity: toWholeNumber(row?.quantity),
+      id: row?.id || `resin-row-${index + 1}`,
+    }));
+  } else if (candidate.resinItem && typeof candidate.resinItem === "object") {
+    state.resinItems = Array.from({ length: 5 }, (_, index) => createDefaultResinRow(index));
+    state.resinItems[0] = {
+      ...state.resinItems[0],
+      ...candidate.resinItem,
+      widthMm: toDecimalNumber(candidate.resinItem.widthMm),
+      heightMm: toDecimalNumber(candidate.resinItem.heightMm),
+      quantity: toWholeNumber(candidate.resinItem.quantity),
+      id: "resin-row-1",
+    };
   }
 
   return state;
@@ -1854,6 +1872,12 @@ function ensureM2RowCount(state, minimumCount) {
   }
 }
 
+function ensureResinRowCount(state, minimumCount) {
+  while (state.resinItems.length < minimumCount) {
+    state.resinItems.push(createDefaultResinRow(state.resinItems.length));
+  }
+}
+
 function trimEmptyRows(rows, minimumCount, isActive) {
   const trimmed = [...rows];
   while (trimmed.length > minimumCount && !isActive(trimmed[trimmed.length - 1])) {
@@ -2742,8 +2766,8 @@ function buildApostilaCoverDetail(row) {
   return parts.join(" | ");
 }
 
-function isResinItemActive(item) {
-  return Boolean((item.description || "").trim() || Number(item.widthMm) > 0 || Number(item.heightMm) > 0 || Number(item.quantity) > 0);
+function isResinRowActive(row) {
+  return Boolean((row.description || "").trim() || Number(row.widthMm) > 0 || Number(row.heightMm) > 0 || Number(row.quantity) > 0);
 }
 
 function getResinMaterialLabel(materialType) {
@@ -2782,21 +2806,17 @@ function getResinLayoutOption(pieceWidthMm, pieceHeightMm) {
   };
 }
 
-function calculateResinWorkbook(state, config) {
-  const source = {
-    ...createDefaultResinItem(),
-    ...(state.resinItem || {}),
-  };
+function calculateResinRow(source, config, index) {
   const widthMm = toDecimalNumber(source.widthMm);
   const heightMm = toDecimalNumber(source.heightMm);
   const quantity = toWholeNumber(source.quantity);
-  const active = isResinItemActive({ ...source, widthMm, heightMm, quantity });
+  const active = isResinRowActive({ ...source, widthMm, heightMm, quantity });
   const materialType = source.materialType || "white";
   const materialLabel = getResinMaterialLabel(materialType);
-  const description = (source.description || "").trim() || "Adesivo resinado";
+  const description = (source.description || "").trim() || `Adesivo resinado ${index + 1}`;
   const resinPricing = config.resinPricing || createDefaultConfig().resinPricing;
 
-  const baseItem = {
+  const baseRow = {
     ...source,
     active,
     valid: false,
@@ -2820,61 +2840,30 @@ function calculateResinWorkbook(state, config) {
     unitValue: 0,
     orientation: "-",
     minimumOrderPrice: toMoneyNumber(resinPricing.minimumOrderPrice),
+    warning: "",
   };
 
   if (!active) {
-    return {
-      item: baseItem,
-      activeRows: [],
-      warnings: [],
-      message: "Informe largura, altura e quantidade em milímetros para calcular os resinados.",
-      tone: "neutral",
-      totals: {
-        activeLines: 0,
-        totalQuantity: 0,
-        totalGeneral: 0,
-        averageValue: 0,
-      },
-    };
+    return baseRow;
   }
 
   if (!widthMm || !heightMm || !quantity) {
     return {
-      item: baseItem,
-      activeRows: [],
-      warnings: ["Preencha largura, altura e quantidade maiores que zero para calcular os resinados."],
-      message: "Preencha largura, altura e quantidade maiores que zero para calcular os resinados.",
-      tone: "warning",
-      totals: {
-        activeLines: 0,
-        totalQuantity: 0,
-        totalGeneral: 0,
-        averageValue: 0,
-      },
+      ...baseRow,
+      warning: `Item ${String(index + 1).padStart(2, "0")}: preencha largura, altura e quantidade maiores que zero.`,
     };
   }
 
-  const normal = getResinLayoutOption(baseItem.finalWidthMm, baseItem.finalHeightMm);
-  const rotated = getResinLayoutOption(baseItem.finalHeightMm, baseItem.finalWidthMm);
+  const normal = getResinLayoutOption(baseRow.finalWidthMm, baseRow.finalHeightMm);
+  const rotated = getResinLayoutOption(baseRow.finalHeightMm, baseRow.finalWidthMm);
   const chosen = rotated.piecesPerSheet > normal.piecesPerSheet ? rotated : normal;
   const orientation = chosen === rotated ? "Girado para melhor aproveitamento" : "Normal";
 
   if (!chosen.piecesPerSheet) {
     return {
-      item: {
-        ...baseItem,
-        orientation,
-      },
-      activeRows: [],
-      warnings: ["Essa medida com a folga de resina não cabe dentro do A3."],
-      message: "Essa medida com a folga de resina não cabe dentro do A3.",
-      tone: "error",
-      totals: {
-        activeLines: 0,
-        totalQuantity: 0,
-        totalGeneral: 0,
-        averageValue: 0,
-      },
+      ...baseRow,
+      orientation,
+      warning: `Item ${String(index + 1).padStart(2, "0")}: essa medida com a folga de resina não cabe dentro do A3.`,
     };
   }
 
@@ -2884,8 +2873,8 @@ function calculateResinWorkbook(state, config) {
   const subtotal = sheetsNeeded * sheetPrice;
   const totalWithMarkup = subtotal + (subtotal * (toMoneyNumber(resinPricing.markupPercent) / 100));
   const total = Math.max(toMoneyNumber(resinPricing.minimumOrderPrice), totalWithMarkup);
-  const item = {
-    ...baseItem,
+  return {
+    ...baseRow,
     valid: true,
     fitAcross: chosen.fitAcross,
     fitDown: chosen.fitDown,
@@ -2898,19 +2887,42 @@ function calculateResinWorkbook(state, config) {
     total,
     unitValue: quantity > 0 ? total / quantity : 0,
     orientation,
+    warning: "",
   };
+}
+
+function calculateResinWorkbook(state, config) {
+  const rows = state.resinItems.map((row, index) => calculateResinRow({
+    ...createDefaultResinRow(index),
+    ...row,
+    id: row?.id || `resin-row-${index + 1}`,
+  }, config, index));
+  const activeRows = rows.filter((row) => row.active && row.valid);
+  const warnings = rows.filter((row) => row.warning).map((row) => row.warning);
+  const totalQuantity = activeRows.reduce((sum, row) => sum + row.quantity, 0);
+  const totalGeneral = activeRows.reduce((sum, row) => sum + row.total, 0);
+  let message = "Preencha as linhas abaixo para calcular várias medidas de resinado no mesmo orçamento.";
+  let tone = "neutral";
+
+  if (warnings.length > 0) {
+    message = "Algumas linhas de resinado precisam de ajuste antes de fechar o cálculo.";
+    tone = "warning";
+  } else if (activeRows.length > 0) {
+    message = "Cálculo de resinados atualizado com sucesso.";
+    tone = "success";
+  }
 
   return {
-    item,
-    activeRows: [item],
-    warnings: [],
-    message: "Cálculo de resinados atualizado com sucesso.",
-    tone: "success",
+    rows,
+    activeRows,
+    warnings,
+    message,
+    tone,
     totals: {
-      activeLines: 1,
-      totalQuantity: quantity,
-      totalGeneral: total,
-      averageValue: item.unitValue,
+      activeLines: activeRows.length,
+      totalQuantity,
+      totalGeneral,
+      averageValue: totalQuantity > 0 ? totalGeneral / totalQuantity : 0,
     },
   };
 }
@@ -3094,15 +3106,19 @@ async function initApp() {
   ensureRowCount(state, 5);
   ensureColorRowCount(state, 5);
   ensureM2RowCount(state, 5);
+  ensureResinRowCount(state, 5);
   state.rows = trimEmptyRows(state.rows, 5, isRowActive);
   state.colorPrintItems = trimEmptyRows(state.colorPrintItems, 5, isColorPrintRowActive);
   state.m2Items = trimEmptyRows(state.m2Items, 5, (row) => Boolean(row.description?.trim() || Number(row.quantity) > 0 || Number(row.widthMm) > 0 || Number(row.heightMm) > 0));
+  state.resinItems = trimEmptyRows(state.resinItems, 5, isResinRowActive);
 
   const rowsTableBody = document.getElementById("rows-table-body");
   const colorRowsTableBody = document.getElementById("color-rows-table-body");
+  const resinRowsTableBody = document.getElementById("resin-rows-table-body");
   const warningList = document.getElementById("warning-list");
   const colorWarningList = document.getElementById("color-warning-list");
   const m2WarningList = document.getElementById("m2-warning-list");
+  const resinWarningList = document.getElementById("resin-warning-list");
   const configSections = document.getElementById("config-sections");
   const clientsList = document.getElementById("clients-list");
   const historyList = document.getElementById("history-list");
@@ -3708,22 +3724,6 @@ async function initApp() {
     document.getElementById("resin-summary-quantity").textContent = formatInteger(resinWorkbook.totals.totalQuantity);
     document.getElementById("resin-summary-total").textContent = formatCurrency(resinWorkbook.totals.totalGeneral);
     document.getElementById("resin-summary-average").textContent = formatCurrency(resinWorkbook.totals.averageValue);
-    document.getElementById("resin-description").value = state.resinItem.description || "";
-    document.getElementById("resin-material").value = state.resinItem.materialType || "white";
-    document.getElementById("resin-width").value = state.resinItem.widthMm || "";
-    document.getElementById("resin-height").value = state.resinItem.heightMm || "";
-    document.getElementById("resin-quantity").value = state.resinItem.quantity || "";
-    document.getElementById("resin-detail-finished-size").textContent = `${formatMeasure(resinWorkbook.item.finalWidthMm || 0)} x ${formatMeasure(resinWorkbook.item.finalHeightMm || 0)} mm`;
-    document.getElementById("resin-detail-orientation").textContent = resinWorkbook.item.orientation || "-";
-    document.getElementById("resin-detail-fit-width").textContent = formatInteger(resinWorkbook.item.fitAcross || 0);
-    document.getElementById("resin-detail-fit-height").textContent = formatInteger(resinWorkbook.item.fitDown || 0);
-    document.getElementById("resin-detail-leftover").textContent = `${formatMeasure(resinWorkbook.item.leftoverWidth || 0)} x ${formatMeasure(resinWorkbook.item.leftoverHeight || 0)} mm`;
-    document.getElementById("resin-result-requested").textContent = formatInteger(resinWorkbook.item.quantity || 0);
-    document.getElementById("resin-result-produced").textContent = formatInteger(resinWorkbook.item.producedQuantity || 0);
-    document.getElementById("resin-result-sheets").textContent = formatInteger(resinWorkbook.item.sheetsNeeded || 0);
-    document.getElementById("resin-result-sheet-price").textContent = formatCurrency(resinWorkbook.item.sheetPrice || 0);
-    document.getElementById("resin-result-minimum").textContent = formatCurrency((config.resinPricing || {}).minimumOrderPrice || 0);
-    document.getElementById("resin-result-total").textContent = formatCurrency(resinWorkbook.item.total || 0);
     setResinFeedback(resinWorkbook.message, resinWorkbook.tone || "neutral");
 
     rowsTableBody.innerHTML = workbook.rows
@@ -3823,6 +3823,41 @@ async function initApp() {
         `
       )
       .join("");
+
+    resinRowsTableBody.innerHTML = resinWorkbook.rows
+      .map(
+        (row, index) => `
+          <tr class="${row.active ? "" : "is-empty"}" data-resin-row-index="${index}">
+            <td><strong>${String(index + 1).padStart(2, "0")}</strong></td>
+            <td><input class="cell-input description" name="description" value="${escapeHtml(row.description)}"></td>
+            <td>
+              <select class="cell-select" name="materialType">
+                <option value="white"${row.materialType === "white" ? " selected" : ""}>Adesivo branco</option>
+                <option value="transparent"${row.materialType === "transparent" ? " selected" : ""}>Adesivo transparente</option>
+                <option value="holo-gold"${row.materialType === "holo-gold" ? " selected" : ""}>Adesivo holográfico dourado</option>
+                <option value="holo-silver"${row.materialType === "holo-silver" ? " selected" : ""}>Adesivo holográfico prateado</option>
+              </select>
+            </td>
+            <td><input class="cell-input" name="widthMm" type="number" min="0" step="0.01" value="${escapeHtml(row.widthMm)}" placeholder="0"></td>
+            <td><input class="cell-input" name="heightMm" type="number" min="0" step="0.01" value="${escapeHtml(row.heightMm)}" placeholder="0"></td>
+            <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${escapeHtml(row.quantity)}" placeholder="0"></td>
+            <td><span class="readonly-value subtle">${row.finalWidthMm > 0 && row.finalHeightMm > 0 ? `${formatMeasure(row.finalWidthMm)} x ${formatMeasure(row.finalHeightMm)} mm` : "-"}</span></td>
+            <td><span class="readonly-value subtle">${escapeHtml(row.orientation || "-")}</span></td>
+            <td><span class="readonly-value subtle">${formatInteger(row.piecesPerSheet || 0)}</span></td>
+            <td><span class="readonly-value subtle">${formatInteger(row.sheetsNeeded || 0)}</span></td>
+            <td><span class="readonly-value subtle">${formatInteger(row.producedQuantity || 0)}</span></td>
+            <td><span class="readonly-value subtle">${formatCurrency(row.sheetPrice || 0)}</span></td>
+            <td><span class="readonly-value">${formatCurrency(row.total || 0)}</span></td>
+            <td><span class="readonly-value subtle">${formatCurrency(row.unitValue || 0)}</span></td>
+          </tr>
+        `
+      )
+      .join("");
+
+    resinWarningList.innerHTML = resinWorkbook.warnings.length
+      ? resinWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
+      : `<div class="warning-item is-success">Sem alertas no momento. Você pode montar várias medidas de resinados no mesmo orçamento por aqui.</div>`;
+
     quotePreview.innerHTML = createQuoteHtml(state, workbook, colorWorkbook, m2Workbook, resinWorkbook);
     return { workbook, colorWorkbook, m2Workbook, resinWorkbook };
   }
@@ -4103,6 +4138,12 @@ async function initApp() {
     renderRowsAndSummary();
   });
 
+  document.getElementById("add-resin-row-button").addEventListener("click", () => {
+    state.resinItems.push(createDefaultResinRow(state.resinItems.length));
+    persistLocalOnly();
+    renderRowsAndSummary();
+  });
+
   document.getElementById("clear-all-button").addEventListener("click", async () => {
     if (!(await confirmAppAction({
       kicker: "Limpeza",
@@ -4153,6 +4194,23 @@ async function initApp() {
     persist();
     renderRowsAndSummary();
     setConfigStatus("Linhas de cálculo de m² limpas.", "warning");
+  });
+
+  document.getElementById("clear-resin-rows-button").addEventListener("click", async () => {
+    if (!(await confirmAppAction({
+      kicker: "Limpeza",
+      title: "Limpar resinados",
+      message: "Deseja realmente limpar todas as linhas da aba de resinados?",
+      confirmLabel: "Limpar",
+      danger: true,
+    }))) {
+      setResinFeedback("A limpeza dos resinados foi cancelada.", "warning");
+      return;
+    }
+    state.resinItems = Array.from({ length: 5 }, (_, index) => createDefaultResinRow(index));
+    persistLocalOnly();
+    renderRowsAndSummary();
+    setResinFeedback("As linhas de resinados foram limpas.", "warning");
   });
 
   document.getElementById("calc-mode-select").addEventListener("change", (event) => {
@@ -4220,40 +4278,26 @@ async function initApp() {
     renderRowsAndSummary();
   });
 
-  ["resin-description", "resin-width", "resin-height", "resin-quantity"].forEach((elementId) => {
-    document.getElementById(elementId).addEventListener("input", (event) => {
-      const target = event.target;
-      if (target.id === "resin-description") {
-        state.resinItem.description = target.value;
-      } else if (target.id === "resin-width") {
-        state.resinItem.widthMm = target.value;
-      } else if (target.id === "resin-height") {
-        state.resinItem.heightMm = target.value;
-      } else if (target.id === "resin-quantity") {
-        state.resinItem.quantity = target.value;
-      }
-      persistLocalOnly();
-      renderRowsAndSummary();
-    });
-  });
-
-  document.getElementById("resin-material").addEventListener("change", (event) => {
-    state.resinItem.materialType = event.target.value;
+  resinRowsTableBody.addEventListener("change", (event) => {
+    const target = event.target;
+    const rowElement = target.closest("tr[data-resin-row-index]");
+    if (!rowElement) {
+      return;
+    }
+    const row = state.resinItems[Number(rowElement.dataset.resinRowIndex)];
+    const field = target.name;
+    if (!field || !row) {
+      return;
+    }
+    if (field === "quantity") {
+      row[field] = toWholeNumber(target.value);
+    } else if (field === "widthMm" || field === "heightMm") {
+      row[field] = toDecimalNumber(target.value);
+    } else {
+      row[field] = target.value;
+    }
     persistLocalOnly();
     renderRowsAndSummary();
-  });
-
-  document.getElementById("resin-calculate-button").addEventListener("click", () => {
-    persistLocalOnly();
-    renderRowsAndSummary();
-    setResinFeedback("Cálculo de resinados atualizado com sucesso.", "success");
-  });
-
-  document.getElementById("resin-reset-button").addEventListener("click", () => {
-    state.resinItem = createDefaultResinItem();
-    persistLocalOnly();
-    renderRowsAndSummary();
-    setResinFeedback("Campos de resinados limpos. Pode começar um novo cálculo.", "success");
   });
 
   colorRowsTableBody.addEventListener("change", (event) => {
