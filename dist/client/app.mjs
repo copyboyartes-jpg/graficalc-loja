@@ -163,6 +163,16 @@ const DEFAULT_M2_DESCRIPTIONS = {
 
 const A4_WIDTH_MM = 210;
 const A4_HEIGHT_MM = 297;
+const A3_WIDTH_MM = 420;
+const A3_HEIGHT_MM = 297;
+const RESIN_MARGIN_MM = 3;
+
+const RESIN_MATERIAL_LABELS = {
+  white: "Adesivo branco",
+  transparent: "Adesivo transparente",
+  "holo-gold": "Adesivo holográfico dourado",
+  "holo-silver": "Adesivo holográfico prateado",
+};
 
 function createDefaultConfig() {
   return {
@@ -294,6 +304,24 @@ function createDefaultConfig() {
       ],
       aboveFiveSheetsPerCut: 1.0,
     },
+    resinPricing: {
+      minimumOrderPrice: 35,
+      markupPercent: 0,
+      pricingByMaterial: {
+        standard: {
+          tier1: 32,
+          tier2: 30,
+          tier5: 28,
+          tier10: 24,
+        },
+        special: {
+          tier1: 45,
+          tier2: 40,
+          tier5: 38,
+          tier10: 35,
+        },
+      },
+    },
     m2Pricing: {
       digitalCut: [
         { min: 1, value: 30, label: "Valor minimo" },
@@ -419,6 +447,16 @@ function createDefaultM2Row(index) {
   };
 }
 
+function createDefaultResinItem() {
+  return {
+    description: "Adesivo resinado",
+    materialType: "white",
+    widthMm: "",
+    heightMm: "",
+    quantity: "",
+  };
+}
+
 function getDefaultM2Description(productId) {
   return DEFAULT_M2_DESCRIPTIONS[productId] || "";
 }
@@ -445,6 +483,7 @@ function createDefaultState() {
     rows: Array.from({ length: 5 }, (_, index) => createDefaultRow(index)),
     colorPrintItems: Array.from({ length: 5 }, (_, index) => createDefaultColorPrintRow(index)),
     m2Items: Array.from({ length: 5 }, (_, index) => createDefaultM2Row(index)),
+    resinItem: createDefaultResinItem(),
     client: {
       name: "",
       contact: "",
@@ -597,6 +636,23 @@ function mergeConfig(candidate) {
     }
   }
 
+  if (candidate.resinPricing && typeof candidate.resinPricing === "object") {
+    merged.resinPricing = {
+      ...merged.resinPricing,
+      ...candidate.resinPricing,
+      pricingByMaterial: {
+        standard: {
+          ...merged.resinPricing.pricingByMaterial.standard,
+          ...(candidate.resinPricing.pricingByMaterial?.standard || {}),
+        },
+        special: {
+          ...merged.resinPricing.pricingByMaterial.special,
+          ...(candidate.resinPricing.pricingByMaterial?.special || {}),
+        },
+      },
+    };
+  }
+
   merged.m2Finishes = normalizeM2Finishes(candidate.m2Finishes, defaults.m2Finishes);
 
   if (Array.isArray(candidate.catalogSections)) {
@@ -659,6 +715,10 @@ function mergeState(candidate) {
           createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString(),
         }))
     : state.quoteHistory;
+  state.resinItem = {
+    ...state.resinItem,
+    ...(candidate.resinItem || {}),
+  };
   state.paymentTerms = typeof candidate.paymentTerms === "string" ? candidate.paymentTerms : state.paymentTerms;
   state.productionDeadline = typeof candidate.productionDeadline === "string" ? candidate.productionDeadline : state.productionDeadline;
   state.quoteNotes = typeof candidate.quoteNotes === "string" ? candidate.quoteNotes : state.quoteNotes;
@@ -814,7 +874,7 @@ function loadConfigSection() {
 
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.configSection);
-    return raw === "impressos" || raw === "m2" ? raw : "calculo";
+    return raw === "impressos" || raw === "m2" || raw === "resinados" ? raw : "calculo";
   } catch {
     return "calculo";
   }
@@ -824,7 +884,7 @@ function saveConfigSection(section) {
   if (typeof localStorage === "undefined") {
     return;
   }
-  const safeSection = section === "impressos" || section === "m2" ? section : "calculo";
+  const safeSection = section === "impressos" || section === "m2" || section === "resinados" ? section : "calculo";
   localStorage.setItem(STORAGE_KEYS.configSection, safeSection);
 }
 
@@ -1819,6 +1879,7 @@ function createConfigSectionTabsMarkup(activeSection = "calculo") {
     { id: "calculo", label: "Cálculo de apostila", helper: "Impressão, capas e acabamentos." },
     { id: "impressos", label: "Impressos coloridos", helper: "Papéis, cortes e produtos extras." },
     { id: "m2", label: "Cálculo de m²", helper: "Faixas, acabamentos e produtos por área." },
+    { id: "resinados", label: "Resinados", helper: "Tabela A3, margem de resina e valor mínimo." },
   ];
 
   return `
@@ -2033,7 +2094,15 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
     createCatalogTabCardMarkup("m2", "Produtos extras desta aba", config.catalogSections, config, viewMode),
   ];
 
-  const safeSection = activeSection === "impressos" || activeSection === "m2" ? activeSection : "calculo";
+  const resinadosCards = [
+    createConfigCardMarkup(
+      "Tabela de resinados",
+      "Configure aqui o valor mínimo, a margem extra e o custo por folha A3 dos adesivos resinados.",
+      createResinConfigMarkup(config.resinPricing)
+    ),
+  ];
+
+  const safeSection = activeSection === "impressos" || activeSection === "m2" || activeSection === "resinados" ? activeSection : "calculo";
   const configGroups = {
     calculo: createConfigGroupMarkup(
       "calculo",
@@ -2052,6 +2121,12 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
       "Aba: Cálculo de m²",
       "Aqui ficam as faixas de preço, acabamentos e produtos extras do cálculo por área.",
       m2Cards
+    ),
+    resinados: createConfigGroupMarkup(
+      "resinados",
+      "Aba: Resinados",
+      "Ajuste aqui a tabela A3 usada no cálculo de adesivos resinados.",
+      resinadosCards
     ),
   };
 
@@ -2287,6 +2362,71 @@ function createColorCutTableMarkup(cutPricing) {
       </label>
     </div>
   `;
+}
+
+function createResinConfigMarkup(resinPricing) {
+  return [
+    `
+      <div class="config-grid compact-grid">
+        <label>
+          <span>Valor mínimo do pedido (R$)</span>
+          <input data-config-prefix="resin" data-config-row="0" data-config-key="minimumOrderPrice" type="number" step="0.01" value="${escapeHtml(resinPricing.minimumOrderPrice)}">
+        </label>
+        <label>
+          <span>Margem extra (%)</span>
+          <input data-config-prefix="resin" data-config-row="0" data-config-key="markupPercent" type="number" step="0.01" value="${escapeHtml(resinPricing.markupPercent)}">
+        </label>
+      </div>
+    `,
+    createInlineConfigBlockMarkup(
+      "Vinil branco e transparente",
+      `
+        <div class="preset-grid">
+          <label>
+            <span>1 folha A3</span>
+            <input data-config-prefix="resin" data-config-row="0" data-config-key="standard-tier1" type="number" step="0.01" value="${escapeHtml(resinPricing.pricingByMaterial.standard.tier1)}">
+          </label>
+          <label>
+            <span>2 folhas A3 (unidade)</span>
+            <input data-config-prefix="resin" data-config-row="0" data-config-key="standard-tier2" type="number" step="0.01" value="${escapeHtml(resinPricing.pricingByMaterial.standard.tier2)}">
+          </label>
+          <label>
+            <span>5 folhas A3 (unidade)</span>
+            <input data-config-prefix="resin" data-config-row="0" data-config-key="standard-tier5" type="number" step="0.01" value="${escapeHtml(resinPricing.pricingByMaterial.standard.tier5)}">
+          </label>
+          <label>
+            <span>10 folhas A3 (unidade)</span>
+            <input data-config-prefix="resin" data-config-row="0" data-config-key="standard-tier10" type="number" step="0.01" value="${escapeHtml(resinPricing.pricingByMaterial.standard.tier10)}">
+          </label>
+        </div>
+      `,
+      "Tabela usada para adesivo branco e transparente."
+    ),
+    createInlineConfigBlockMarkup(
+      "Vinil especial",
+      `
+        <div class="preset-grid">
+          <label>
+            <span>1 folha A3</span>
+            <input data-config-prefix="resin" data-config-row="0" data-config-key="special-tier1" type="number" step="0.01" value="${escapeHtml(resinPricing.pricingByMaterial.special.tier1)}">
+          </label>
+          <label>
+            <span>2 folhas A3 (unidade)</span>
+            <input data-config-prefix="resin" data-config-row="0" data-config-key="special-tier2" type="number" step="0.01" value="${escapeHtml(resinPricing.pricingByMaterial.special.tier2)}">
+          </label>
+          <label>
+            <span>5 folhas A3 (unidade)</span>
+            <input data-config-prefix="resin" data-config-row="0" data-config-key="special-tier5" type="number" step="0.01" value="${escapeHtml(resinPricing.pricingByMaterial.special.tier5)}">
+          </label>
+          <label>
+            <span>10 folhas A3 (unidade)</span>
+            <input data-config-prefix="resin" data-config-row="0" data-config-key="special-tier10" type="number" step="0.01" value="${escapeHtml(resinPricing.pricingByMaterial.special.tier10)}">
+          </label>
+        </div>
+      `,
+      "Tabela usada para holográficos e outros materiais especiais."
+    ),
+  ].join("");
 }
 
 function createM2PricingMarkup(m2Pricing) {
@@ -2602,7 +2742,180 @@ function buildApostilaCoverDetail(row) {
   return parts.join(" | ");
 }
 
-function createQuoteHtml(state, workbook, colorWorkbook, m2Workbook) {
+function isResinItemActive(item) {
+  return Boolean((item.description || "").trim() || Number(item.widthMm) > 0 || Number(item.heightMm) > 0 || Number(item.quantity) > 0);
+}
+
+function getResinMaterialLabel(materialType) {
+  return RESIN_MATERIAL_LABELS[materialType] || RESIN_MATERIAL_LABELS.white;
+}
+
+function getResinMaterialGroup(materialType) {
+  return materialType === "holo-gold" || materialType === "holo-silver" ? "special" : "standard";
+}
+
+function getResinSheetUnitPrice(resinPricing, materialType, sheetsNeeded) {
+  const pricingByMaterial = resinPricing?.pricingByMaterial || {};
+  const table = pricingByMaterial[getResinMaterialGroup(materialType)] || pricingByMaterial.standard || {};
+  if (sheetsNeeded >= 10) {
+    return toMoneyNumber(table.tier10);
+  }
+  if (sheetsNeeded >= 5) {
+    return toMoneyNumber(table.tier5);
+  }
+  if (sheetsNeeded >= 2) {
+    return toMoneyNumber(table.tier2);
+  }
+  return toMoneyNumber(table.tier1);
+}
+
+function getResinLayoutOption(pieceWidthMm, pieceHeightMm) {
+  const fitAcross = Math.floor(A3_WIDTH_MM / pieceWidthMm);
+  const fitDown = Math.floor(A3_HEIGHT_MM / pieceHeightMm);
+  const piecesPerSheet = fitAcross * fitDown;
+  return {
+    fitAcross,
+    fitDown,
+    piecesPerSheet,
+    leftoverWidth: Math.max(A3_WIDTH_MM - (fitAcross * pieceWidthMm), 0),
+    leftoverHeight: Math.max(A3_HEIGHT_MM - (fitDown * pieceHeightMm), 0),
+  };
+}
+
+function calculateResinWorkbook(state, config) {
+  const source = {
+    ...createDefaultResinItem(),
+    ...(state.resinItem || {}),
+  };
+  const widthMm = toDecimalNumber(source.widthMm);
+  const heightMm = toDecimalNumber(source.heightMm);
+  const quantity = toWholeNumber(source.quantity);
+  const active = isResinItemActive({ ...source, widthMm, heightMm, quantity });
+  const materialType = source.materialType || "white";
+  const materialLabel = getResinMaterialLabel(materialType);
+  const description = (source.description || "").trim() || "Adesivo resinado";
+  const resinPricing = config.resinPricing || createDefaultConfig().resinPricing;
+
+  const baseItem = {
+    ...source,
+    active,
+    valid: false,
+    description,
+    materialType,
+    materialLabel,
+    widthMm,
+    heightMm,
+    quantity,
+    finalWidthMm: widthMm > 0 ? widthMm + RESIN_MARGIN_MM : 0,
+    finalHeightMm: heightMm > 0 ? heightMm + RESIN_MARGIN_MM : 0,
+    fitAcross: 0,
+    fitDown: 0,
+    piecesPerSheet: 0,
+    leftoverWidth: 0,
+    leftoverHeight: 0,
+    sheetsNeeded: 0,
+    producedQuantity: 0,
+    sheetPrice: getResinSheetUnitPrice(resinPricing, materialType, 1),
+    total: 0,
+    unitValue: 0,
+    orientation: "-",
+    minimumOrderPrice: toMoneyNumber(resinPricing.minimumOrderPrice),
+  };
+
+  if (!active) {
+    return {
+      item: baseItem,
+      activeRows: [],
+      warnings: [],
+      message: "Informe largura, altura e quantidade em milímetros para calcular os resinados.",
+      tone: "neutral",
+      totals: {
+        activeLines: 0,
+        totalQuantity: 0,
+        totalGeneral: 0,
+        averageValue: 0,
+      },
+    };
+  }
+
+  if (!widthMm || !heightMm || !quantity) {
+    return {
+      item: baseItem,
+      activeRows: [],
+      warnings: ["Preencha largura, altura e quantidade maiores que zero para calcular os resinados."],
+      message: "Preencha largura, altura e quantidade maiores que zero para calcular os resinados.",
+      tone: "warning",
+      totals: {
+        activeLines: 0,
+        totalQuantity: 0,
+        totalGeneral: 0,
+        averageValue: 0,
+      },
+    };
+  }
+
+  const normal = getResinLayoutOption(baseItem.finalWidthMm, baseItem.finalHeightMm);
+  const rotated = getResinLayoutOption(baseItem.finalHeightMm, baseItem.finalWidthMm);
+  const chosen = rotated.piecesPerSheet > normal.piecesPerSheet ? rotated : normal;
+  const orientation = chosen === rotated ? "Girado para melhor aproveitamento" : "Normal";
+
+  if (!chosen.piecesPerSheet) {
+    return {
+      item: {
+        ...baseItem,
+        orientation,
+      },
+      activeRows: [],
+      warnings: ["Essa medida com a folga de resina não cabe dentro do A3."],
+      message: "Essa medida com a folga de resina não cabe dentro do A3.",
+      tone: "error",
+      totals: {
+        activeLines: 0,
+        totalQuantity: 0,
+        totalGeneral: 0,
+        averageValue: 0,
+      },
+    };
+  }
+
+  const sheetsNeeded = Math.ceil(quantity / chosen.piecesPerSheet);
+  const producedQuantity = sheetsNeeded * chosen.piecesPerSheet;
+  const sheetPrice = getResinSheetUnitPrice(resinPricing, materialType, sheetsNeeded);
+  const subtotal = sheetsNeeded * sheetPrice;
+  const totalWithMarkup = subtotal + (subtotal * (toMoneyNumber(resinPricing.markupPercent) / 100));
+  const total = Math.max(toMoneyNumber(resinPricing.minimumOrderPrice), totalWithMarkup);
+  const item = {
+    ...baseItem,
+    valid: true,
+    fitAcross: chosen.fitAcross,
+    fitDown: chosen.fitDown,
+    piecesPerSheet: chosen.piecesPerSheet,
+    leftoverWidth: chosen.leftoverWidth,
+    leftoverHeight: chosen.leftoverHeight,
+    sheetsNeeded,
+    producedQuantity,
+    sheetPrice,
+    total,
+    unitValue: quantity > 0 ? total / quantity : 0,
+    orientation,
+  };
+
+  return {
+    item,
+    activeRows: [item],
+    warnings: [],
+    message: "Cálculo de resinados atualizado com sucesso.",
+    tone: "success",
+    totals: {
+      activeLines: 1,
+      totalQuantity: quantity,
+      totalGeneral: total,
+      averageValue: item.unitValue,
+    },
+  };
+}
+
+function createQuoteHtml(state, workbook, colorWorkbook, m2Workbook, resinWorkbook) {
   const dateText = new Intl.DateTimeFormat("pt-BR").format(new Date());
   const quoteEntries = [
     ...workbook.activeRows.map((row) => {
@@ -2627,9 +2940,16 @@ function createQuoteHtml(state, workbook, colorWorkbook, m2Workbook) {
       detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.productLabel}${row.finishSummary ? ` | ${row.finishSummary}` : ""}${row.artCreationFee > 0 ? ` | Arte/edição: ${formatCurrency(row.artCreationFee)}` : ""}`,
       total: row.total,
     })),
+    ...resinWorkbook.activeRows.map((row) => ({
+      kind: "Resinados",
+      description: row.description,
+      detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} mm | ${row.materialLabel} | ${formatInteger(row.sheetsNeeded)} folha(s) A3 | ${formatInteger(row.piecesPerSheet)} por folha`,
+      extraDetail: `Com resina: ${formatMeasure(row.finalWidthMm)} x ${formatMeasure(row.finalHeightMm)} mm | ${row.orientation}`,
+      total: row.total,
+    })),
   ];
-  const combinedTotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral;
-  const combinedUnits = workbook.totals.totalQuantity + colorWorkbook.totals.totalQuantity + m2Workbook.totals.totalQuantity;
+  const combinedTotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
+  const combinedUnits = workbook.totals.totalQuantity + colorWorkbook.totals.totalQuantity + m2Workbook.totals.totalQuantity + resinWorkbook.totals.totalQuantity;
   const lineItemsMarkup = quoteEntries.length
     ? quoteEntries
         .map(
@@ -2706,7 +3026,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, m2Workbook) {
   `;
 }
 
-function createQuoteText(state, workbook, colorWorkbook, m2Workbook) {
+function createQuoteText(state, workbook, colorWorkbook, m2Workbook, resinWorkbook) {
   const dateText = new Intl.DateTimeFormat("pt-BR").format(new Date());
   const lines = [
     `ORÇAMENTO | ${state.company.name || "Sua empresa"}`,
@@ -2736,6 +3056,9 @@ function createQuoteText(state, workbook, colorWorkbook, m2Workbook) {
     ...m2Workbook.activeRows.map((row, index) => ({
       text: `- ${getM2RowDescription(row) || `M² ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.finishSummary ? `${row.finishSummary} | ` : ""}${row.artCreationFee > 0 ? `Arte/edição: ${formatCurrency(row.artCreationFee)} | ` : ""}${formatCurrency(row.total)}`,
     })),
+    ...resinWorkbook.activeRows.map((row, index) => ({
+      text: `- ${row.description || `Resinado ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} mm | ${row.materialLabel} | ${row.sheetsNeeded} folha(s) A3 | ${row.piecesPerSheet} por folha | ${formatCurrency(row.total)}`,
+    })),
   ];
 
   if (quoteEntries.length === 0) {
@@ -2744,7 +3067,7 @@ function createQuoteText(state, workbook, colorWorkbook, m2Workbook) {
     quoteEntries.forEach((entry) => lines.push(entry.text));
   }
 
-  lines.push("", `Total geral: ${formatCurrency(workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral)}`);
+  lines.push("", `Total geral: ${formatCurrency(workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral)}`);
 
   if (state.quoteNotes?.trim()) {
     lines.push("", "Observações:", state.quoteNotes.trim());
@@ -2758,7 +3081,7 @@ async function initApp() {
   const config = loadFromStorage(STORAGE_KEYS.config, mergeConfig);
   let configViewMode = loadConfigViewMode();
   let activeConfigSection = loadConfigSection();
-  let lastConfigSourceTab = activeConfigSection;
+  let lastConfigSourceTab = activeConfigSection === "impressos" || activeConfigSection === "m2" || activeConfigSection === "resinados" ? activeConfigSection : "calculo";
   let isConfigUnlocked = loadSessionFlag(SESSION_KEYS.configUnlocked);
   let sharedSyncTimer = null;
   let sharedSyncInFlight = false;
@@ -2787,6 +3110,7 @@ async function initApp() {
   const quotePreview = document.getElementById("quote-preview");
   const feedback = document.getElementById("import-feedback");
   const colorFeedback = document.getElementById("color-feedback");
+  const resinFeedback = document.getElementById("resin-feedback");
   const configStatus = document.getElementById("config-status");
   const syncStatus = document.getElementById("sync-status");
   const spiralDiscountInput = document.getElementById("spiral-discount-input");
@@ -2829,6 +3153,10 @@ async function initApp() {
 
   function setColorFeedback(message, tone = "neutral") {
     setStatusMessage(colorFeedback, message, tone);
+  }
+
+  function setResinFeedback(message, tone = "neutral") {
+    setStatusMessage(resinFeedback, message, tone);
   }
 
   function setClientsFeedback(message, tone = "neutral") {
@@ -3103,14 +3431,14 @@ async function initApp() {
 
   function selectTab(tabName) {
     if (tabName === "configuracao") {
-      activeConfigSection = lastConfigSourceTab === "impressos" || lastConfigSourceTab === "m2" ? lastConfigSourceTab : "calculo";
+      activeConfigSection = lastConfigSourceTab === "impressos" || lastConfigSourceTab === "m2" || lastConfigSourceTab === "resinados" ? lastConfigSourceTab : "calculo";
       saveConfigSection(activeConfigSection);
       renderConfig();
       if (!isConfigUnlocked) {
         setConfigStatus("Digite a senha para acessar a configuração.", "warning");
         focusConfigPasswordField();
       }
-    } else if (tabName === "calculo" || tabName === "impressos" || tabName === "m2") {
+    } else if (tabName === "calculo" || tabName === "impressos" || tabName === "m2" || tabName === "resinados") {
       lastConfigSourceTab = tabName;
     }
     tabButtons.forEach((button) => {
@@ -3358,6 +3686,7 @@ async function initApp() {
     const workbook = calculateWorkbook(state, config);
     const colorWorkbook = calculateColorPrintWorkbook(state, config);
     const m2Workbook = calculateM2WorkbookFromConfig(state, config);
+    const resinWorkbook = calculateResinWorkbook(state, config);
     const m2Catalog = getM2Catalog(config);
 
     document.getElementById("summary-active-lines").textContent = formatInteger(workbook.totals.activeLines);
@@ -3374,6 +3703,28 @@ async function initApp() {
     document.getElementById("m2-summary-quantity").textContent = formatInteger(m2Workbook.totals.totalQuantity);
     document.getElementById("m2-summary-total").textContent = formatCurrency(m2Workbook.totals.totalGeneral);
     document.getElementById("m2-summary-average").textContent = formatCurrency(m2Workbook.totals.averageValue);
+
+    document.getElementById("resin-summary-active").textContent = formatInteger(resinWorkbook.totals.activeLines);
+    document.getElementById("resin-summary-quantity").textContent = formatInteger(resinWorkbook.totals.totalQuantity);
+    document.getElementById("resin-summary-total").textContent = formatCurrency(resinWorkbook.totals.totalGeneral);
+    document.getElementById("resin-summary-average").textContent = formatCurrency(resinWorkbook.totals.averageValue);
+    document.getElementById("resin-description").value = state.resinItem.description || "";
+    document.getElementById("resin-material").value = state.resinItem.materialType || "white";
+    document.getElementById("resin-width").value = state.resinItem.widthMm || "";
+    document.getElementById("resin-height").value = state.resinItem.heightMm || "";
+    document.getElementById("resin-quantity").value = state.resinItem.quantity || "";
+    document.getElementById("resin-detail-finished-size").textContent = `${formatMeasure(resinWorkbook.item.finalWidthMm || 0)} x ${formatMeasure(resinWorkbook.item.finalHeightMm || 0)} mm`;
+    document.getElementById("resin-detail-orientation").textContent = resinWorkbook.item.orientation || "-";
+    document.getElementById("resin-detail-fit-width").textContent = formatInteger(resinWorkbook.item.fitAcross || 0);
+    document.getElementById("resin-detail-fit-height").textContent = formatInteger(resinWorkbook.item.fitDown || 0);
+    document.getElementById("resin-detail-leftover").textContent = `${formatMeasure(resinWorkbook.item.leftoverWidth || 0)} x ${formatMeasure(resinWorkbook.item.leftoverHeight || 0)} mm`;
+    document.getElementById("resin-result-requested").textContent = formatInteger(resinWorkbook.item.quantity || 0);
+    document.getElementById("resin-result-produced").textContent = formatInteger(resinWorkbook.item.producedQuantity || 0);
+    document.getElementById("resin-result-sheets").textContent = formatInteger(resinWorkbook.item.sheetsNeeded || 0);
+    document.getElementById("resin-result-sheet-price").textContent = formatCurrency(resinWorkbook.item.sheetPrice || 0);
+    document.getElementById("resin-result-minimum").textContent = formatCurrency((config.resinPricing || {}).minimumOrderPrice || 0);
+    document.getElementById("resin-result-total").textContent = formatCurrency(resinWorkbook.item.total || 0);
+    setResinFeedback(resinWorkbook.message, resinWorkbook.tone || "neutral");
 
     rowsTableBody.innerHTML = workbook.rows
       .map((row, index) => {
@@ -3472,8 +3823,8 @@ async function initApp() {
         `
       )
       .join("");
-    quotePreview.innerHTML = createQuoteHtml(state, workbook, colorWorkbook, m2Workbook);
-    return { workbook, colorWorkbook, m2Workbook };
+    quotePreview.innerHTML = createQuoteHtml(state, workbook, colorWorkbook, m2Workbook, resinWorkbook);
+    return { workbook, colorWorkbook, m2Workbook, resinWorkbook };
   }
 
   function closeM2FinishPopover() {
@@ -3869,6 +4220,42 @@ async function initApp() {
     renderRowsAndSummary();
   });
 
+  ["resin-description", "resin-width", "resin-height", "resin-quantity"].forEach((elementId) => {
+    document.getElementById(elementId).addEventListener("input", (event) => {
+      const target = event.target;
+      if (target.id === "resin-description") {
+        state.resinItem.description = target.value;
+      } else if (target.id === "resin-width") {
+        state.resinItem.widthMm = target.value;
+      } else if (target.id === "resin-height") {
+        state.resinItem.heightMm = target.value;
+      } else if (target.id === "resin-quantity") {
+        state.resinItem.quantity = target.value;
+      }
+      persistLocalOnly();
+      renderRowsAndSummary();
+    });
+  });
+
+  document.getElementById("resin-material").addEventListener("change", (event) => {
+    state.resinItem.materialType = event.target.value;
+    persistLocalOnly();
+    renderRowsAndSummary();
+  });
+
+  document.getElementById("resin-calculate-button").addEventListener("click", () => {
+    persistLocalOnly();
+    renderRowsAndSummary();
+    setResinFeedback("Cálculo de resinados atualizado com sucesso.", "success");
+  });
+
+  document.getElementById("resin-reset-button").addEventListener("click", () => {
+    state.resinItem = createDefaultResinItem();
+    persistLocalOnly();
+    renderRowsAndSummary();
+    setResinFeedback("Campos de resinados limpos. Pode começar um novo cálculo.", "success");
+  });
+
   colorRowsTableBody.addEventListener("change", (event) => {
     const target = event.target;
     const rowElement = target.closest("tr[data-color-row-index]");
@@ -4072,6 +4459,23 @@ async function initApp() {
       return;
     }
 
+    if (prefix === "resin") {
+      if (key === "minimumOrderPrice" || key === "markupPercent") {
+        config.resinPricing[key] = toMoneyNumber(target.value);
+      } else {
+        const match = key.match(/^(standard|special)-(tier1|tier2|tier5|tier10)$/);
+        if (!match) {
+          return;
+        }
+        const [, group, tierKey] = match;
+        config.resinPricing.pricingByMaterial[group][tierKey] = toMoneyNumber(target.value);
+      }
+      persist();
+      renderRowsAndSummary();
+      setConfigStatus("Tabela de resinados atualizada.", "success");
+      return;
+    }
+
     const array = getConfigArrayByPrefix(config, prefix);
     if (!array || !array[rowIndex]) {
       return;
@@ -4126,7 +4530,7 @@ async function initApp() {
 
     const sectionButton = event.target.closest("[data-config-section]");
     if (sectionButton) {
-      activeConfigSection = sectionButton.dataset.configSection === "impressos" || sectionButton.dataset.configSection === "m2"
+      activeConfigSection = sectionButton.dataset.configSection === "impressos" || sectionButton.dataset.configSection === "m2" || sectionButton.dataset.configSection === "resinados"
         ? sectionButton.dataset.configSection
         : "calculo";
       saveConfigSection(activeConfigSection);
@@ -4371,7 +4775,8 @@ async function initApp() {
     const workbook = calculateWorkbook(state, config);
     const colorWorkbook = calculateColorPrintWorkbook(state, config);
     const m2Workbook = calculateM2WorkbookFromConfig(state, config);
-    const text = createQuoteText(state, workbook, colorWorkbook, m2Workbook);
+    const resinWorkbook = calculateResinWorkbook(state, config);
+    const text = createQuoteText(state, workbook, colorWorkbook, m2Workbook, resinWorkbook);
     try {
       await navigator.clipboard.writeText(text);
       setMainFeedback("Resumo do orçamento copiado com sucesso.", "success");
@@ -4444,14 +4849,15 @@ async function initApp() {
     const workbook = calculateWorkbook(state, config);
     const colorWorkbook = calculateColorPrintWorkbook(state, config);
     const m2Workbook = calculateM2WorkbookFromConfig(state, config);
+    const resinWorkbook = calculateResinWorkbook(state, config);
     const title = state.client.name.trim() || `Orçamento ${new Date().toLocaleDateString("pt-BR")}`;
-    const summary = createQuoteText(state, workbook, colorWorkbook, m2Workbook).split("\n").slice(0, 10).join(" • ");
+    const summary = createQuoteText(state, workbook, colorWorkbook, m2Workbook, resinWorkbook).split("\n").slice(0, 10).join(" • ");
 
     state.quoteHistory.unshift({
       id: `quote-${Date.now()}`,
       title,
       clientName: state.client.name.trim(),
-      total: workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral,
+      total: workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral,
       summary,
       createdAt: new Date().toISOString(),
     });
@@ -4573,6 +4979,34 @@ async function initApp() {
 if (typeof window !== "undefined" && typeof document !== "undefined") {
   initApp().catch(() => {});
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
