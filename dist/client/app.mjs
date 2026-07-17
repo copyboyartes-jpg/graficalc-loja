@@ -568,7 +568,7 @@ function normalizeCatalogSections(list) {
       continue;
     }
     if (Array.isArray(item.products)) {
-      const tab = item.tab === "calculo" || item.tab === "impressos" || item.tab === "m2" ? item.tab : "m2";
+      const tab = item.tab === "calculo" || item.tab === "impressos" || item.tab === "credenciais" || item.tab === "produtos-prontos" || item.tab === "m2" ? item.tab : "m2";
       for (const product of item.products) {
         if (!product || typeof product !== "object") {
           continue;
@@ -582,7 +582,7 @@ function normalizeCatalogSections(list) {
       }
       continue;
     }
-    if (item.tab === "calculo" || item.tab === "impressos" || item.tab === "m2") {
+    if (item.tab === "calculo" || item.tab === "impressos" || item.tab === "credenciais" || item.tab === "produtos-prontos" || item.tab === "m2") {
       normalized.push({
         id: item.id || `produto-${Date.now()}`,
         label: item.label || item.name || "Novo produto",
@@ -970,7 +970,7 @@ function loadConfigSection() {
 
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.configSection);
-    return raw === "impressos" || raw === "m2" || raw === "resinados" ? raw : "calculo";
+    return raw === "impressos" || raw === "credenciais" || raw === "produtos-prontos" || raw === "m2" || raw === "resinados" ? raw : "calculo";
   } catch {
     return "calculo";
   }
@@ -980,7 +980,7 @@ function saveConfigSection(section) {
   if (typeof localStorage === "undefined") {
     return;
   }
-  const safeSection = section === "impressos" || section === "m2" || section === "resinados" ? section : "calculo";
+  const safeSection = section === "impressos" || section === "credenciais" || section === "produtos-prontos" || section === "m2" || section === "resinados" ? section : "calculo";
   localStorage.setItem(STORAGE_KEYS.configSection, safeSection);
 }
 
@@ -2270,6 +2270,8 @@ function createConfigSectionTabsMarkup(activeSection = "calculo") {
   const sections = [
     { id: "calculo", label: "Cálculo de apostila", helper: "Impressão, capas e acabamentos." },
     { id: "impressos", label: "Impressos coloridos", helper: "Papéis, cortes e produtos extras." },
+    { id: "credenciais", label: "Credenciais", helper: "Materiais, laminação e cordões." },
+    { id: "produtos-prontos", label: "Produtos prontos", helper: "Cordões e itens vendidos separadamente." },
     { id: "m2", label: "Cálculo de m²", helper: "Faixas, acabamentos e produtos por área." },
     { id: "resinados", label: "Resinados", helper: "Tabela A3, margem de resina e valor mínimo." },
   ];
@@ -2491,6 +2493,54 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
     createCatalogTabCardMarkup("m2", "Produtos extras desta aba", config.catalogSections, config, viewMode),
   ];
 
+  const credenciaisCards = [
+    createConfigCardMarkup(
+      "Papéis da credencial",
+      "Esses valores abastecem os papéis usados na aba de credenciais. Para PS 1mm e PS 2mm, o sistema continua puxando as faixas do cálculo de m².",
+      [
+        createInlineConfigBlockMarkup(
+          "Couche 250 / Offset 240 / Reciclato 240",
+          createTableMarkup(
+            ["Qtd mínima", "Valor", "Faixa"],
+            config.colorPrintPricing["250g"],
+            "credential-color-250g",
+            [
+              { key: "min", type: "number", step: "1" },
+              { key: "value", type: "number", step: "0.01" },
+              { key: "label", type: "text" },
+            ]
+          )
+        ),
+        createInlineConfigBlockMarkup(
+          "Couche 300 / Metalizados",
+          createTableMarkup(
+            ["Qtd mínima", "Valor", "Faixa"],
+            config.colorPrintPricing["300g"],
+            "credential-color-300g",
+            [
+              { key: "min", type: "number", step: "1" },
+              { key: "value", type: "number", step: "0.01" },
+              { key: "label", type: "text" },
+            ]
+          )
+        ),
+      ].join("")
+    ),
+    createConfigCardMarkup(
+      "Cordões e acessórios da credencial",
+      "Configure aqui os cordões usados diretamente na aba de credenciais.",
+      createCredentialLanyardPricingMarkup(config.credentialLanyardPricing)
+    ),
+  ];
+
+  const produtosProntosCards = [
+    createConfigCardMarkup(
+      "Cordões e produtos vendidos separadamente",
+      "Esses valores aparecem na aba de produtos prontos para orçar itens avulsos.",
+      createCredentialLanyardPricingMarkup(config.credentialLanyardPricing)
+    ),
+  ];
+
   const resinadosCards = [
     createConfigCardMarkup(
       "Tabela de resinados",
@@ -2499,7 +2549,7 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
     ),
   ];
 
-  const safeSection = activeSection === "impressos" || activeSection === "m2" || activeSection === "resinados" ? activeSection : "calculo";
+  const safeSection = activeSection === "impressos" || activeSection === "credenciais" || activeSection === "produtos-prontos" || activeSection === "m2" || activeSection === "resinados" ? activeSection : "calculo";
   const configGroups = {
     calculo: createConfigGroupMarkup(
       "calculo",
@@ -2512,6 +2562,18 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
       "Aba: Impressos coloridos",
       "Use este bloco para ajustar preços, cortes e produtos extras dos impressos coloridos.",
       impressosCards
+    ),
+    credenciais: createConfigGroupMarkup(
+      "credenciais",
+      "Aba: Credenciais",
+      "Use este bloco para ajustar materiais, laminação e cordões da aba de credenciais.",
+      credenciaisCards
+    ),
+    "produtos-prontos": createConfigGroupMarkup(
+      "produtos-prontos",
+      "Aba: Produtos prontos",
+      "Aqui ficam os valores dos cordões e itens vendidos separadamente na aba de produtos prontos.",
+      produtosProntosCards
     ),
     m2: createConfigGroupMarkup(
       "m2",
@@ -3537,7 +3599,7 @@ async function initApp() {
   const config = loadFromStorage(STORAGE_KEYS.config, mergeConfig);
   let configViewMode = loadConfigViewMode();
   let activeConfigSection = loadConfigSection();
-  let lastConfigSourceTab = activeConfigSection === "impressos" || activeConfigSection === "m2" || activeConfigSection === "resinados" ? activeConfigSection : "calculo";
+  let lastConfigSourceTab = activeConfigSection === "impressos" || activeConfigSection === "credenciais" || activeConfigSection === "produtos-prontos" || activeConfigSection === "m2" || activeConfigSection === "resinados" ? activeConfigSection : "calculo";
   let isConfigUnlocked = loadSessionFlag(SESSION_KEYS.configUnlocked);
   let sharedSyncTimer = null;
   let sharedSyncInFlight = false;
@@ -3965,16 +4027,14 @@ async function initApp() {
 
   function selectTab(tabName) {
     if (tabName === "configuracao") {
-      activeConfigSection = lastConfigSourceTab === "impressos" || lastConfigSourceTab === "m2" || lastConfigSourceTab === "resinados" ? lastConfigSourceTab : "calculo";
+      activeConfigSection = lastConfigSourceTab === "impressos" || lastConfigSourceTab === "credenciais" || lastConfigSourceTab === "produtos-prontos" || lastConfigSourceTab === "m2" || lastConfigSourceTab === "resinados" ? lastConfigSourceTab : "calculo";
       saveConfigSection(activeConfigSection);
       renderConfig();
       if (!isConfigUnlocked) {
         setConfigStatus("Digite a senha para acessar a configuração.", "warning");
         focusConfigPasswordField();
       }
-    } else if (tabName === "credenciais" || tabName === "produtos-prontos") {
-      lastConfigSourceTab = "impressos";
-    } else if (tabName === "calculo" || tabName === "impressos" || tabName === "m2" || tabName === "resinados") {
+    } else if (tabName === "calculo" || tabName === "impressos" || tabName === "credenciais" || tabName === "produtos-prontos" || tabName === "m2" || tabName === "resinados") {
       lastConfigSourceTab = tabName;
     }
     tabButtons.forEach((button) => {
@@ -5419,7 +5479,7 @@ async function initApp() {
 
     const sectionButton = event.target.closest("[data-config-section]");
     if (sectionButton) {
-      activeConfigSection = sectionButton.dataset.configSection === "impressos" || sectionButton.dataset.configSection === "m2" || sectionButton.dataset.configSection === "resinados"
+      activeConfigSection = sectionButton.dataset.configSection === "impressos" || sectionButton.dataset.configSection === "credenciais" || sectionButton.dataset.configSection === "produtos-prontos" || sectionButton.dataset.configSection === "m2" || sectionButton.dataset.configSection === "resinados"
         ? sectionButton.dataset.configSection
         : "calculo";
       saveConfigSection(activeConfigSection);
