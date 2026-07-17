@@ -475,6 +475,7 @@ function createDefaultCredentialRow(index) {
     id: `credential-row-${index + 1}`,
     description: "",
     materialType: "Couche 250g",
+    printMode: "Só frente",
     lamination: "Sem laminação",
     lanyardType: "none",
     widthCm: 0,
@@ -1372,6 +1373,8 @@ function calculateCredentialWorkbook(state, config) {
     const active = isCredentialRowActive(row);
     const material = getCredentialMaterialConfig(row.materialType);
     const lanyard = getCredentialLanyardSelection(config, row.lanyardType, quantity);
+    const printMode = row.printMode === "Frente e verso" ? "Frente e verso" : "Só frente";
+    const sides = printMode === "Frente e verso" ? 2 : 1;
     const widthMm = widthCm * 10;
     const heightMm = heightCm * 10;
     const areaM2 = (widthCm * heightCm * quantity) / 10000;
@@ -1387,12 +1390,14 @@ function calculateCredentialWorkbook(state, config) {
       quantity,
       materialType: material.label,
       materialLabel: material.label,
+      printMode,
       lanyardType: lanyard.id,
       lanyardLabel: lanyard.label,
       lanyardUnitPrice: lanyard.unitPrice,
       areaM2,
       itemsPerSheet: 0,
       sheetsNeeded: 0,
+      impressionsNeeded: 0,
       rotated: false,
       sheetPrice: 0,
       pricePerM2: 0,
@@ -1433,10 +1438,11 @@ function calculateCredentialWorkbook(state, config) {
       }
 
       const sheetsNeeded = Math.ceil(quantity / fit.itemsPerSheet);
+      const impressionsNeeded = sheetsNeeded * sides;
       const pricingKey = getColorPaperPricingKey(material.paperType);
       const pricing = config.colorPrintPricing?.[pricingKey] || [];
-      const sheetPrice = lookupTier(pricing, sheetsNeeded);
-      const baseTotal = sheetsNeeded * sheetPrice;
+      const sheetPrice = lookupTier(pricing, impressionsNeeded);
+      const baseTotal = impressionsNeeded * sheetPrice;
       const laminationTotal = laminationSelected ? areaM2 * laminationPricePerM2 : 0;
       const total = baseTotal + laminationTotal + lanyardTotal;
 
@@ -1445,6 +1451,7 @@ function calculateCredentialWorkbook(state, config) {
         valid: true,
         itemsPerSheet: fit.itemsPerSheet,
         sheetsNeeded,
+        impressionsNeeded,
         rotated: fit.rotated,
         sheetPrice,
         baseTotal,
@@ -1462,7 +1469,16 @@ function calculateCredentialWorkbook(state, config) {
     const pricePerM2 = toMoneyNumber(tier?.value);
     const minimumValue = toMoneyNumber(minimumBand?.value);
     const baseSubtotal = areaM2 * pricePerM2;
-    const baseTotal = Math.max(minimumValue, baseSubtotal);
+    let baseTotal = Math.max(minimumValue, baseSubtotal);
+
+    if (printMode === "Frente e verso") {
+      const flatCutPricing = config.m2Pricing?.flatCut || [];
+      const flatCutBand = getM2PricingBand(flatCutPricing, areaM2);
+      const flatCutPricePerM2 = toMoneyNumber(flatCutBand?.value);
+      const flatCutSubtotal = areaM2 * flatCutPricePerM2;
+      baseTotal += flatCutSubtotal;
+    }
+
     const laminationTotal = laminationSelected ? areaM2 * laminationPricePerM2 : 0;
     const total = baseTotal + laminationTotal + lanyardTotal;
 
@@ -3358,7 +3374,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
     ...credentialWorkbook.activeRows.map((row) => ({
       kind: "Credencial",
       description: row.description || "Credencial",
-      detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthCm)} x ${formatMeasure(row.heightCm)} cm | ${row.materialLabel}${row.lamination === "Com laminação" ? " | Com laminação" : ""}${row.lanyardType !== "none" ? ` | ${row.lanyardLabel}` : ""}`,
+      detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthCm)} x ${formatMeasure(row.heightCm)} cm | ${row.materialLabel} | ${row.printMode}${row.lamination === "Com laminação" ? " | Com laminação" : ""}${row.lanyardType !== "none" ? ` | ${row.lanyardLabel}` : ""}`,
       extraDetail: row.itemsPerSheet > 0 ? `${formatInteger(row.itemsPerSheet)} por A4 | ${formatInteger(row.sheetsNeeded)} folha(s) A4` : `Área total: ${formatAreaM2(row.areaM2)} m²`,
       total: row.total,
     })),
@@ -3488,7 +3504,7 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
       text: `- ${row.description || `Impresso ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.paperType} | ${row.printMode} | ${formatCurrency(row.total)}`,
     })),
     ...credentialWorkbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || `Credencial ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthCm)} x ${formatMeasure(row.heightCm)} cm | ${row.materialLabel}${row.lamination === "Com laminação" ? " | Com laminação" : ""}${row.lanyardType !== "none" ? ` | ${row.lanyardLabel}` : ""} | ${formatCurrency(row.total)}`,
+      text: `- ${row.description || `Credencial ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthCm)} x ${formatMeasure(row.heightCm)} cm | ${row.materialLabel} | ${row.printMode}${row.lamination === "Com laminação" ? " | Com laminação" : ""}${row.lanyardType !== "none" ? ` | ${row.lanyardLabel}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...readyWorkbook.activeRows.map((row, index) => ({
       text: `- ${row.description || `Produto pronto ${index + 1}`} | ${row.quantity} unidades | ${row.productLabel} | ${formatCurrency(row.total)}`,
@@ -4306,6 +4322,7 @@ async function initApp() {
             <td><strong>${String(index + 1).padStart(2, "0")}</strong></td>
             <td><input class="cell-input description" name="description" value="${escapeHtml(row.description)}" placeholder="Ex.: Credencial evento"></td>
             <td><select class="cell-select" name="materialType">${buildOptions(OPTIONS.credentialMaterials, row.materialType)}</select></td>
+            <td><select class="cell-select" name="printMode">${buildOptions(OPTIONS.printModes, row.printMode)}</select></td>
             <td><select class="cell-select" name="lamination">${buildOptions(OPTIONS.credentialLamination, row.lamination)}</select></td>
             <td>
               <div class="finish-picker">
