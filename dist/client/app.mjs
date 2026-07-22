@@ -657,6 +657,7 @@ function createDefaultRow(index) {
     backCoverType: "Sem contracapa",
     backCoverPaper: "Sulfite 75g",
     spiralOption: "Completa",
+    artCreationFee: 0,
     discountType: "R$",
     discountValue: 0,
   };
@@ -673,6 +674,7 @@ function createDefaultColorPrintRow(index) {
     paperType: "Sulfite 75g",
     quantity: 0,
     cutPriceOverride: "",
+    artCreationFee: 0,
     discountType: "R$",
     discountValue: 0,
   };
@@ -707,6 +709,7 @@ function createDefaultCredentialRow(index) {
     widthCm: 0,
     heightCm: 0,
     quantity: 0,
+    artCreationFee: 0,
     discountType: "R$",
     discountValue: 0,
   };
@@ -718,6 +721,7 @@ function createDefaultReadyProductRow(index) {
     productType: READY_PRODUCT_CATALOG[0]?.id || "",
     description: "",
     quantity: 0,
+    artCreationFee: 0,
     discountType: "R$",
     discountValue: 0,
   };
@@ -731,6 +735,7 @@ function createDefaultResinRow(index) {
     widthMm: 0,
     heightMm: 0,
     quantity: 0,
+    artCreationFee: 0,
     discountType: "R$",
     discountValue: 0,
   };
@@ -1024,6 +1029,7 @@ function mergeState(candidate) {
       quantity: toWholeNumber(row?.quantity),
       pages: toWholeNumber(row?.pages),
       colorPages: toWholeNumber(row?.colorPages),
+      artCreationFee: toMoneyNumber(row?.artCreationFee),
       discountType: normalizeDiscountType(row?.discountType),
       discountValue: toMoneyNumber(row?.discountValue),
       id: row?.id || `row-${index + 1}`,
@@ -1040,6 +1046,7 @@ function mergeState(candidate) {
       cutPriceOverride: row?.cutPriceOverride === "" || row?.cutPriceOverride === null || typeof row?.cutPriceOverride === "undefined"
         ? ""
         : toMoneyNumber(row?.cutPriceOverride),
+      artCreationFee: toMoneyNumber(row?.artCreationFee),
       discountType: normalizeDiscountType(row?.discountType),
       discountValue: toMoneyNumber(row?.discountValue),
       id: row?.id || `color-row-${index + 1}`,
@@ -1053,6 +1060,7 @@ function mergeState(candidate) {
       widthCm: toDecimalNumber(row?.widthCm),
       heightCm: toDecimalNumber(row?.heightCm),
       quantity: toWholeNumber(row?.quantity),
+      artCreationFee: toMoneyNumber(row?.artCreationFee),
       discountType: normalizeDiscountType(row?.discountType),
       discountValue: toMoneyNumber(row?.discountValue),
       id: row?.id || `credential-row-${index + 1}`,
@@ -1064,6 +1072,7 @@ function mergeState(candidate) {
       ...createDefaultReadyProductRow(index),
       ...row,
       quantity: toWholeNumber(row?.quantity),
+      artCreationFee: toMoneyNumber(row?.artCreationFee),
       discountType: normalizeDiscountType(row?.discountType),
       discountValue: toMoneyNumber(row?.discountValue),
       id: row?.id || `ready-product-row-${index + 1}`,
@@ -1107,6 +1116,7 @@ function mergeState(candidate) {
       widthMm: toDecimalNumber(row?.widthMm),
       heightMm: toDecimalNumber(row?.heightMm),
       quantity: toWholeNumber(row?.quantity),
+      artCreationFee: toMoneyNumber(row?.artCreationFee),
       discountType: normalizeDiscountType(row?.discountType),
       discountValue: toMoneyNumber(row?.discountValue),
       id: row?.id || `resin-row-${index + 1}`,
@@ -1119,6 +1129,7 @@ function mergeState(candidate) {
       widthMm: toDecimalNumber(candidate.resinItem.widthMm),
       heightMm: toDecimalNumber(candidate.resinItem.heightMm),
       quantity: toWholeNumber(candidate.resinItem.quantity),
+      artCreationFee: toMoneyNumber(candidate.resinItem.artCreationFee),
       discountType: normalizeDiscountType(candidate.resinItem.discountType),
       discountValue: toMoneyNumber(candidate.resinItem.discountValue),
       id: "resin-row-1",
@@ -1306,6 +1317,15 @@ function applyRowDiscount(row, subtotal, quantity) {
     total: discount.total,
     unitValue: quantity > 0 ? discount.total / quantity : 0,
   };
+}
+
+function getArtCreationFee(row) {
+  return toMoneyNumber(row?.artCreationFee);
+}
+
+function formatArtCreationDetail(row) {
+  const value = getArtCreationFee(row);
+  return value > 0 ? `Criação de arte: ${formatCurrency(value)}` : "";
 }
 
 function formatDateTime(value) {
@@ -1697,6 +1717,7 @@ function calculateCredentialWorkbook(state, config) {
     const areaM2 = (widthCm * heightCm * quantity) / 10000;
     const laminationSelected = row.lamination === "Com laminação";
     const lanyardTotal = quantity * lanyard.unitPrice;
+    const artCreationFee = getArtCreationFee(row);
 
     const baseRow = {
       ...row,
@@ -1722,6 +1743,7 @@ function calculateCredentialWorkbook(state, config) {
       baseTotal: 0,
       laminationTotal: 0,
       lanyardTotal,
+      artCreationFee,
       subtotalBeforeDiscount: 0,
       discountAmount: 0,
       discountDescription: "",
@@ -1764,7 +1786,7 @@ function calculateCredentialWorkbook(state, config) {
       const sheetPrice = lookupTier(pricing, impressionsNeeded);
       const baseTotal = impressionsNeeded * sheetPrice;
       const laminationTotal = laminationSelected ? areaM2 * laminationPricePerM2 : 0;
-      const rowDiscount = applyRowDiscount(row, baseTotal + laminationTotal + lanyardTotal, quantity);
+      const rowDiscount = applyRowDiscount(row, baseTotal + laminationTotal + lanyardTotal + artCreationFee, quantity);
 
       return {
         ...baseRow,
@@ -1777,6 +1799,7 @@ function calculateCredentialWorkbook(state, config) {
         baseTotal,
         laminationTotal,
         lanyardTotal,
+        artCreationFee,
         ...rowDiscount,
         tierLabel: `${fit.itemsPerSheet} por A4`,
       };
@@ -1799,7 +1822,7 @@ function calculateCredentialWorkbook(state, config) {
     }
 
     const laminationTotal = laminationSelected ? areaM2 * laminationPricePerM2 : 0;
-    const rowDiscount = applyRowDiscount(row, baseTotal + laminationTotal + lanyardTotal, quantity);
+    const rowDiscount = applyRowDiscount(row, baseTotal + laminationTotal + lanyardTotal + artCreationFee, quantity);
 
     return {
       ...baseRow,
@@ -1808,6 +1831,7 @@ function calculateCredentialWorkbook(state, config) {
       baseTotal,
       laminationTotal,
       lanyardTotal,
+      artCreationFee,
       ...rowDiscount,
       tierLabel: tier?.label || "-",
     };
@@ -1845,7 +1869,8 @@ function calculateReadyProductWorkbook(state, config) {
     const subtotal = product.totalPrice === null || product.totalPrice === undefined
       ? quantity * product.unitPrice
       : product.totalPrice;
-    const rowDiscount = applyRowDiscount(row, subtotal, quantity);
+    const artCreationFee = getArtCreationFee(row);
+    const rowDiscount = applyRowDiscount(row, subtotal + artCreationFee, quantity);
     const packageWarning =
       active &&
       product.pricingMode === "printedBadge" &&
@@ -1863,6 +1888,7 @@ function calculateReadyProductWorkbook(state, config) {
       productType: product.label,
       productLabel: product.label,
       description: description || product.label,
+      artCreationFee,
       unitPrice: product.totalPrice === null || product.totalPrice === undefined || quantity <= 0 ? product.unitPrice : subtotal / quantity,
       ...rowDiscount,
       warning: active && quantity <= 0 ? `Produto pronto ${index + 1}: informe uma quantidade maior que zero.` : packageWarning,
@@ -1895,7 +1921,7 @@ function calculateWorkbook(state, config) {
     colorPages: toWholeNumber(row.colorPages),
   }));
 
-  const rowBase = rows.map((row) => {
+    const rowBase = rows.map((row) => {
     const innerBreakdown = getInnerImpressionBreakdown(row);
     const bindingSheetsPerCopy = getBindingSheetsPerCopy(row);
     const coverImpressions = getCoverImpressions(row, "cover");
@@ -2062,7 +2088,8 @@ function calculateWorkbook(state, config) {
       finishingTotal = row.quantity * finishingUnit;
     }
 
-    const rowDiscount = applyRowDiscount(row, innerTotal + coverTotal + backTotal + finishingTotal, row.quantity);
+    const artCreationFee = getArtCreationFee(row);
+    const rowDiscount = applyRowDiscount(row, innerTotal + coverTotal + backTotal + finishingTotal + artCreationFee, row.quantity);
 
     if (row.colorPages > row.pages && isRowActive(row)) {
       warnings.push(`Item ${index + 1}: as páginas coloridas não podem ser maiores que o total de páginas. O app usou o limite da quantidade total.`);
@@ -2089,6 +2116,7 @@ function calculateWorkbook(state, config) {
       groupedQuantity: groupMeta?.groupQuantity || 0,
       finishingUnit,
       finishingTotal,
+      artCreationFee,
       ...rowDiscount,
     };
   });
@@ -2145,7 +2173,8 @@ function calculateColorPrintWorkbook(state, config) {
         printTotal: 0,
         suggestedCutPrice: 0,
         finalCutPrice: row.cutPriceOverride === "" ? 0 : toMoneyNumber(row.cutPriceOverride),
-        ...applyRowDiscount(row, row.cutPriceOverride === "" ? 0 : toMoneyNumber(row.cutPriceOverride), quantity),
+        artCreationFee: getArtCreationFee(row),
+        ...applyRowDiscount(row, (row.cutPriceOverride === "" ? 0 : toMoneyNumber(row.cutPriceOverride)) + getArtCreationFee(row), quantity),
         estimatedCuts: 0,
       };
     }
@@ -2168,7 +2197,8 @@ function calculateColorPrintWorkbook(state, config) {
         printTotal: 0,
         suggestedCutPrice: 0,
         finalCutPrice: row.cutPriceOverride === "" ? 0 : toMoneyNumber(row.cutPriceOverride),
-        ...applyRowDiscount(row, row.cutPriceOverride === "" ? 0 : toMoneyNumber(row.cutPriceOverride), quantity),
+        artCreationFee: getArtCreationFee(row),
+        ...applyRowDiscount(row, (row.cutPriceOverride === "" ? 0 : toMoneyNumber(row.cutPriceOverride)) + getArtCreationFee(row), quantity),
         estimatedCuts: 0,
       };
     }
@@ -2191,7 +2221,8 @@ function calculateColorPrintWorkbook(state, config) {
     }
 
     const finalCutPrice = row.cutPriceOverride === "" ? suggestedCutPrice : toMoneyNumber(row.cutPriceOverride);
-    const rowDiscount = applyRowDiscount(row, printTotal + finalCutPrice, quantity);
+    const artCreationFee = getArtCreationFee(row);
+    const rowDiscount = applyRowDiscount(row, printTotal + finalCutPrice + artCreationFee, quantity);
 
     return {
       ...row,
@@ -2206,6 +2237,7 @@ function calculateColorPrintWorkbook(state, config) {
       printTotal,
       suggestedCutPrice,
       finalCutPrice,
+      artCreationFee,
       ...rowDiscount,
       estimatedCuts,
     };
@@ -3722,6 +3754,7 @@ function calculateResinRow(source, config, index) {
   const materialLabel = getResinMaterialLabel(materialType);
   const description = (source.description || "").trim() || `Adesivo resinado ${index + 1}`;
   const resinPricing = config.resinPricing || createDefaultConfig().resinPricing;
+  const artCreationFee = getArtCreationFee(source);
 
   const baseRow = {
     ...source,
@@ -3743,6 +3776,7 @@ function calculateResinRow(source, config, index) {
     sheetsNeeded: 0,
     producedQuantity: 0,
     sheetPrice: getResinSheetUnitPrice(resinPricing, materialType, 1),
+    artCreationFee,
     subtotalBeforeDiscount: 0,
     discountAmount: 0,
     discountDescription: "",
@@ -3783,7 +3817,7 @@ function calculateResinRow(source, config, index) {
   const subtotal = sheetsNeeded * sheetPrice;
   const totalWithMarkup = subtotal + (subtotal * (toMoneyNumber(resinPricing.markupPercent) / 100));
   const totalBeforeDiscount = Math.max(toMoneyNumber(resinPricing.minimumOrderPrice), totalWithMarkup);
-  const rowDiscount = applyRowDiscount(source, totalBeforeDiscount, quantity);
+  const rowDiscount = applyRowDiscount(source, totalBeforeDiscount + artCreationFee, quantity);
   return {
     ...baseRow,
     valid: true,
@@ -3847,6 +3881,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
         description: row.description,
         detail: `${formatInteger(row.quantity)} apostilas | ${formatInteger(row.pages)} páginas${row.colorPages > 0 ? ` (${formatInteger(row.blackWhitePages)} PB + ${formatInteger(row.colorPages)} coloridas)` : ""} | ${buildApostilaPrintDetail(row)} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}`,
         extraDetail: coverDetail,
+        artDetail: formatArtCreationDetail(row),
         discountDetail: row.discountDescription,
         total: row.total,
       };
@@ -3855,6 +3890,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       kind: "Impresso colorido",
       description: row.description,
       detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.paperType} | ${row.printMode}`,
+      artDetail: formatArtCreationDetail(row),
       discountDetail: row.discountDescription,
       total: row.total,
     })),
@@ -3863,6 +3899,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       description: row.description || "Credencial",
       detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthCm)} x ${formatMeasure(row.heightCm)} cm | ${row.materialLabel} | ${row.printMode}${row.lamination === "Com laminação" ? " | Com laminação" : ""}${row.lanyardType !== "none" ? ` | ${row.lanyardLabel}` : ""}`,
       extraDetail: row.itemsPerSheet > 0 ? `${formatInteger(row.itemsPerSheet)} por A4 | ${formatInteger(row.sheetsNeeded)} folha(s) A4` : `Área total: ${formatAreaM2(row.areaM2)} m²`,
+      artDetail: formatArtCreationDetail(row),
       discountDetail: row.discountDescription,
       total: row.total,
     })),
@@ -3870,13 +3907,15 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       kind: "Produto pronto",
       description: row.description || row.productLabel,
       detail: `${formatInteger(row.quantity)} unidades | ${row.productLabel}`,
+      artDetail: formatArtCreationDetail(row),
       discountDetail: row.discountDescription,
       total: row.total,
     })),
     ...m2Workbook.activeRows.map((row) => ({
       kind: "Cálculo de m²",
       description: getM2RowDescription(row),
-      detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.productLabel}${row.finishSummary ? ` | ${row.finishSummary}` : ""}${row.artCreationFee > 0 ? ` | Arte/edição: ${formatCurrency(row.artCreationFee)}` : ""}`,
+      detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.productLabel}${row.finishSummary ? ` | ${row.finishSummary}` : ""}`,
+      artDetail: formatArtCreationDetail(row),
       discountDetail: row.discountDescription,
       total: row.total,
     })),
@@ -3885,6 +3924,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       description: row.description,
       detail: `${formatInteger(row.quantity)} unidades | ${formatResinMeasureCm(row.widthMm)} x ${formatResinMeasureCm(row.heightMm)} cm | ${row.materialLabel} | ${formatInteger(row.sheetsNeeded)} folha(s) A3 | ${formatInteger(row.piecesPerSheet)} por folha`,
       extraDetail: `Com resina: ${formatResinMeasureCm(row.finalWidthMm)} x ${formatResinMeasureCm(row.finalHeightMm)} cm | ${row.orientation}`,
+      artDetail: formatArtCreationDetail(row),
       discountDetail: row.discountDescription,
       total: row.total,
     })),
@@ -3904,6 +3944,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
                   ${escapeHtml(entry.kind)} | ${escapeHtml(entry.detail)}
                 </small>
                 ${entry.extraDetail ? `<small class="quote-extra-detail">${escapeHtml(entry.extraDetail)}</small>` : ""}
+                ${entry.artDetail ? `<small class="quote-extra-detail">${escapeHtml(entry.artDetail)}</small>` : ""}
                 ${entry.discountDetail ? `<small class="quote-discount-detail">${escapeHtml(entry.discountDetail)}</small>` : ""}
               </div>
               <div>${formatCurrency(entry.total)}</div>
@@ -3992,23 +4033,23 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
     ...workbook.activeRows.map((row, index) => {
       const coverDetail = buildApostilaCoverDetail(row);
       return {
-        text: `- ${row.description || `Apostila ${index + 1}`} | ${row.quantity} apostilas | ${row.pages} páginas${row.colorPages > 0 ? ` (${row.blackWhitePages} PB + ${row.colorPages} coloridas)` : ""} | ${buildApostilaPrintDetail(row)} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}${coverDetail ? ` | ${coverDetail}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
+        text: `- ${row.description || `Apostila ${index + 1}`} | ${row.quantity} apostilas | ${row.pages} páginas${row.colorPages > 0 ? ` (${row.blackWhitePages} PB + ${row.colorPages} coloridas)` : ""} | ${buildApostilaPrintDetail(row)} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}${coverDetail ? ` | ${coverDetail}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
       };
     }),
     ...colorWorkbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || `Impresso ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.paperType} | ${row.printMode}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
+      text: `- ${row.description || `Impresso ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.paperType} | ${row.printMode}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...credentialWorkbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || `Credencial ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthCm)} x ${formatMeasure(row.heightCm)} cm | ${row.materialLabel} | ${row.printMode}${row.lamination === "Com laminação" ? " | Com laminação" : ""}${row.lanyardType !== "none" ? ` | ${row.lanyardLabel}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
+      text: `- ${row.description || `Credencial ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthCm)} x ${formatMeasure(row.heightCm)} cm | ${row.materialLabel} | ${row.printMode}${row.lamination === "Com laminação" ? " | Com laminação" : ""}${row.lanyardType !== "none" ? ` | ${row.lanyardLabel}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...readyWorkbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || `Produto pronto ${index + 1}`} | ${row.quantity} unidades | ${row.productLabel}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
+      text: `- ${row.description || `Produto pronto ${index + 1}`} | ${row.quantity} unidades | ${row.productLabel}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...m2Workbook.activeRows.map((row, index) => ({
-      text: `- ${getM2RowDescription(row) || `M² ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.finishSummary ? `${row.finishSummary} | ` : ""}${row.artCreationFee > 0 ? `Arte/edição: ${formatCurrency(row.artCreationFee)} | ` : ""}${row.discountDescription ? `${row.discountDescription} | ` : ""}${formatCurrency(row.total)}`,
+      text: `- ${getM2RowDescription(row) || `M² ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.finishSummary ? `${row.finishSummary} | ` : ""}${formatArtCreationDetail(row) ? `${formatArtCreationDetail(row)} | ` : ""}${row.discountDescription ? `${row.discountDescription} | ` : ""}${formatCurrency(row.total)}`,
     })),
     ...resinWorkbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || `Resinado ${index + 1}`} | ${row.quantity} unidades | ${formatResinMeasureCm(row.widthMm)} x ${formatResinMeasureCm(row.heightMm)} cm | ${row.materialLabel} | ${row.sheetsNeeded} folha(s) A3 | ${row.piecesPerSheet} por folha${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
+      text: `- ${row.description || `Resinado ${index + 1}`} | ${row.quantity} unidades | ${formatResinMeasureCm(row.widthMm)} x ${formatResinMeasureCm(row.heightMm)} cm | ${row.materialLabel} | ${row.sheetsNeeded} folha(s) A3 | ${row.piecesPerSheet} por folha${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
   ];
 
@@ -4786,6 +4827,7 @@ async function initApp() {
             <td><span class="readonly-value subtle">${formatCurrency(row.coverTotal)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.backTotal)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.finishingTotal)}${row.groupedFinishing ? `<br><small>${row.bindingGroupLeader ? `Grupo ${escapeHtml(row.bindingGroup)}` : `Grupo ${escapeHtml(row.bindingGroup)} (na 1a linha)`}</small>` : ""}</span></td>
+            <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
             <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
             <td><input class="cell-input" name="discountValue" type="number" min="0" step="0.01" value="${escapeHtml(row.discountValue ?? 0)}" placeholder="0,00"></td>
             <td><span class="readonly-value">${formatCurrency(row.total)}</span></td>
@@ -4813,6 +4855,7 @@ async function initApp() {
             <td><span class="readonly-value subtle">${formatCurrency(row.printTotal)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.suggestedCutPrice)}</span></td>
             <td><input class="cell-input" name="cutPriceOverride" type="number" min="0" step="0.01" value="${escapeHtml(row.cutPriceOverride)}" placeholder="${row.suggestedCutPrice > 0 ? row.suggestedCutPrice.toFixed(2) : "0.00"}"></td>
+            <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
             <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
             <td><input class="cell-input" name="discountValue" type="number" min="0" step="0.01" value="${escapeHtml(row.discountValue ?? 0)}" placeholder="0,00"></td>
             <td><span class="readonly-value">${formatCurrency(row.total)}</span></td>
@@ -4848,6 +4891,7 @@ async function initApp() {
             <td><span class="readonly-value subtle">${formatCurrency(row.baseTotal)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.laminationTotal)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.lanyardTotal)}</span></td>
+            <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
             <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
             <td><input class="cell-input" name="discountValue" type="number" min="0" step="0.01" value="${escapeHtml(row.discountValue ?? 0)}" placeholder="0,00"></td>
             <td><span class="readonly-value">${formatCurrency(row.total)}</span></td>
@@ -4878,6 +4922,7 @@ async function initApp() {
             <td><input class="cell-input description" name="description" value="${escapeHtml(row.description === row.productLabel ? "" : row.description)}" placeholder="${escapeHtml(row.productLabel)}"></td>
             <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${escapeHtml(row.quantity)}" placeholder="0"></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.unitPrice)}</span></td>
+            <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
             <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
             <td><input class="cell-input" name="discountValue" type="number" min="0" step="0.01" value="${escapeHtml(row.discountValue ?? 0)}" placeholder="0,00"></td>
             <td><span class="readonly-value">${formatCurrency(row.total)}</span></td>
@@ -4960,6 +5005,7 @@ async function initApp() {
             <td><span class="readonly-value subtle">${formatInteger(row.sheetsNeeded || 0)}</span></td>
             <td><span class="readonly-value subtle">${formatInteger(row.producedQuantity || 0)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.sheetPrice || 0)}</span></td>
+            <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
             <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
             <td><input class="cell-input" name="discountValue" type="number" min="0" step="0.01" value="${escapeHtml(row.discountValue ?? 0)}" placeholder="0,00"></td>
             <td><span class="readonly-value">${formatCurrency(row.total || 0)}</span></td>
@@ -5563,7 +5609,7 @@ async function initApp() {
     }
     if (field === "quantity" || field === "pages" || field === "colorPages") {
       row[field] = toWholeNumber(target.value);
-    } else if (field === "discountValue") {
+    } else if (field === "artCreationFee" || field === "discountValue") {
       row[field] = toMoneyNumber(target.value);
     } else if (field === "discountType") {
       row[field] = normalizeDiscountType(target.value);
@@ -5589,7 +5635,7 @@ async function initApp() {
       row[field] = toWholeNumber(target.value);
     } else if (field === "widthMm" || field === "heightMm") {
       row[field] = toDecimalNumber(target.value) * 10;
-    } else if (field === "discountValue") {
+    } else if (field === "artCreationFee" || field === "discountValue") {
       row[field] = toMoneyNumber(target.value);
     } else if (field === "discountType") {
       row[field] = normalizeDiscountType(target.value);
@@ -5619,7 +5665,7 @@ async function initApp() {
       row[field] = toDecimalNumber(target.value);
     } else if (field === "cutPriceOverride") {
       row[field] = target.value === "" ? "" : toMoneyNumber(target.value);
-    } else if (field === "discountValue") {
+    } else if (field === "artCreationFee" || field === "discountValue") {
       row[field] = toMoneyNumber(target.value);
     } else if (field === "discountType") {
       row[field] = normalizeDiscountType(target.value);
@@ -5646,7 +5692,7 @@ async function initApp() {
       row[field] = toWholeNumber(target.value);
     } else if (field === "widthCm" || field === "heightCm") {
       row[field] = toDecimalNumber(target.value);
-    } else if (field === "discountValue") {
+    } else if (field === "artCreationFee" || field === "discountValue") {
       row[field] = toMoneyNumber(target.value);
     } else if (field === "discountType") {
       row[field] = normalizeDiscountType(target.value);
@@ -5670,7 +5716,7 @@ async function initApp() {
     }
     if (field === "quantity") {
       row[field] = toWholeNumber(target.value);
-    } else if (field === "discountValue") {
+    } else if (field === "artCreationFee" || field === "discountValue") {
       row[field] = toMoneyNumber(target.value);
     } else if (field === "discountType") {
       row[field] = normalizeDiscountType(target.value);
