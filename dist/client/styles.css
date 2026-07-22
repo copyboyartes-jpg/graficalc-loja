@@ -1560,6 +1560,12 @@ textarea {
   color: var(--ink) !important;
 }
 
+.quote-discount-detail {
+  margin-top: 6px;
+  font-weight: 700;
+  color: #9f4f1d !important;
+}
+
 .quote-total-bar {
   display: flex;
   justify-content: space-between;

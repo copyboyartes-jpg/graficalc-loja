@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GrafiCalc | Orçamento Gráfico</title>
-  <link rel="stylesheet" href="./styles.css?v=6c53499a8c26">
+  <link rel="stylesheet" href="./styles.css?v=93c787d92513">
 </head>
 <body>
   <div class="page-shell">
@@ -185,6 +185,8 @@
                   <th>Total capa</th>
                   <th>Total contra</th>
                   <th>Acabamento</th>
+                  <th>Tipo desc.</th>
+                  <th>Desconto</th>
                   <th>Total item</th>
                   <th>Valor un.</th>
                 </tr>
@@ -252,6 +254,8 @@
                   <th>Impressões</th>
                   <th>Corte sugerido</th>
                   <th>Corte final</th>
+                  <th>Tipo desc.</th>
+                  <th>Desconto</th>
                   <th>Total item</th>
                   <th>Valor un.</th>
                 </tr>
@@ -329,6 +333,8 @@
                   <th>Acab. selec. total</th>
                   <th>Extra fixo</th>
                   <th>Arte / edição</th>
+                  <th>Tipo desc.</th>
+                  <th>Desconto</th>
                   <th>Total item</th>
                 </tr>
               </thead>
@@ -396,6 +402,8 @@
                   <th>Valor base</th>
                   <th>Laminação total</th>
                   <th>Cordão total</th>
+                  <th>Tipo desc.</th>
+                  <th>Desconto</th>
                   <th>Total item</th>
                   <th>Valor un.</th>
                 </tr>
@@ -454,6 +462,8 @@
                   <th>Descrição</th>
                   <th>Quantidade</th>
                   <th>Valor un.</th>
+                  <th>Tipo desc.</th>
+                  <th>Desconto</th>
                   <th>Total item</th>
                 </tr>
               </thead>
@@ -518,6 +528,8 @@
                   <th>Folhas A3</th>
                   <th>Produção total</th>
                   <th>Custo por folha</th>
+                  <th>Tipo desc.</th>
+                  <th>Desconto</th>
                   <th>Total item</th>
                   <th>Valor un.</th>
                 </tr>
@@ -717,6 +729,17 @@
                 <span>Prazo de produção</span>
                 <input id="production-deadline" type="text">
               </label>
+              <label>
+                <span>Tipo de desconto geral</span>
+                <select id="quote-discount-type">
+                  <option value="R$">R$</option>
+                  <option value="%">%</option>
+                </select>
+              </label>
+              <label>
+                <span>Desconto geral</span>
+                <input id="quote-discount-value" type="number" min="0" step="0.01">
+              </label>
               <label class="full-width">
                 <span>Observações para o cliente</span>
                 <textarea id="quote-notes" rows="4"></textarea>
@@ -798,7 +821,7 @@
     </div>
   </div>
 
-  <script src="./app.mjs?v=dd9323b8dcb0"></script>
+  <script src="./app.mjs?v=e78a66d3fb30"></script>
 </body>
 </html>
 

@@ -657,6 +657,8 @@ function createDefaultRow(index) {
     backCoverType: "Sem contracapa",
     backCoverPaper: "Sulfite 75g",
     spiralOption: "Completa",
+    discountType: "R$",
+    discountValue: 0,
   };
 }
 
@@ -671,6 +673,8 @@ function createDefaultColorPrintRow(index) {
     paperType: "Sulfite 75g",
     quantity: 0,
     cutPriceOverride: "",
+    discountType: "R$",
+    discountValue: 0,
   };
 }
 
@@ -687,6 +691,8 @@ function createDefaultM2Row(index) {
     finishOverrides: {},
     extraCharge: 0,
     artCreationFee: 0,
+    discountType: "R$",
+    discountValue: 0,
   };
 }
 
@@ -701,6 +707,8 @@ function createDefaultCredentialRow(index) {
     widthCm: 0,
     heightCm: 0,
     quantity: 0,
+    discountType: "R$",
+    discountValue: 0,
   };
 }
 
@@ -710,6 +718,8 @@ function createDefaultReadyProductRow(index) {
     productType: READY_PRODUCT_CATALOG[0]?.id || "",
     description: "",
     quantity: 0,
+    discountType: "R$",
+    discountValue: 0,
   };
 }
 
@@ -721,6 +731,8 @@ function createDefaultResinRow(index) {
     widthMm: 0,
     heightMm: 0,
     quantity: 0,
+    discountType: "R$",
+    discountValue: 0,
   };
 }
 
@@ -770,6 +782,8 @@ function createDefaultState() {
     paymentTerms: "",
     productionDeadline: "",
     quoteNotes: "",
+    quoteDiscountType: "R$",
+    quoteDiscountValue: 0,
   };
 }
 
@@ -1000,6 +1014,8 @@ function mergeState(candidate) {
   state.paymentTerms = typeof candidate.paymentTerms === "string" ? candidate.paymentTerms : state.paymentTerms;
   state.productionDeadline = typeof candidate.productionDeadline === "string" ? candidate.productionDeadline : state.productionDeadline;
   state.quoteNotes = typeof candidate.quoteNotes === "string" ? candidate.quoteNotes : state.quoteNotes;
+  state.quoteDiscountType = normalizeDiscountType(candidate.quoteDiscountType);
+  state.quoteDiscountValue = toMoneyNumber(candidate.quoteDiscountValue);
 
   if (Array.isArray(candidate.rows) && candidate.rows.length > 0) {
     state.rows = candidate.rows.map((row, index) => ({
@@ -1008,6 +1024,8 @@ function mergeState(candidate) {
       quantity: toWholeNumber(row?.quantity),
       pages: toWholeNumber(row?.pages),
       colorPages: toWholeNumber(row?.colorPages),
+      discountType: normalizeDiscountType(row?.discountType),
+      discountValue: toMoneyNumber(row?.discountValue),
       id: row?.id || `row-${index + 1}`,
     }));
   }
@@ -1022,6 +1040,8 @@ function mergeState(candidate) {
       cutPriceOverride: row?.cutPriceOverride === "" || row?.cutPriceOverride === null || typeof row?.cutPriceOverride === "undefined"
         ? ""
         : toMoneyNumber(row?.cutPriceOverride),
+      discountType: normalizeDiscountType(row?.discountType),
+      discountValue: toMoneyNumber(row?.discountValue),
       id: row?.id || `color-row-${index + 1}`,
     }));
   }
@@ -1033,6 +1053,8 @@ function mergeState(candidate) {
       widthCm: toDecimalNumber(row?.widthCm),
       heightCm: toDecimalNumber(row?.heightCm),
       quantity: toWholeNumber(row?.quantity),
+      discountType: normalizeDiscountType(row?.discountType),
+      discountValue: toMoneyNumber(row?.discountValue),
       id: row?.id || `credential-row-${index + 1}`,
     }));
   }
@@ -1042,6 +1064,8 @@ function mergeState(candidate) {
       ...createDefaultReadyProductRow(index),
       ...row,
       quantity: toWholeNumber(row?.quantity),
+      discountType: normalizeDiscountType(row?.discountType),
+      discountValue: toMoneyNumber(row?.discountValue),
       id: row?.id || `ready-product-row-${index + 1}`,
     }));
   }
@@ -1069,6 +1093,8 @@ function mergeState(candidate) {
         typeof row?.extraCharge !== "undefined" ? row.extraCharge : row?.finishingExtra
       ),
       artCreationFee: toMoneyNumber(row?.artCreationFee),
+      discountType: normalizeDiscountType(row?.discountType),
+      discountValue: toMoneyNumber(row?.discountValue),
       productId: validM2Catalog.has(row?.productId) ? row.productId : M2_CATALOG[0].id,
       id: row?.id || `m2-row-${index + 1}`,
     }));
@@ -1081,6 +1107,8 @@ function mergeState(candidate) {
       widthMm: toDecimalNumber(row?.widthMm),
       heightMm: toDecimalNumber(row?.heightMm),
       quantity: toWholeNumber(row?.quantity),
+      discountType: normalizeDiscountType(row?.discountType),
+      discountValue: toMoneyNumber(row?.discountValue),
       id: row?.id || `resin-row-${index + 1}`,
     }));
   } else if (candidate.resinItem && typeof candidate.resinItem === "object") {
@@ -1091,6 +1119,8 @@ function mergeState(candidate) {
       widthMm: toDecimalNumber(candidate.resinItem.widthMm),
       heightMm: toDecimalNumber(candidate.resinItem.heightMm),
       quantity: toWholeNumber(candidate.resinItem.quantity),
+      discountType: normalizeDiscountType(candidate.resinItem.discountType),
+      discountValue: toMoneyNumber(candidate.resinItem.discountValue),
       id: "resin-row-1",
     };
   }
@@ -1231,6 +1261,51 @@ function formatCurrency(value) {
 
 function formatInteger(value) {
   return new Intl.NumberFormat("pt-BR").format(Number(value || 0));
+}
+
+function normalizeDiscountType(value) {
+  return value === "%" ? "%" : "R$";
+}
+
+function formatDiscountValue(type, value) {
+  const safeType = normalizeDiscountType(type);
+  const safeValue = toMoneyNumber(value);
+  if (safeType === "%") {
+    return `${formatMeasure(safeValue)}%`;
+  }
+  return formatCurrency(safeValue);
+}
+
+function calculateDiscount(subtotal, type, value) {
+  const safeSubtotal = Math.max(0, toMoneyNumber(subtotal));
+  const safeType = normalizeDiscountType(type);
+  const safeValue = toMoneyNumber(value);
+  const rawAmount = safeType === "%"
+    ? safeSubtotal * (Math.min(safeValue, 100) / 100)
+    : safeValue;
+  const amount = safeValue > 0 ? Math.min(safeSubtotal, Math.max(0, rawAmount)) : 0;
+  const total = Math.max(0, safeSubtotal - amount);
+  return {
+    type: safeType,
+    value: safeValue,
+    amount,
+    total,
+    hasDiscount: amount > 0,
+    description: amount > 0 ? `Desconto: ${formatDiscountValue(safeType, safeValue)} (-${formatCurrency(amount)})` : "",
+  };
+}
+
+function applyRowDiscount(row, subtotal, quantity) {
+  const discount = calculateDiscount(subtotal, row.discountType, row.discountValue);
+  return {
+    subtotalBeforeDiscount: Math.max(0, toMoneyNumber(subtotal)),
+    discountType: discount.type,
+    discountValue: discount.value,
+    discountAmount: discount.amount,
+    discountDescription: discount.description,
+    total: discount.total,
+    unitValue: quantity > 0 ? discount.total / quantity : 0,
+  };
 }
 
 function formatDateTime(value) {
@@ -1647,6 +1722,9 @@ function calculateCredentialWorkbook(state, config) {
       baseTotal: 0,
       laminationTotal: 0,
       lanyardTotal,
+      subtotalBeforeDiscount: 0,
+      discountAmount: 0,
+      discountDescription: "",
       total: 0,
       unitValue: 0,
       warning: "",
@@ -1686,7 +1764,7 @@ function calculateCredentialWorkbook(state, config) {
       const sheetPrice = lookupTier(pricing, impressionsNeeded);
       const baseTotal = impressionsNeeded * sheetPrice;
       const laminationTotal = laminationSelected ? areaM2 * laminationPricePerM2 : 0;
-      const total = baseTotal + laminationTotal + lanyardTotal;
+      const rowDiscount = applyRowDiscount(row, baseTotal + laminationTotal + lanyardTotal, quantity);
 
       return {
         ...baseRow,
@@ -1699,8 +1777,7 @@ function calculateCredentialWorkbook(state, config) {
         baseTotal,
         laminationTotal,
         lanyardTotal,
-        total,
-        unitValue: quantity > 0 ? total / quantity : 0,
+        ...rowDiscount,
         tierLabel: `${fit.itemsPerSheet} por A4`,
       };
     }
@@ -1722,7 +1799,7 @@ function calculateCredentialWorkbook(state, config) {
     }
 
     const laminationTotal = laminationSelected ? areaM2 * laminationPricePerM2 : 0;
-    const total = baseTotal + laminationTotal + lanyardTotal;
+    const rowDiscount = applyRowDiscount(row, baseTotal + laminationTotal + lanyardTotal, quantity);
 
     return {
       ...baseRow,
@@ -1731,8 +1808,7 @@ function calculateCredentialWorkbook(state, config) {
       baseTotal,
       laminationTotal,
       lanyardTotal,
-      total,
-      unitValue: quantity > 0 ? total / quantity : 0,
+      ...rowDiscount,
       tierLabel: tier?.label || "-",
     };
   });
@@ -1766,9 +1842,10 @@ function calculateReadyProductWorkbook(state, config) {
     const active = isReadyProductRowActive(row);
     const product = getReadyProductSelection(config, row.productType, quantity);
     const description = (row.description || "").trim();
-    const total = product.totalPrice === null || product.totalPrice === undefined
+    const subtotal = product.totalPrice === null || product.totalPrice === undefined
       ? quantity * product.unitPrice
       : product.totalPrice;
+    const rowDiscount = applyRowDiscount(row, subtotal, quantity);
     const packageWarning =
       active &&
       product.pricingMode === "printedBadge" &&
@@ -1786,9 +1863,8 @@ function calculateReadyProductWorkbook(state, config) {
       productType: product.label,
       productLabel: product.label,
       description: description || product.label,
-      unitPrice: product.totalPrice === null || product.totalPrice === undefined || quantity <= 0 ? product.unitPrice : total / quantity,
-      total,
-      unitValue: quantity > 0 ? total / quantity : 0,
+      unitPrice: product.totalPrice === null || product.totalPrice === undefined || quantity <= 0 ? product.unitPrice : subtotal / quantity,
+      ...rowDiscount,
       warning: active && quantity <= 0 ? `Produto pronto ${index + 1}: informe uma quantidade maior que zero.` : packageWarning,
     };
   });
@@ -1986,8 +2062,7 @@ function calculateWorkbook(state, config) {
       finishingTotal = row.quantity * finishingUnit;
     }
 
-    const total = innerTotal + coverTotal + backTotal + finishingTotal;
-    const unitValue = row.quantity > 0 ? total / row.quantity : 0;
+    const rowDiscount = applyRowDiscount(row, innerTotal + coverTotal + backTotal + finishingTotal, row.quantity);
 
     if (row.colorPages > row.pages && isRowActive(row)) {
       warnings.push(`Item ${index + 1}: as páginas coloridas não podem ser maiores que o total de páginas. O app usou o limite da quantidade total.`);
@@ -2014,8 +2089,7 @@ function calculateWorkbook(state, config) {
       groupedQuantity: groupMeta?.groupQuantity || 0,
       finishingUnit,
       finishingTotal,
-      total,
-      unitValue,
+      ...rowDiscount,
     };
   });
 
@@ -2071,8 +2145,7 @@ function calculateColorPrintWorkbook(state, config) {
         printTotal: 0,
         suggestedCutPrice: 0,
         finalCutPrice: row.cutPriceOverride === "" ? 0 : toMoneyNumber(row.cutPriceOverride),
-        total: row.cutPriceOverride === "" ? 0 : toMoneyNumber(row.cutPriceOverride),
-        unitValue: 0,
+        ...applyRowDiscount(row, row.cutPriceOverride === "" ? 0 : toMoneyNumber(row.cutPriceOverride), quantity),
         estimatedCuts: 0,
       };
     }
@@ -2095,8 +2168,7 @@ function calculateColorPrintWorkbook(state, config) {
         printTotal: 0,
         suggestedCutPrice: 0,
         finalCutPrice: row.cutPriceOverride === "" ? 0 : toMoneyNumber(row.cutPriceOverride),
-        total: row.cutPriceOverride === "" ? 0 : toMoneyNumber(row.cutPriceOverride),
-        unitValue: 0,
+        ...applyRowDiscount(row, row.cutPriceOverride === "" ? 0 : toMoneyNumber(row.cutPriceOverride), quantity),
         estimatedCuts: 0,
       };
     }
@@ -2119,8 +2191,7 @@ function calculateColorPrintWorkbook(state, config) {
     }
 
     const finalCutPrice = row.cutPriceOverride === "" ? suggestedCutPrice : toMoneyNumber(row.cutPriceOverride);
-    const total = printTotal + finalCutPrice;
-    const unitValue = quantity > 0 ? total / quantity : 0;
+    const rowDiscount = applyRowDiscount(row, printTotal + finalCutPrice, quantity);
 
     return {
       ...row,
@@ -2135,8 +2206,7 @@ function calculateColorPrintWorkbook(state, config) {
       printTotal,
       suggestedCutPrice,
       finalCutPrice,
-      total,
-      unitValue,
+      ...rowDiscount,
       estimatedCuts,
     };
   });
@@ -2401,24 +2471,17 @@ function calculateM2WorkbookFromConfig(state, config) {
     };
   });
 
-  const activeRows = rowsWithMinimum.filter((row) => row.active);
+  const discountedRows = rowsWithMinimum.map((row) => ({
+    ...row,
+    ...applyRowDiscount(row, row.active ? row.total : 0, row.quantity),
+  }));
+
+  const activeRows = discountedRows.filter((row) => row.active);
   const totalQuantity = activeRows.reduce((sum, row) => sum + row.quantity, 0);
-  const totalGeneral = shouldGroupSameMaterials
-    ? [...new Set(activeRows.map((row) => row.productId))].reduce(
-        (sum, productId) => {
-          const product = M2_CATALOG.find((item) => item.id === productId) || M2_CATALOG[0];
-          const minimumValue = getM2MinimumValue(config.m2Pricing?.[product.pricingKey || product.configKey] || []);
-          const productBase = baseTotalsByProduct[productId] || 0;
-          const productFixed = fixedTotalsByProduct[productId] || 0;
-          const adjustedBase = productBase > 0 && productBase < minimumValue ? minimumValue : productBase;
-          return sum + adjustedBase + productFixed;
-        },
-        0
-      )
-    : activeRows.reduce((sum, row) => sum + row.total, 0);
+  const totalGeneral = activeRows.reduce((sum, row) => sum + row.total, 0);
 
   return {
-    rows: rowsWithMinimum,
+    rows: discountedRows,
     activeRows,
     totals: {
       activeLines: activeRows.length,
@@ -3680,6 +3743,9 @@ function calculateResinRow(source, config, index) {
     sheetsNeeded: 0,
     producedQuantity: 0,
     sheetPrice: getResinSheetUnitPrice(resinPricing, materialType, 1),
+    subtotalBeforeDiscount: 0,
+    discountAmount: 0,
+    discountDescription: "",
     total: 0,
     unitValue: 0,
     orientation: "-",
@@ -3716,7 +3782,8 @@ function calculateResinRow(source, config, index) {
   const sheetPrice = getResinSheetUnitPrice(resinPricing, materialType, sheetsNeeded);
   const subtotal = sheetsNeeded * sheetPrice;
   const totalWithMarkup = subtotal + (subtotal * (toMoneyNumber(resinPricing.markupPercent) / 100));
-  const total = Math.max(toMoneyNumber(resinPricing.minimumOrderPrice), totalWithMarkup);
+  const totalBeforeDiscount = Math.max(toMoneyNumber(resinPricing.minimumOrderPrice), totalWithMarkup);
+  const rowDiscount = applyRowDiscount(source, totalBeforeDiscount, quantity);
   return {
     ...baseRow,
     valid: true,
@@ -3728,8 +3795,7 @@ function calculateResinRow(source, config, index) {
     sheetsNeeded,
     producedQuantity,
     sheetPrice,
-    total,
-    unitValue: quantity > 0 ? total / quantity : 0,
+    ...rowDiscount,
     orientation,
     warning: "",
   };
@@ -3781,6 +3847,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
         description: row.description,
         detail: `${formatInteger(row.quantity)} apostilas | ${formatInteger(row.pages)} páginas${row.colorPages > 0 ? ` (${formatInteger(row.blackWhitePages)} PB + ${formatInteger(row.colorPages)} coloridas)` : ""} | ${buildApostilaPrintDetail(row)} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}`,
         extraDetail: coverDetail,
+        discountDetail: row.discountDescription,
         total: row.total,
       };
     }),
@@ -3788,6 +3855,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       kind: "Impresso colorido",
       description: row.description,
       detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.paperType} | ${row.printMode}`,
+      discountDetail: row.discountDescription,
       total: row.total,
     })),
     ...credentialWorkbook.activeRows.map((row) => ({
@@ -3795,18 +3863,21 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       description: row.description || "Credencial",
       detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthCm)} x ${formatMeasure(row.heightCm)} cm | ${row.materialLabel} | ${row.printMode}${row.lamination === "Com laminação" ? " | Com laminação" : ""}${row.lanyardType !== "none" ? ` | ${row.lanyardLabel}` : ""}`,
       extraDetail: row.itemsPerSheet > 0 ? `${formatInteger(row.itemsPerSheet)} por A4 | ${formatInteger(row.sheetsNeeded)} folha(s) A4` : `Área total: ${formatAreaM2(row.areaM2)} m²`,
+      discountDetail: row.discountDescription,
       total: row.total,
     })),
     ...readyWorkbook.activeRows.map((row) => ({
       kind: "Produto pronto",
       description: row.description || row.productLabel,
       detail: `${formatInteger(row.quantity)} unidades | ${row.productLabel}`,
+      discountDetail: row.discountDescription,
       total: row.total,
     })),
     ...m2Workbook.activeRows.map((row) => ({
       kind: "Cálculo de m²",
       description: getM2RowDescription(row),
       detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.productLabel}${row.finishSummary ? ` | ${row.finishSummary}` : ""}${row.artCreationFee > 0 ? ` | Arte/edição: ${formatCurrency(row.artCreationFee)}` : ""}`,
+      discountDetail: row.discountDescription,
       total: row.total,
     })),
     ...resinWorkbook.activeRows.map((row) => ({
@@ -3814,10 +3885,13 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       description: row.description,
       detail: `${formatInteger(row.quantity)} unidades | ${formatResinMeasureCm(row.widthMm)} x ${formatResinMeasureCm(row.heightMm)} cm | ${row.materialLabel} | ${formatInteger(row.sheetsNeeded)} folha(s) A3 | ${formatInteger(row.piecesPerSheet)} por folha`,
       extraDetail: `Com resina: ${formatResinMeasureCm(row.finalWidthMm)} x ${formatResinMeasureCm(row.finalHeightMm)} cm | ${row.orientation}`,
+      discountDetail: row.discountDescription,
       total: row.total,
     })),
   ];
-  const combinedTotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
+  const combinedSubtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
+  const quoteDiscount = calculateDiscount(combinedSubtotal, state.quoteDiscountType, state.quoteDiscountValue);
+  const combinedTotal = quoteDiscount.total;
   const combinedUnits = workbook.totals.totalQuantity + colorWorkbook.totals.totalQuantity + credentialWorkbook.totals.totalQuantity + readyWorkbook.totals.totalQuantity + m2Workbook.totals.totalQuantity + resinWorkbook.totals.totalQuantity;
   const lineItemsMarkup = quoteEntries.length
     ? quoteEntries
@@ -3830,6 +3904,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
                   ${escapeHtml(entry.kind)} | ${escapeHtml(entry.detail)}
                 </small>
                 ${entry.extraDetail ? `<small class="quote-extra-detail">${escapeHtml(entry.extraDetail)}</small>` : ""}
+                ${entry.discountDetail ? `<small class="quote-discount-detail">${escapeHtml(entry.discountDetail)}</small>` : ""}
               </div>
               <div>${formatCurrency(entry.total)}</div>
             </div>
@@ -3888,6 +3963,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
         <div>
           <strong>Total geral</strong>
           <p class="quote-muted">Total de unidades: ${formatInteger(combinedUnits)}</p>
+          ${quoteDiscount.hasDiscount ? `<p class="quote-muted">Subtotal: ${formatCurrency(combinedSubtotal)}</p><p class="quote-discount-detail">Desconto geral: ${formatDiscountValue(quoteDiscount.type, quoteDiscount.value)} (-${formatCurrency(quoteDiscount.amount)})</p>` : ""}
         </div>
         <strong>${formatCurrency(combinedTotal)}</strong>
       </div>
@@ -3916,23 +3992,23 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
     ...workbook.activeRows.map((row, index) => {
       const coverDetail = buildApostilaCoverDetail(row);
       return {
-        text: `- ${row.description || `Apostila ${index + 1}`} | ${row.quantity} apostilas | ${row.pages} páginas${row.colorPages > 0 ? ` (${row.blackWhitePages} PB + ${row.colorPages} coloridas)` : ""} | ${buildApostilaPrintDetail(row)} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}${coverDetail ? ` | ${coverDetail}` : ""} | ${formatCurrency(row.total)}`,
+        text: `- ${row.description || `Apostila ${index + 1}`} | ${row.quantity} apostilas | ${row.pages} páginas${row.colorPages > 0 ? ` (${row.blackWhitePages} PB + ${row.colorPages} coloridas)` : ""} | ${buildApostilaPrintDetail(row)} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}${coverDetail ? ` | ${coverDetail}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
       };
     }),
     ...colorWorkbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || `Impresso ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.paperType} | ${row.printMode} | ${formatCurrency(row.total)}`,
+      text: `- ${row.description || `Impresso ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.paperType} | ${row.printMode}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...credentialWorkbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || `Credencial ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthCm)} x ${formatMeasure(row.heightCm)} cm | ${row.materialLabel} | ${row.printMode}${row.lamination === "Com laminação" ? " | Com laminação" : ""}${row.lanyardType !== "none" ? ` | ${row.lanyardLabel}` : ""} | ${formatCurrency(row.total)}`,
+      text: `- ${row.description || `Credencial ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthCm)} x ${formatMeasure(row.heightCm)} cm | ${row.materialLabel} | ${row.printMode}${row.lamination === "Com laminação" ? " | Com laminação" : ""}${row.lanyardType !== "none" ? ` | ${row.lanyardLabel}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...readyWorkbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || `Produto pronto ${index + 1}`} | ${row.quantity} unidades | ${row.productLabel} | ${formatCurrency(row.total)}`,
+      text: `- ${row.description || `Produto pronto ${index + 1}`} | ${row.quantity} unidades | ${row.productLabel}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...m2Workbook.activeRows.map((row, index) => ({
-      text: `- ${getM2RowDescription(row) || `M² ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.finishSummary ? `${row.finishSummary} | ` : ""}${row.artCreationFee > 0 ? `Arte/edição: ${formatCurrency(row.artCreationFee)} | ` : ""}${formatCurrency(row.total)}`,
+      text: `- ${getM2RowDescription(row) || `M² ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.finishSummary ? `${row.finishSummary} | ` : ""}${row.artCreationFee > 0 ? `Arte/edição: ${formatCurrency(row.artCreationFee)} | ` : ""}${row.discountDescription ? `${row.discountDescription} | ` : ""}${formatCurrency(row.total)}`,
     })),
     ...resinWorkbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || `Resinado ${index + 1}`} | ${row.quantity} unidades | ${formatResinMeasureCm(row.widthMm)} x ${formatResinMeasureCm(row.heightMm)} cm | ${row.materialLabel} | ${row.sheetsNeeded} folha(s) A3 | ${row.piecesPerSheet} por folha | ${formatCurrency(row.total)}`,
+      text: `- ${row.description || `Resinado ${index + 1}`} | ${row.quantity} unidades | ${formatResinMeasureCm(row.widthMm)} x ${formatResinMeasureCm(row.heightMm)} cm | ${row.materialLabel} | ${row.sheetsNeeded} folha(s) A3 | ${row.piecesPerSheet} por folha${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
   ];
 
@@ -3942,7 +4018,15 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
     quoteEntries.forEach((entry) => lines.push(entry.text));
   }
 
-  lines.push("", `Total geral: ${formatCurrency(workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral)}`);
+  const combinedSubtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
+  const quoteDiscount = calculateDiscount(combinedSubtotal, state.quoteDiscountType, state.quoteDiscountValue);
+  if (quoteDiscount.hasDiscount) {
+    lines.push("", `Subtotal: ${formatCurrency(combinedSubtotal)}`);
+    lines.push(`Desconto geral: ${formatDiscountValue(quoteDiscount.type, quoteDiscount.value)} (-${formatCurrency(quoteDiscount.amount)})`);
+    lines.push(`Total geral: ${formatCurrency(quoteDiscount.total)}`);
+  } else {
+    lines.push("", `Total geral: ${formatCurrency(combinedSubtotal)}`);
+  }
 
   if (state.quoteNotes?.trim()) {
     lines.push("", "Observações:", state.quoteNotes.trim());
@@ -4427,6 +4511,8 @@ async function initApp() {
     document.getElementById("client-cnpj").value = state.client.cnpj;
     document.getElementById("payment-terms").value = state.paymentTerms;
     document.getElementById("production-deadline").value = state.productionDeadline;
+    document.getElementById("quote-discount-type").value = normalizeDiscountType(state.quoteDiscountType);
+    document.getElementById("quote-discount-value").value = state.quoteDiscountValue || 0;
     document.getElementById("quote-notes").value = state.quoteNotes;
     document.getElementById("company-name").value = state.company.name;
     document.getElementById("company-cnpj").value = state.company.cnpj;
@@ -4700,6 +4786,8 @@ async function initApp() {
             <td><span class="readonly-value subtle">${formatCurrency(row.coverTotal)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.backTotal)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.finishingTotal)}${row.groupedFinishing ? `<br><small>${row.bindingGroupLeader ? `Grupo ${escapeHtml(row.bindingGroup)}` : `Grupo ${escapeHtml(row.bindingGroup)} (na 1a linha)`}</small>` : ""}</span></td>
+            <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
+            <td><input class="cell-input" name="discountValue" type="number" min="0" step="0.01" value="${escapeHtml(row.discountValue ?? 0)}" placeholder="0,00"></td>
             <td><span class="readonly-value">${formatCurrency(row.total)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.unitValue)}</span></td>
           </tr>
@@ -4725,6 +4813,8 @@ async function initApp() {
             <td><span class="readonly-value subtle">${formatCurrency(row.printTotal)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.suggestedCutPrice)}</span></td>
             <td><input class="cell-input" name="cutPriceOverride" type="number" min="0" step="0.01" value="${escapeHtml(row.cutPriceOverride)}" placeholder="${row.suggestedCutPrice > 0 ? row.suggestedCutPrice.toFixed(2) : "0.00"}"></td>
+            <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
+            <td><input class="cell-input" name="discountValue" type="number" min="0" step="0.01" value="${escapeHtml(row.discountValue ?? 0)}" placeholder="0,00"></td>
             <td><span class="readonly-value">${formatCurrency(row.total)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.unitValue)}</span></td>
           </tr>
@@ -4758,6 +4848,8 @@ async function initApp() {
             <td><span class="readonly-value subtle">${formatCurrency(row.baseTotal)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.laminationTotal)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.lanyardTotal)}</span></td>
+            <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
+            <td><input class="cell-input" name="discountValue" type="number" min="0" step="0.01" value="${escapeHtml(row.discountValue ?? 0)}" placeholder="0,00"></td>
             <td><span class="readonly-value">${formatCurrency(row.total)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.unitValue)}</span></td>
           </tr>
@@ -4786,6 +4878,8 @@ async function initApp() {
             <td><input class="cell-input description" name="description" value="${escapeHtml(row.description === row.productLabel ? "" : row.description)}" placeholder="${escapeHtml(row.productLabel)}"></td>
             <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${escapeHtml(row.quantity)}" placeholder="0"></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.unitPrice)}</span></td>
+            <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
+            <td><input class="cell-input" name="discountValue" type="number" min="0" step="0.01" value="${escapeHtml(row.discountValue ?? 0)}" placeholder="0,00"></td>
             <td><span class="readonly-value">${formatCurrency(row.total)}</span></td>
           </tr>
         `
@@ -4835,6 +4929,8 @@ async function initApp() {
             <td><span class="readonly-value subtle">${formatCurrency(row.configuredFinishExtraTotal || 0)}</span></td>
             <td><input class="cell-input" name="extraCharge" type="number" min="0" step="0.01" value="${escapeHtml(row.extraCharge ?? 0)}" placeholder="0,00"></td>
             <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
+            <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
+            <td><input class="cell-input" name="discountValue" type="number" min="0" step="0.01" value="${escapeHtml(row.discountValue ?? 0)}" placeholder="0,00"></td>
             <td><span class="readonly-value">${formatCurrency(row.total)}</span></td>
           </tr>
         `
@@ -4864,6 +4960,8 @@ async function initApp() {
             <td><span class="readonly-value subtle">${formatInteger(row.sheetsNeeded || 0)}</span></td>
             <td><span class="readonly-value subtle">${formatInteger(row.producedQuantity || 0)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.sheetPrice || 0)}</span></td>
+            <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
+            <td><input class="cell-input" name="discountValue" type="number" min="0" step="0.01" value="${escapeHtml(row.discountValue ?? 0)}" placeholder="0,00"></td>
             <td><span class="readonly-value">${formatCurrency(row.total || 0)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.unitValue || 0)}</span></td>
           </tr>
@@ -5463,7 +5561,15 @@ async function initApp() {
     if (!field || !row) {
       return;
     }
-    row[field] = field === "quantity" || field === "pages" || field === "colorPages" ? toWholeNumber(target.value) : target.value;
+    if (field === "quantity" || field === "pages" || field === "colorPages") {
+      row[field] = toWholeNumber(target.value);
+    } else if (field === "discountValue") {
+      row[field] = toMoneyNumber(target.value);
+    } else if (field === "discountType") {
+      row[field] = normalizeDiscountType(target.value);
+    } else {
+      row[field] = target.value;
+    }
     persist();
     renderRowsAndSummary();
   });
@@ -5483,6 +5589,10 @@ async function initApp() {
       row[field] = toWholeNumber(target.value);
     } else if (field === "widthMm" || field === "heightMm") {
       row[field] = toDecimalNumber(target.value) * 10;
+    } else if (field === "discountValue") {
+      row[field] = toMoneyNumber(target.value);
+    } else if (field === "discountType") {
+      row[field] = normalizeDiscountType(target.value);
     } else {
       row[field] = target.value;
     }
@@ -5509,6 +5619,10 @@ async function initApp() {
       row[field] = toDecimalNumber(target.value);
     } else if (field === "cutPriceOverride") {
       row[field] = target.value === "" ? "" : toMoneyNumber(target.value);
+    } else if (field === "discountValue") {
+      row[field] = toMoneyNumber(target.value);
+    } else if (field === "discountType") {
+      row[field] = normalizeDiscountType(target.value);
     } else {
       row[field] = target.value;
     }
@@ -5532,6 +5646,10 @@ async function initApp() {
       row[field] = toWholeNumber(target.value);
     } else if (field === "widthCm" || field === "heightCm") {
       row[field] = toDecimalNumber(target.value);
+    } else if (field === "discountValue") {
+      row[field] = toMoneyNumber(target.value);
+    } else if (field === "discountType") {
+      row[field] = normalizeDiscountType(target.value);
     } else {
       row[field] = target.value;
     }
@@ -5552,6 +5670,10 @@ async function initApp() {
     }
     if (field === "quantity") {
       row[field] = toWholeNumber(target.value);
+    } else if (field === "discountValue") {
+      row[field] = toMoneyNumber(target.value);
+    } else if (field === "discountType") {
+      row[field] = normalizeDiscountType(target.value);
     } else {
       row[field] = target.value;
     }
@@ -5606,6 +5728,10 @@ async function initApp() {
       } else {
         row[field] = toMoneyNumber(target.value);
       }
+    } else if (field === "discountValue") {
+      row[field] = toMoneyNumber(target.value);
+    } else if (field === "discountType") {
+      row[field] = normalizeDiscountType(target.value);
     } else {
       row[field] = target.value;
     }
@@ -6062,21 +6188,32 @@ async function initApp() {
     ["client-cnpj", "client", "cnpj"],
     ["payment-terms", null, "paymentTerms"],
     ["production-deadline", null, "productionDeadline"],
+    ["quote-discount-type", null, "quoteDiscountType"],
+    ["quote-discount-value", null, "quoteDiscountValue"],
     ["quote-notes", null, "quoteNotes"],
     ["company-name", "company", "name"],
     ["company-cnpj", "company", "cnpj"],
     ["company-contact", "company", "contact"],
     ["company-address", "company", "address"],
   ].forEach(([elementId, section, field]) => {
-    document.getElementById(elementId).addEventListener("input", (event) => {
+    const element = document.getElementById(elementId);
+    const updateField = (event) => {
       if (section) {
         state[section][field] = event.target.value;
+      } else if (field === "quoteDiscountValue") {
+        state[field] = toMoneyNumber(event.target.value);
+      } else if (field === "quoteDiscountType") {
+        state[field] = normalizeDiscountType(event.target.value);
       } else {
         state[field] = event.target.value;
       }
       persist();
       renderRowsAndSummary();
-    });
+    };
+    element.addEventListener("input", updateField);
+    if (element.tagName === "SELECT") {
+      element.addEventListener("change", updateField);
+    }
   });
 
   document.getElementById("company-logo-input").addEventListener("change", async (event) => {
@@ -6178,12 +6315,14 @@ async function initApp() {
     const resinWorkbook = calculateResinWorkbook(state, config);
     const title = state.client.name.trim() || `Orçamento ${new Date().toLocaleDateString("pt-BR")}`;
     const summary = createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, m2Workbook, resinWorkbook).split("\n").slice(0, 10).join(" • ");
+    const subtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
+    const quoteDiscount = calculateDiscount(subtotal, state.quoteDiscountType, state.quoteDiscountValue);
 
     state.quoteHistory.unshift({
       id: `quote-${Date.now()}`,
       title,
       clientName: state.client.name.trim(),
-      total: workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral,
+      total: quoteDiscount.total,
       summary,
       createdAt: new Date().toISOString(),
     });
