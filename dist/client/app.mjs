@@ -243,6 +243,26 @@ const READY_PRODUCT_CATALOG = [
     ],
   },
   {
+    id: "Caneca de cerâmica",
+    label: "Caneca de cerâmica",
+    category: "Canecas",
+    pricingMode: "tieredUnit",
+    tiers: [
+      { min: 1, value: 35, label: "1 un" },
+      { min: 2, value: 27.5, label: "2 un ou mais" },
+    ],
+  },
+  {
+    id: "Caneca de vidro",
+    label: "Caneca de vidro",
+    category: "Canecas",
+    pricingMode: "tieredUnit",
+    tiers: [
+      { min: 1, value: 40, label: "1 un" },
+      { min: 2, value: 32.5, label: "2 un ou mais" },
+    ],
+  },
+  {
     id: "Windbanner 3x0,75m completo com base de concreto",
     label: "Windbanner 3x0,75m completo com base de concreto",
     category: "Windbanner",
