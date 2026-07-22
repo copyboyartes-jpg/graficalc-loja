@@ -1875,6 +1875,14 @@ function buildBusinessCardPrintModeOptions(material, currentValue) {
     .join("");
 }
 
+function buildBusinessCardQuantityOptions(material, printMode, currentValue) {
+  const options = getBusinessCardQuantityOptions(material, printMode);
+  return [
+    `<option value="0"${toWholeNumber(currentValue) <= 0 ? " selected" : ""}>Escolher</option>`,
+    ...options.map((tier) => `<option value="${escapeHtml(tier.quantity)}"${toWholeNumber(currentValue) === tier.quantity ? " selected" : ""}>${formatInteger(tier.quantity)} cartões - ${formatCurrency(tier.total)}</option>`),
+  ].join("");
+}
+
 function getCredentialMaterialConfig(materialType) {
   const material = materialType || "Couche 250g";
   if (material === "PS 1mm") {
@@ -4563,7 +4571,6 @@ async function initApp() {
     "select:not([disabled])",
     "textarea:not([disabled]):not([readonly])",
     "button[data-credential-lanyard-toggle]:not([disabled])",
-    "button[data-business-card-quantity-toggle]:not([disabled])",
     "button[data-m2-finish-toggle]:not([disabled])",
   ].join(", ");
 
@@ -5327,12 +5334,7 @@ async function initApp() {
             <td><select class="cell-select" name="productionType">${buildOptions(OPTIONS.businessCardProductions, row.productionType)}</select></td>
             <td><select class="cell-select" name="materialId">${buildBusinessCardMaterialOptions(row.productionType, row.materialId)}</select></td>
             <td><select class="cell-select" name="printMode">${buildBusinessCardPrintModeOptions(material, row.printMode)}</select></td>
-            <td>
-              <button class="button finish-picker-button" type="button" data-business-card-quantity-toggle>
-                <span>${row.quantity > 0 ? `${formatInteger(row.quantity)} cartões` : "Escolher"}</span>
-                <span class="finish-picker-chevron">▾</span>
-              </button>
-            </td>
+            <td><select class="cell-select" name="quantity">${buildBusinessCardQuantityOptions(material, row.printMode, row.quantity)}</select></td>
             <td><span class="readonly-value subtle">${escapeHtml(row.packageLabel || "-")}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.baseTotal)}</span></td>
             <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
@@ -5347,7 +5349,7 @@ async function initApp() {
 
     businessCardWarningList.innerHTML = businessCardWorkbook.warnings.length
       ? businessCardWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
-      : `<div class="warning-item is-success">Sem alertas no momento. Escolha a quantidade pelo popover para usar somente os pacotes cadastrados.</div>`;
+      : `<div class="warning-item is-success">Sem alertas no momento. Escolha a quantidade na lista para usar somente os pacotes cadastrados.</div>`;
     setBusinessCardFeedback(
       businessCardWorkbook.activeRows.length > 0
         ? "Cartões de visitas atualizados com sucesso."
@@ -6267,20 +6269,6 @@ async function initApp() {
     persistLocalOnly();
     renderRowsAndSummary();
   });
-
-  document.addEventListener("click", (event) => {
-    const toggle = event.target.closest("[data-business-card-quantity-toggle]");
-    if (!toggle) {
-      return;
-    }
-    event.preventDefault();
-    event.stopPropagation();
-    const rowElement = toggle.closest("tr[data-business-card-row-index]");
-    if (!rowElement) {
-      return;
-    }
-    openBusinessCardQuantityPopover(Number(rowElement.dataset.businessCardRowIndex), toggle);
-  }, true);
 
   credentialRowsTableBody.addEventListener("click", (event) => {
     const toggle = event.target.closest("[data-credential-lanyard-toggle]");
