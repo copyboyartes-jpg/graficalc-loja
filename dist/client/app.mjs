@@ -5481,12 +5481,12 @@ async function initApp() {
         </div>
         <button type="button" class="button finish-popover-close" data-business-card-quantity-close>Fechar</button>
       </div>
-      <div class="finish-popover-options">
+      <div class="finish-popover-list">
         ${options.length ? options.map((tier) => `
-          <label class="finish-option">
+          <label class="finish-picker-option">
             <input type="radio" name="business-card-quantity-option" value="${escapeHtml(tier.quantity)}"${selectedQuantity === tier.quantity ? " checked" : ""} data-business-card-quantity-option>
-            <span>
-              <strong>${formatInteger(tier.quantity)} cartões</strong>
+            <span class="finish-option-copy">
+              <span class="finish-option-label">${formatInteger(tier.quantity)} cartões</span>
               <small>${formatCurrency(tier.total)}</small>
             </span>
           </label>
@@ -6268,18 +6268,19 @@ async function initApp() {
     renderRowsAndSummary();
   });
 
-  businessCardRowsTableBody.addEventListener("click", (event) => {
+  document.addEventListener("click", (event) => {
     const toggle = event.target.closest("[data-business-card-quantity-toggle]");
     if (!toggle) {
       return;
     }
     event.preventDefault();
+    event.stopPropagation();
     const rowElement = toggle.closest("tr[data-business-card-row-index]");
     if (!rowElement) {
       return;
     }
     openBusinessCardQuantityPopover(Number(rowElement.dataset.businessCardRowIndex), toggle);
-  });
+  }, true);
 
   credentialRowsTableBody.addEventListener("click", (event) => {
     const toggle = event.target.closest("[data-credential-lanyard-toggle]");
