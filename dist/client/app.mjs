@@ -50,6 +50,7 @@ const OPTIONS = {
   ],
   businessCardProductions: ["Laser", "Offset"],
   businessCardPrintModes: ["Só frente", "Frente e verso"],
+  businessCardExtraFinish: ["Sem acabamento adicional", "Com acabamento adicional"],
   flyerProductions: ["Laser", "Offset"],
   flyerPrintModes: ["Só frente", "Frente e verso"],
   flyerFolds: ["Sem dobra", "1 dobra", "2 dobras"],
@@ -970,6 +971,7 @@ function createDefaultBusinessCardRow(index) {
     materialId: BUSINESS_CARD_CATALOG[0]?.id || "",
     printMode: "Só frente",
     quantity: 0,
+    extraFinish: "Sem acabamento adicional",
     artCreationFee: 0,
     discountType: "R$",
     discountValue: 0,
@@ -1395,6 +1397,7 @@ function mergeState(candidate) {
       productionType: OPTIONS.businessCardProductions.includes(row?.productionType) ? row.productionType : "Laser",
       printMode: OPTIONS.businessCardPrintModes.includes(row?.printMode) ? row.printMode : "Só frente",
       quantity: toWholeNumber(row?.quantity),
+      extraFinish: OPTIONS.businessCardExtraFinish.includes(row?.extraFinish) ? row.extraFinish : "Sem acabamento adicional",
       artCreationFee: toMoneyNumber(row?.artCreationFee),
       discountType: normalizeDiscountType(row?.discountType),
       discountValue: toMoneyNumber(row?.discountValue),
@@ -1949,6 +1952,16 @@ function buildBusinessCardQuantityOptions(material, printMode, currentValue) {
   ].join("");
 }
 
+function calculateBusinessCardExtraFinishTotal(quantity, extraFinish) {
+  if (extraFinish !== "Com acabamento adicional" || quantity < 100) {
+    return 0;
+  }
+  if (quantity >= 1000) {
+    return Math.ceil(quantity / 1000) * 25;
+  }
+  return 10 + Math.ceil(quantity / 100) * 3;
+}
+
 function isFlyerRowActive(row) {
   return Boolean(row.description?.trim() || Number(row.quantity) > 0);
 }
@@ -2341,12 +2354,16 @@ function calculateBusinessCardWorkbook(state) {
     const active = isBusinessCardRowActive(row);
     const tier = getBusinessCardTier(material, printMode, quantity);
     const baseTotal = active && quantity > 0 && tier ? toMoneyNumber(tier.total) : 0;
+    const extraFinish = OPTIONS.businessCardExtraFinish.includes(row.extraFinish) ? row.extraFinish : "Sem acabamento adicional";
+    const extraFinishTotal = active ? calculateBusinessCardExtraFinishTotal(quantity, extraFinish) : 0;
     const artCreationFee = getArtCreationFee(row);
-    const rowDiscount = applyRowDiscount(row, baseTotal + artCreationFee, quantity);
+    const rowDiscount = applyRowDiscount(row, baseTotal + extraFinishTotal + artCreationFee, quantity);
     const warning = active && quantity <= 0
       ? `Cartão ${index + 1}: escolha uma quantidade da tabela.`
       : active && !tier
         ? `Cartão ${index + 1}: escolha uma quantidade válida para essa combinação de papel e impressão.`
+        : active && extraFinish === "Com acabamento adicional" && quantity < 100
+          ? `Cartão ${index + 1}: acabamento adicional tem mínimo de 100 unidades.`
         : "";
 
     return {
@@ -2358,9 +2375,11 @@ function calculateBusinessCardWorkbook(state) {
       materialLabel: material?.label || "",
       printMode,
       quantity,
+      extraFinish,
       packageQuantity: tier?.quantity || 0,
       packageLabel: tier ? `${formatInteger(tier.quantity)} cartões` : "-",
       baseTotal,
+      extraFinishTotal,
       artCreationFee,
       ...rowDiscount,
       warning,
@@ -4491,6 +4510,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       kind: "Cartões de visitas",
       description: row.description || "Cartão de visita",
       detail: `${formatInteger(row.quantity)} cartões | ${row.productionType} | ${row.materialLabel} | ${row.printMode} | Pacote: ${row.packageLabel}`,
+      extraDetail: row.extraFinishTotal > 0 ? `Acabamento adicional: ${formatCurrency(row.extraFinishTotal)}` : "",
       artDetail: formatArtCreationDetail(row),
       discountDetail: row.discountDescription,
       total: row.total,
@@ -4639,7 +4659,7 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
       text: `- ${row.description || `Produto pronto ${index + 1}`} | ${row.quantity} unidades | ${row.productLabel}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...businessCardWorkbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || `Cartão de visita ${index + 1}`} | ${row.quantity} cartões | ${row.productionType} | ${row.materialLabel} | ${row.printMode} | Pacote: ${row.packageLabel}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
+      text: `- ${row.description || `Cartão de visita ${index + 1}`} | ${row.quantity} cartões | ${row.productionType} | ${row.materialLabel} | ${row.printMode} | Pacote: ${row.packageLabel}${row.extraFinishTotal > 0 ? ` | Acabamento adicional: ${formatCurrency(row.extraFinishTotal)}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...flyerWorkbook.activeRows.map((row, index) => ({
       text: `- ${row.description || `Panfleto/folder ${index + 1}`} | ${row.quantity} unidades | ${row.productionType} | ${row.paper} | ${row.size} | ${row.printMode}${row.foldType !== "Sem dobra" ? ` | ${row.foldType}` : ""}${row.foldTotal > 0 ? ` | Dobra: ${formatCurrency(row.foldTotal)}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
@@ -5583,6 +5603,8 @@ async function initApp() {
             <td><select class="cell-select" name="quantity">${buildBusinessCardQuantityOptions(material, row.printMode, row.quantity)}</select></td>
             <td><span class="readonly-value subtle">${escapeHtml(row.packageLabel || "-")}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.baseTotal)}</span></td>
+            <td><select class="cell-select" name="extraFinish">${buildOptions(OPTIONS.businessCardExtraFinish, row.extraFinish)}</select></td>
+            <td><span class="readonly-value subtle">${formatCurrency(row.extraFinishTotal || 0)}</span></td>
             <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
             <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
             <td><input class="cell-input" name="discountValue" type="number" min="0" step="0.01" value="${escapeHtml(row.discountValue ?? 0)}" placeholder="0,00"></td>
