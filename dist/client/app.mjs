@@ -48,6 +48,8 @@ const OPTIONS = {
     "Cordão estampado 20mm com jacaré",
     "Cordão estampado 20mm com mosquetão",
   ],
+  businessCardProductions: ["Laser", "Offset"],
+  businessCardPrintModes: ["Só frente", "Frente e verso"],
   spiralOptions: ["Completa", "Sem capas plásticas"],
   calcModes: ["Independente", "Somar quantidades"],
   m2CalcModes: ["Independente", "Somar materiais iguais"],
@@ -186,6 +188,110 @@ const RESIN_MATERIAL_LABELS = {
   "holo-gold": "Adesivo holográfico dourado",
   "holo-silver": "Adesivo holográfico prateado",
 };
+
+const BUSINESS_CARD_CATALOG = [
+  ...["Couche 300g", "Offset 240g", "Metalizado branco 250g"].map((label) => ({
+    id: `laser-${label.toLowerCase().replaceAll(" ", "-")}`,
+    label,
+    production: "Laser",
+    modes: {
+      "Só frente": [
+        { quantity: 100, total: 42.5 },
+        { quantity: 200, total: 63 },
+        { quantity: 300, total: 97 },
+        { quantity: 500, total: 119 },
+        { quantity: 1000, total: 206 },
+      ],
+      "Frente e verso": [
+        { quantity: 100, total: 67 },
+        { quantity: 200, total: 115 },
+        { quantity: 300, total: 140 },
+        { quantity: 500, total: 200 },
+        { quantity: 1000, total: 345 },
+      ],
+    },
+  })),
+  {
+    id: "offset-couche-300g-verniz-brilho-total-frente",
+    label: "Couche 300g verniz brilho total frente",
+    production: "Offset",
+    modes: {
+      "Só frente": [
+        { quantity: 1000, total: 140 },
+        { quantity: 2000, total: 266 },
+        { quantity: 3000, total: 400 },
+        { quantity: 5000, total: 505 },
+      ],
+      "Frente e verso": [
+        { quantity: 1000, total: 167 },
+        { quantity: 2000, total: 321 },
+        { quantity: 3000, total: 483 },
+        { quantity: 5000, total: 580 },
+      ],
+    },
+  },
+  {
+    id: "offset-couche-250g-verniz-brilho-total-frente",
+    label: "Couche 250g verniz brilho total frente",
+    production: "Offset",
+    modes: {
+      "Só frente": [
+        { quantity: 1000, total: 121 },
+        { quantity: 2000, total: 231 },
+        { quantity: 3000, total: 352 },
+        { quantity: 5000, total: 480 },
+      ],
+      "Frente e verso": [
+        { quantity: 1000, total: 145 },
+        { quantity: 2000, total: 278 },
+        { quantity: 3000, total: 424 },
+        { quantity: 5000, total: 500 },
+      ],
+    },
+  },
+  {
+    id: "offset-papel-supremo-300g",
+    label: "Papel supremo 300g",
+    production: "Offset",
+    modes: {
+      "Frente e verso": [
+        { quantity: 1000, total: 231 },
+        { quantity: 2000, total: 448 },
+        { quantity: 3000, total: 519 },
+        { quantity: 5000, total: 854 },
+      ],
+    },
+  },
+  {
+    id: "offset-couche-300g-laminacao-fosca-verniz-localizado",
+    label: "Couche 300g com laminação fosca e verniz localizado frente e verso",
+    production: "Offset",
+    modes: {
+      "Frente e verso": [
+        { quantity: 500, total: 212 },
+        { quantity: 1000, total: 254 },
+        { quantity: 2000, total: 496 },
+        { quantity: 3000, total: 732 },
+        { quantity: 5000, total: 902 },
+      ],
+    },
+  },
+  {
+    id: "offset-couche-300g-laminacao-fosca-hotstamping",
+    label: "Couche 300g com laminação fosca e hotstamping",
+    production: "Offset",
+    modes: {
+      "Só frente": [
+        { quantity: 500, total: 426 },
+        { quantity: 1000, total: 603 },
+      ],
+      "Frente e verso": [
+        { quantity: 500, total: 481 },
+        { quantity: 1000, total: 654 },
+      ],
+    },
+  },
+];
 
 const READY_PRODUCT_CATALOG = [
   {
@@ -821,6 +927,20 @@ function createDefaultResinRow(index) {
   };
 }
 
+function createDefaultBusinessCardRow(index) {
+  return {
+    id: `business-card-row-${index + 1}`,
+    description: "Cartão de visita",
+    productionType: "Laser",
+    materialId: BUSINESS_CARD_CATALOG[0]?.id || "",
+    printMode: "Só frente",
+    quantity: 0,
+    artCreationFee: 0,
+    discountType: "R$",
+    discountValue: 0,
+  };
+}
+
 function getDefaultM2Description(productId) {
   return DEFAULT_M2_DESCRIPTIONS[productId] || "";
 }
@@ -850,6 +970,7 @@ function createDefaultState() {
     readyProductItems: Array.from({ length: 5 }, (_, index) => createDefaultReadyProductRow(index)),
     m2Items: Array.from({ length: 5 }, (_, index) => createDefaultM2Row(index)),
     resinItems: Array.from({ length: 5 }, (_, index) => createDefaultResinRow(index)),
+    businessCardItems: Array.from({ length: 5 }, (_, index) => createDefaultBusinessCardRow(index)),
     client: {
       name: "",
       contact: "",
@@ -887,7 +1008,7 @@ function normalizeCatalogSections(list) {
       continue;
     }
     if (Array.isArray(item.products)) {
-      const tab = item.tab === "calculo" || item.tab === "impressos" || item.tab === "credenciais" || item.tab === "produtos-prontos" || item.tab === "m2" ? item.tab : "m2";
+      const tab = item.tab === "calculo" || item.tab === "impressos" || item.tab === "credenciais" || item.tab === "produtos-prontos" || item.tab === "cartoes" || item.tab === "m2" ? item.tab : "m2";
       for (const product of item.products) {
         if (!product || typeof product !== "object") {
           continue;
@@ -901,7 +1022,7 @@ function normalizeCatalogSections(list) {
       }
       continue;
     }
-    if (item.tab === "calculo" || item.tab === "impressos" || item.tab === "credenciais" || item.tab === "produtos-prontos" || item.tab === "m2") {
+    if (item.tab === "calculo" || item.tab === "impressos" || item.tab === "credenciais" || item.tab === "produtos-prontos" || item.tab === "cartoes" || item.tab === "m2") {
       normalized.push({
         id: item.id || `produto-${Date.now()}`,
         label: item.label || item.name || "Novo produto",
@@ -1216,6 +1337,20 @@ function mergeState(candidate) {
     };
   }
 
+  if (Array.isArray(candidate.businessCardItems) && candidate.businessCardItems.length > 0) {
+    state.businessCardItems = candidate.businessCardItems.map((row, index) => ({
+      ...createDefaultBusinessCardRow(index),
+      ...row,
+      productionType: OPTIONS.businessCardProductions.includes(row?.productionType) ? row.productionType : "Laser",
+      printMode: OPTIONS.businessCardPrintModes.includes(row?.printMode) ? row.printMode : "Só frente",
+      quantity: toWholeNumber(row?.quantity),
+      artCreationFee: toMoneyNumber(row?.artCreationFee),
+      discountType: normalizeDiscountType(row?.discountType),
+      discountValue: toMoneyNumber(row?.discountValue),
+      id: row?.id || `business-card-row-${index + 1}`,
+    }));
+  }
+
   return state;
 }
 
@@ -1314,7 +1449,7 @@ function loadConfigSection() {
 
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.configSection);
-    return raw === "impressos" || raw === "credenciais" || raw === "produtos-prontos" || raw === "m2" || raw === "resinados" ? raw : "calculo";
+    return raw === "impressos" || raw === "credenciais" || raw === "produtos-prontos" || raw === "cartoes" || raw === "m2" || raw === "resinados" ? raw : "calculo";
   } catch {
     return "calculo";
   }
@@ -1324,7 +1459,7 @@ function saveConfigSection(section) {
   if (typeof localStorage === "undefined") {
     return;
   }
-  const safeSection = section === "impressos" || section === "credenciais" || section === "produtos-prontos" || section === "m2" || section === "resinados" ? section : "calculo";
+  const safeSection = section === "impressos" || section === "credenciais" || section === "produtos-prontos" || section === "cartoes" || section === "m2" || section === "resinados" ? section : "calculo";
   localStorage.setItem(STORAGE_KEYS.configSection, safeSection);
 }
 
@@ -1683,6 +1818,48 @@ function isCredentialRowActive(row) {
   return Boolean(row.description?.trim() || Number(row.quantity) > 0 || Number(row.widthCm) > 0 || Number(row.heightCm) > 0);
 }
 
+function isBusinessCardRowActive(row) {
+  return Boolean(row.description?.trim() || Number(row.quantity) > 0);
+}
+
+function getBusinessCardMaterials(productionType) {
+  const production = OPTIONS.businessCardProductions.includes(productionType) ? productionType : "Laser";
+  return BUSINESS_CARD_CATALOG.filter((item) => item.production === production);
+}
+
+function getBusinessCardMaterial(materialId, productionType) {
+  const materials = getBusinessCardMaterials(productionType);
+  return materials.find((item) => item.id === materialId) || materials[0] || BUSINESS_CARD_CATALOG[0];
+}
+
+function getBusinessCardValidPrintMode(material, printMode) {
+  const availableModes = Object.keys(material?.modes || {});
+  if (availableModes.includes(printMode)) {
+    return printMode;
+  }
+  return availableModes[0] || "Só frente";
+}
+
+function getBusinessCardTier(material, printMode, quantity) {
+  const tiers = [...(material?.modes?.[printMode] || [])].sort((a, b) => a.quantity - b.quantity);
+  if (!tiers.length) {
+    return null;
+  }
+  return tiers.find((tier) => quantity <= tier.quantity) || tiers[tiers.length - 1];
+}
+
+function buildBusinessCardMaterialOptions(productionType, currentValue) {
+  return getBusinessCardMaterials(productionType)
+    .map((material) => `<option value="${escapeHtml(material.id)}"${material.id === currentValue ? " selected" : ""}>${escapeHtml(material.label)}</option>`)
+    .join("");
+}
+
+function buildBusinessCardPrintModeOptions(material, currentValue) {
+  return Object.keys(material?.modes || {})
+    .map((mode) => `<option value="${escapeHtml(mode)}"${mode === currentValue ? " selected" : ""}>${escapeHtml(mode)}</option>`)
+    .join("");
+}
+
 function getCredentialMaterialConfig(materialType) {
   const material = materialType || "Couche 250g";
   if (material === "PS 1mm") {
@@ -1972,6 +2149,61 @@ function calculateReadyProductWorkbook(state, config) {
       unitPrice: product.totalPrice === null || product.totalPrice === undefined || quantity <= 0 ? product.unitPrice : subtotal / quantity,
       ...rowDiscount,
       warning: active && quantity <= 0 ? `Produto pronto ${index + 1}: informe uma quantidade maior que zero.` : packageWarning,
+    };
+  });
+
+  const activeRows = rows.filter((row) => row.active && row.valid);
+  const warnings = rows.filter((row) => row.warning).map((row) => row.warning);
+  const totalQuantity = activeRows.reduce((sum, row) => sum + row.quantity, 0);
+  const totalGeneral = activeRows.reduce((sum, row) => sum + row.total, 0);
+
+  return {
+    rows,
+    activeRows,
+    warnings,
+    totals: {
+      activeLines: activeRows.length,
+      totalQuantity,
+      totalGeneral,
+      averageValue: totalQuantity > 0 ? totalGeneral / totalQuantity : 0,
+    },
+  };
+}
+
+function calculateBusinessCardWorkbook(state) {
+  const rows = state.businessCardItems.map((row, index) => {
+    const productionType = OPTIONS.businessCardProductions.includes(row.productionType) ? row.productionType : "Laser";
+    const material = getBusinessCardMaterial(row.materialId, productionType);
+    const printMode = getBusinessCardValidPrintMode(material, row.printMode);
+    const quantity = toWholeNumber(row.quantity);
+    const active = isBusinessCardRowActive(row);
+    const tier = getBusinessCardTier(material, printMode, quantity);
+    const baseTotal = active && quantity > 0 && tier ? toMoneyNumber(tier.total) : 0;
+    const artCreationFee = getArtCreationFee(row);
+    const rowDiscount = applyRowDiscount(row, baseTotal + artCreationFee, quantity);
+    const warning = active && quantity <= 0
+      ? `Cartão ${index + 1}: informe uma quantidade maior que zero.`
+      : active && !tier
+        ? `Cartão ${index + 1}: não existe tabela para essa combinação de papel e impressão.`
+        : active && tier && quantity > tier.quantity
+          ? `Cartão ${index + 1}: quantidade acima da maior faixa cadastrada. O valor foi calculado pelo pacote de ${formatInteger(tier.quantity)} cartões.`
+          : "";
+
+    return {
+      ...row,
+      active,
+      valid: active ? quantity > 0 && Boolean(tier) : false,
+      productionType,
+      materialId: material?.id || "",
+      materialLabel: material?.label || "",
+      printMode,
+      quantity,
+      packageQuantity: tier?.quantity || 0,
+      packageLabel: tier ? `${formatInteger(tier.quantity)} cartões` : "-",
+      baseTotal,
+      artCreationFee,
+      ...rowDiscount,
+      warning,
     };
   });
 
@@ -2698,6 +2930,15 @@ function ensureResinRowCount(state, minimumCount) {
   }
 }
 
+function ensureBusinessCardRowCount(state, minimumCount) {
+  if (!Array.isArray(state.businessCardItems)) {
+    state.businessCardItems = [];
+  }
+  while (state.businessCardItems.length < minimumCount) {
+    state.businessCardItems.push(createDefaultBusinessCardRow(state.businessCardItems.length));
+  }
+}
+
 function trimEmptyRows(rows, minimumCount, isActive) {
   const trimmed = [...rows];
   while (trimmed.length > minimumCount && !isActive(trimmed[trimmed.length - 1])) {
@@ -2724,6 +2965,7 @@ function createConfigSectionTabsMarkup(activeSection = "calculo") {
     { id: "impressos", label: "Impressos coloridos", helper: "Papéis, cortes e produtos extras." },
     { id: "credenciais", label: "Credenciais", helper: "Materiais, laminação e cordões." },
     { id: "produtos-prontos", label: "Produtos prontos", helper: "Cordões e itens vendidos separadamente." },
+    { id: "cartoes", label: "Cartões de visitas", helper: "Tabela laser e offset para cartões." },
     { id: "m2", label: "Cálculo de m²", helper: "Faixas, acabamentos e produtos por área." },
     { id: "resinados", label: "Resinados", helper: "Tabela A3, margem de resina e valor mínimo." },
   ];
@@ -3011,7 +3253,15 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
     ),
   ];
 
-  const safeSection = activeSection === "impressos" || activeSection === "credenciais" || activeSection === "produtos-prontos" || activeSection === "m2" || activeSection === "resinados" ? activeSection : "calculo";
+  const cartoesCards = [
+    createConfigCardMarkup(
+      "Tabela de cartões",
+      "Inclui produção laser e offset, com opções de só frente e frente e verso conforme a tabela enviada.",
+      `<p class="helper-text">Use a aba Cartões de visitas para selecionar produção, papel/acabamento, impressão e quantidade. O sistema usa automaticamente o pacote da tabela mais próximo.</p>`
+    ),
+  ];
+
+  const safeSection = activeSection === "impressos" || activeSection === "credenciais" || activeSection === "produtos-prontos" || activeSection === "cartoes" || activeSection === "m2" || activeSection === "resinados" ? activeSection : "calculo";
   const configGroups = {
     calculo: createConfigGroupMarkup(
       "calculo",
@@ -3036,6 +3286,12 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
       "Aba: Produtos prontos",
       "Aqui ficam os valores dos cordões e itens vendidos separadamente na aba de produtos prontos.",
       produtosProntosCards
+    ),
+    cartoes: createConfigGroupMarkup(
+      "cartoes",
+      "Aba: Cartões de visitas",
+      "Tabela de cartões laser e offset usada na aba de cartões de visitas.",
+      cartoesCards
     ),
     m2: createConfigGroupMarkup(
       "m2",
@@ -3951,7 +4207,7 @@ function calculateResinWorkbook(state, config) {
   };
 }
 
-function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, m2Workbook, resinWorkbook) {
+function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, m2Workbook, resinWorkbook) {
   const dateText = new Intl.DateTimeFormat("pt-BR").format(new Date());
   const quoteEntries = [
     ...workbook.activeRows.map((row) => {
@@ -3991,6 +4247,14 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       discountDetail: row.discountDescription,
       total: row.total,
     })),
+    ...businessCardWorkbook.activeRows.map((row) => ({
+      kind: "Cartões de visitas",
+      description: row.description || "Cartão de visita",
+      detail: `${formatInteger(row.quantity)} cartões | ${row.productionType} | ${row.materialLabel} | ${row.printMode} | Pacote: ${row.packageLabel}`,
+      artDetail: formatArtCreationDetail(row),
+      discountDetail: row.discountDescription,
+      total: row.total,
+    })),
     ...m2Workbook.activeRows.map((row) => ({
       kind: "Cálculo de m²",
       description: getM2RowDescription(row),
@@ -4009,10 +4273,10 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       total: row.total,
     })),
   ];
-  const combinedSubtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
+  const combinedSubtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
   const quoteDiscount = calculateDiscount(combinedSubtotal, state.quoteDiscountType, state.quoteDiscountValue);
   const combinedTotal = quoteDiscount.total;
-  const combinedUnits = workbook.totals.totalQuantity + colorWorkbook.totals.totalQuantity + credentialWorkbook.totals.totalQuantity + readyWorkbook.totals.totalQuantity + m2Workbook.totals.totalQuantity + resinWorkbook.totals.totalQuantity;
+  const combinedUnits = workbook.totals.totalQuantity + colorWorkbook.totals.totalQuantity + credentialWorkbook.totals.totalQuantity + readyWorkbook.totals.totalQuantity + businessCardWorkbook.totals.totalQuantity + m2Workbook.totals.totalQuantity + resinWorkbook.totals.totalQuantity;
   const lineItemsMarkup = quoteEntries.length
     ? quoteEntries
         .map(
@@ -4092,7 +4356,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
   `;
 }
 
-function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, m2Workbook, resinWorkbook) {
+function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, m2Workbook, resinWorkbook) {
   const dateText = new Intl.DateTimeFormat("pt-BR").format(new Date());
   const lines = [
     `ORÇAMENTO | ${state.company.name || "Sua empresa"}`,
@@ -4125,6 +4389,9 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
     ...readyWorkbook.activeRows.map((row, index) => ({
       text: `- ${row.description || `Produto pronto ${index + 1}`} | ${row.quantity} unidades | ${row.productLabel}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
+    ...businessCardWorkbook.activeRows.map((row, index) => ({
+      text: `- ${row.description || `Cartão de visita ${index + 1}`} | ${row.quantity} cartões | ${row.productionType} | ${row.materialLabel} | ${row.printMode} | Pacote: ${row.packageLabel}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
+    })),
     ...m2Workbook.activeRows.map((row, index) => ({
       text: `- ${getM2RowDescription(row) || `M² ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.finishSummary ? `${row.finishSummary} | ` : ""}${formatArtCreationDetail(row) ? `${formatArtCreationDetail(row)} | ` : ""}${row.discountDescription ? `${row.discountDescription} | ` : ""}${formatCurrency(row.total)}`,
     })),
@@ -4139,7 +4406,7 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
     quoteEntries.forEach((entry) => lines.push(entry.text));
   }
 
-  const combinedSubtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
+  const combinedSubtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
   const quoteDiscount = calculateDiscount(combinedSubtotal, state.quoteDiscountType, state.quoteDiscountValue);
   if (quoteDiscount.hasDiscount) {
     lines.push("", `Subtotal: ${formatCurrency(combinedSubtotal)}`);
@@ -4161,7 +4428,7 @@ async function initApp() {
   const config = loadFromStorage(STORAGE_KEYS.config, mergeConfig);
   let configViewMode = loadConfigViewMode();
   let activeConfigSection = loadConfigSection();
-  let lastConfigSourceTab = activeConfigSection === "impressos" || activeConfigSection === "credenciais" || activeConfigSection === "produtos-prontos" || activeConfigSection === "m2" || activeConfigSection === "resinados" ? activeConfigSection : "calculo";
+  let lastConfigSourceTab = activeConfigSection === "impressos" || activeConfigSection === "credenciais" || activeConfigSection === "produtos-prontos" || activeConfigSection === "cartoes" || activeConfigSection === "m2" || activeConfigSection === "resinados" ? activeConfigSection : "calculo";
   let isConfigUnlocked = loadSessionFlag(SESSION_KEYS.configUnlocked);
   let sharedSyncTimer = null;
   let sharedSyncInFlight = false;
@@ -4175,12 +4442,14 @@ async function initApp() {
   ensureColorRowCount(state, 5);
   ensureCredentialRowCount(state, 5);
   ensureReadyProductRowCount(state, 5);
+  ensureBusinessCardRowCount(state, 5);
   ensureM2RowCount(state, 5);
   ensureResinRowCount(state, 5);
   state.rows = trimEmptyRows(state.rows, 5, isRowActive);
   state.colorPrintItems = trimEmptyRows(state.colorPrintItems, 5, isColorPrintRowActive);
   state.credentialItems = trimEmptyRows(state.credentialItems, 5, isCredentialRowActive);
   state.readyProductItems = trimEmptyRows(state.readyProductItems, 5, isReadyProductRowActive);
+  state.businessCardItems = trimEmptyRows(state.businessCardItems, 5, isBusinessCardRowActive);
   state.m2Items = trimEmptyRows(state.m2Items, 5, (row) => Boolean(row.description?.trim() || Number(row.quantity) > 0 || Number(row.widthMm) > 0 || Number(row.heightMm) > 0));
   state.resinItems = trimEmptyRows(state.resinItems, 5, isResinRowActive);
 
@@ -4188,11 +4457,13 @@ async function initApp() {
   const colorRowsTableBody = document.getElementById("color-rows-table-body");
   const credentialRowsTableBody = document.getElementById("credential-rows-table-body");
   const readyRowsTableBody = document.getElementById("ready-rows-table-body");
+  const businessCardRowsTableBody = document.getElementById("business-card-rows-table-body");
   const resinRowsTableBody = document.getElementById("resin-rows-table-body");
   const warningList = document.getElementById("warning-list");
   const colorWarningList = document.getElementById("color-warning-list");
   const credentialWarningList = document.getElementById("credential-warning-list");
   const readyWarningList = document.getElementById("ready-warning-list");
+  const businessCardWarningList = document.getElementById("business-card-warning-list");
   const m2WarningList = document.getElementById("m2-warning-list");
   const resinWarningList = document.getElementById("resin-warning-list");
   const configSections = document.getElementById("config-sections");
@@ -4204,6 +4475,7 @@ async function initApp() {
   const colorFeedback = document.getElementById("color-feedback");
   const credentialFeedback = document.getElementById("credential-feedback");
   const readyFeedback = document.getElementById("ready-feedback");
+  const businessCardFeedback = document.getElementById("business-card-feedback");
   const resinFeedback = document.getElementById("resin-feedback");
   const configStatus = document.getElementById("config-status");
   const syncStatus = document.getElementById("sync-status");
@@ -4255,6 +4527,10 @@ async function initApp() {
 
   function setReadyFeedback(message, tone = "neutral") {
     setStatusMessage(readyFeedback, message, tone);
+  }
+
+  function setBusinessCardFeedback(message, tone = "neutral") {
+    setStatusMessage(businessCardFeedback, message, tone);
   }
 
   function setResinFeedback(message, tone = "neutral") {
@@ -4589,14 +4865,14 @@ async function initApp() {
 
   function selectTab(tabName) {
     if (tabName === "configuracao") {
-      activeConfigSection = lastConfigSourceTab === "impressos" || lastConfigSourceTab === "credenciais" || lastConfigSourceTab === "produtos-prontos" || lastConfigSourceTab === "m2" || lastConfigSourceTab === "resinados" ? lastConfigSourceTab : "calculo";
+      activeConfigSection = lastConfigSourceTab === "impressos" || lastConfigSourceTab === "credenciais" || lastConfigSourceTab === "produtos-prontos" || lastConfigSourceTab === "cartoes" || lastConfigSourceTab === "m2" || lastConfigSourceTab === "resinados" ? lastConfigSourceTab : "calculo";
       saveConfigSection(activeConfigSection);
       renderConfig();
       if (!isConfigUnlocked) {
         setConfigStatus("Digite a senha para acessar a configuração.", "warning");
         focusConfigPasswordField();
       }
-    } else if (tabName === "calculo" || tabName === "impressos" || tabName === "credenciais" || tabName === "produtos-prontos" || tabName === "m2" || tabName === "resinados") {
+    } else if (tabName === "calculo" || tabName === "impressos" || tabName === "credenciais" || tabName === "produtos-prontos" || tabName === "cartoes" || tabName === "m2" || tabName === "resinados") {
       lastConfigSourceTab = tabName;
     }
     tabButtons.forEach((button) => {
@@ -4847,6 +5123,7 @@ async function initApp() {
     const colorWorkbook = calculateColorPrintWorkbook(state, config);
     const credentialWorkbook = calculateCredentialWorkbook(state, config);
     const readyWorkbook = calculateReadyProductWorkbook(state, config);
+    const businessCardWorkbook = calculateBusinessCardWorkbook(state);
     const m2Workbook = calculateM2WorkbookFromConfig(state, config);
     const resinWorkbook = calculateResinWorkbook(state, config);
     const m2Catalog = getM2Catalog(config);
@@ -4870,6 +5147,11 @@ async function initApp() {
     document.getElementById("ready-summary-quantity").textContent = formatInteger(readyWorkbook.totals.totalQuantity);
     document.getElementById("ready-summary-total").textContent = formatCurrency(readyWorkbook.totals.totalGeneral);
     document.getElementById("ready-summary-average").textContent = formatCurrency(readyWorkbook.totals.averageValue);
+
+    document.getElementById("business-summary-active").textContent = formatInteger(businessCardWorkbook.totals.activeLines);
+    document.getElementById("business-summary-quantity").textContent = formatInteger(businessCardWorkbook.totals.totalQuantity);
+    document.getElementById("business-summary-total").textContent = formatCurrency(businessCardWorkbook.totals.totalGeneral);
+    document.getElementById("business-summary-average").textContent = formatCurrency(businessCardWorkbook.totals.averageValue);
 
     document.getElementById("m2-summary-active").textContent = formatInteger(m2Workbook.totals.activeLines);
     document.getElementById("m2-summary-quantity").textContent = formatInteger(m2Workbook.totals.totalQuantity);
@@ -5021,6 +5303,39 @@ async function initApp() {
       readyWorkbook.activeRows.length > 0 ? "success" : "neutral"
     );
 
+    businessCardRowsTableBody.innerHTML = businessCardWorkbook.rows
+      .map((row, index) => {
+        const material = getBusinessCardMaterial(row.materialId, row.productionType);
+        return `
+          <tr class="${row.active ? "" : "is-empty"}" data-business-card-row-index="${index}">
+            <td><strong>${String(index + 1).padStart(2, "0")}</strong></td>
+            <td><input class="cell-input description" name="description" value="${escapeHtml(row.description)}" placeholder="Ex.: Cartão de visita"></td>
+            <td><select class="cell-select" name="productionType">${buildOptions(OPTIONS.businessCardProductions, row.productionType)}</select></td>
+            <td><select class="cell-select" name="materialId">${buildBusinessCardMaterialOptions(row.productionType, row.materialId)}</select></td>
+            <td><select class="cell-select" name="printMode">${buildBusinessCardPrintModeOptions(material, row.printMode)}</select></td>
+            <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${escapeHtml(row.quantity)}" placeholder="0"></td>
+            <td><span class="readonly-value subtle">${escapeHtml(row.packageLabel || "-")}</span></td>
+            <td><span class="readonly-value subtle">${formatCurrency(row.baseTotal)}</span></td>
+            <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
+            <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
+            <td><input class="cell-input" name="discountValue" type="number" min="0" step="0.01" value="${escapeHtml(row.discountValue ?? 0)}" placeholder="0,00"></td>
+            <td><span class="readonly-value">${formatCurrency(row.total)}</span></td>
+            <td><span class="readonly-value subtle">${formatCurrency(row.unitValue)}</span></td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    businessCardWarningList.innerHTML = businessCardWorkbook.warnings.length
+      ? businessCardWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
+      : `<div class="warning-item is-success">Sem alertas no momento. O app usa o próximo pacote da tabela quando a quantidade não existe exatamente.</div>`;
+    setBusinessCardFeedback(
+      businessCardWorkbook.activeRows.length > 0
+        ? "Cartões de visitas atualizados com sucesso."
+        : "Use esta aba para orçar vários modelos de cartões de visita no mesmo orçamento.",
+      businessCardWorkbook.activeRows.length > 0 ? "success" : "neutral"
+    );
+
     m2WarningList.innerHTML = m2Workbook.warnings.length
       ? m2Workbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
       : `<div class="warning-item is-success">Sem alertas no momento. Preencha as medidas e acabamentos para o app montar o valor final com segurança.</div>`;
@@ -5099,8 +5414,8 @@ async function initApp() {
       ? resinWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
       : `<div class="warning-item is-success">Sem alertas no momento. Você pode montar várias medidas de resinados no mesmo orçamento por aqui.</div>`;
 
-    quotePreview.innerHTML = createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, m2Workbook, resinWorkbook);
-    return { workbook, colorWorkbook, credentialWorkbook, readyWorkbook, m2Workbook, resinWorkbook };
+    quotePreview.innerHTML = createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, m2Workbook, resinWorkbook);
+    return { workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, m2Workbook, resinWorkbook };
   }
 
   function closeM2FinishPopover() {
@@ -5512,6 +5827,12 @@ async function initApp() {
     renderRowsAndSummary();
   });
 
+  document.getElementById("add-business-card-row-button").addEventListener("click", () => {
+    state.businessCardItems.push(createDefaultBusinessCardRow(state.businessCardItems.length));
+    persistLocalOnly();
+    renderRowsAndSummary();
+  });
+
   document.getElementById("add-m2-row-button").addEventListener("click", () => {
     state.m2Items.push(createDefaultM2Row(state.m2Items.length));
     persist();
@@ -5591,6 +5912,23 @@ async function initApp() {
     persistLocalOnly();
     renderRowsAndSummary();
     setReadyFeedback("As linhas de produtos prontos foram limpas.", "warning");
+  });
+
+  document.getElementById("clear-business-card-rows-button").addEventListener("click", async () => {
+    if (!(await confirmAppAction({
+      kicker: "Limpeza",
+      title: "Limpar cartões de visitas",
+      message: "Deseja realmente limpar todas as linhas da aba de cartões de visitas?",
+      confirmLabel: "Limpar",
+      danger: true,
+    }))) {
+      setBusinessCardFeedback("A limpeza dos cartões foi cancelada.", "warning");
+      return;
+    }
+    state.businessCardItems = Array.from({ length: 5 }, (_, index) => createDefaultBusinessCardRow(index));
+    persistLocalOnly();
+    renderRowsAndSummary();
+    setBusinessCardFeedback("As linhas de cartões de visitas foram limpas.", "warning");
   });
 
   document.getElementById("clear-m2-rows-button").addEventListener("click", async () => {
@@ -5800,6 +6138,43 @@ async function initApp() {
       row[field] = toMoneyNumber(target.value);
     } else if (field === "discountType") {
       row[field] = normalizeDiscountType(target.value);
+    } else {
+      row[field] = target.value;
+    }
+    persistLocalOnly();
+    renderRowsAndSummary();
+  });
+
+  businessCardRowsTableBody.addEventListener("change", (event) => {
+    const target = event.target;
+    const rowElement = target.closest("tr[data-business-card-row-index]");
+    if (!rowElement) {
+      return;
+    }
+    const row = state.businessCardItems[Number(rowElement.dataset.businessCardRowIndex)];
+    const field = target.name;
+    if (!field || !row) {
+      return;
+    }
+
+    if (field === "quantity") {
+      row[field] = toWholeNumber(target.value);
+    } else if (field === "artCreationFee" || field === "discountValue") {
+      row[field] = toMoneyNumber(target.value);
+    } else if (field === "discountType") {
+      row[field] = normalizeDiscountType(target.value);
+    } else if (field === "productionType") {
+      row.productionType = OPTIONS.businessCardProductions.includes(target.value) ? target.value : "Laser";
+      const material = getBusinessCardMaterials(row.productionType)[0];
+      row.materialId = material?.id || "";
+      row.printMode = getBusinessCardValidPrintMode(material, row.printMode);
+    } else if (field === "materialId") {
+      const material = getBusinessCardMaterial(target.value, row.productionType);
+      row.materialId = material?.id || "";
+      row.printMode = getBusinessCardValidPrintMode(material, row.printMode);
+    } else if (field === "printMode") {
+      const material = getBusinessCardMaterial(row.materialId, row.productionType);
+      row.printMode = getBusinessCardValidPrintMode(material, target.value);
     } else {
       row[field] = target.value;
     }
@@ -6088,7 +6463,7 @@ async function initApp() {
 
     const sectionButton = event.target.closest("[data-config-section]");
     if (sectionButton) {
-      activeConfigSection = sectionButton.dataset.configSection === "impressos" || sectionButton.dataset.configSection === "credenciais" || sectionButton.dataset.configSection === "produtos-prontos" || sectionButton.dataset.configSection === "m2" || sectionButton.dataset.configSection === "resinados"
+      activeConfigSection = sectionButton.dataset.configSection === "impressos" || sectionButton.dataset.configSection === "credenciais" || sectionButton.dataset.configSection === "produtos-prontos" || sectionButton.dataset.configSection === "cartoes" || sectionButton.dataset.configSection === "m2" || sectionButton.dataset.configSection === "resinados"
         ? sectionButton.dataset.configSection
         : "calculo";
       saveConfigSection(activeConfigSection);
@@ -6361,9 +6736,10 @@ async function initApp() {
     const colorWorkbook = calculateColorPrintWorkbook(state, config);
     const credentialWorkbook = calculateCredentialWorkbook(state, config);
     const readyWorkbook = calculateReadyProductWorkbook(state, config);
+    const businessCardWorkbook = calculateBusinessCardWorkbook(state);
     const m2Workbook = calculateM2WorkbookFromConfig(state, config);
     const resinWorkbook = calculateResinWorkbook(state, config);
-    const text = createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, m2Workbook, resinWorkbook);
+    const text = createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, m2Workbook, resinWorkbook);
     try {
       await navigator.clipboard.writeText(text);
       setMainFeedback("Resumo do orçamento copiado com sucesso.", "success");
@@ -6437,11 +6813,12 @@ async function initApp() {
     const colorWorkbook = calculateColorPrintWorkbook(state, config);
     const credentialWorkbook = calculateCredentialWorkbook(state, config);
     const readyWorkbook = calculateReadyProductWorkbook(state, config);
+    const businessCardWorkbook = calculateBusinessCardWorkbook(state);
     const m2Workbook = calculateM2WorkbookFromConfig(state, config);
     const resinWorkbook = calculateResinWorkbook(state, config);
     const title = state.client.name.trim() || `Orçamento ${new Date().toLocaleDateString("pt-BR")}`;
-    const summary = createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, m2Workbook, resinWorkbook).split("\n").slice(0, 10).join(" • ");
-    const subtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
+    const summary = createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, m2Workbook, resinWorkbook).split("\n").slice(0, 10).join(" • ");
+    const subtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
     const quoteDiscount = calculateDiscount(subtotal, state.quoteDiscountType, state.quoteDiscountValue);
 
     state.quoteHistory.unshift({
