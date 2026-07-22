@@ -930,7 +930,7 @@ function createDefaultResinRow(index) {
 function createDefaultBusinessCardRow(index) {
   return {
     id: `business-card-row-${index + 1}`,
-    description: "Cartão de visita",
+    description: "",
     productionType: "Laser",
     materialId: BUSINESS_CARD_CATALOG[0]?.id || "",
     printMode: "Só frente",
@@ -1845,7 +1845,22 @@ function getBusinessCardTier(material, printMode, quantity) {
   if (!tiers.length) {
     return null;
   }
-  return tiers.find((tier) => quantity <= tier.quantity) || tiers[tiers.length - 1];
+  return tiers.find((tier) => quantity === tier.quantity) || null;
+}
+
+function getBusinessCardQuantityOptions(material, printMode) {
+  return [...(material?.modes?.[printMode] || [])].sort((a, b) => a.quantity - b.quantity);
+}
+
+function normalizeBusinessCardRowChoice(row) {
+  const material = getBusinessCardMaterial(row.materialId, row.productionType);
+  row.materialId = material?.id || "";
+  row.printMode = getBusinessCardValidPrintMode(material, row.printMode);
+  const options = getBusinessCardQuantityOptions(material, row.printMode);
+  const quantity = toWholeNumber(row.quantity);
+  if (quantity > 0 && !options.some((tier) => tier.quantity === quantity)) {
+    row.quantity = options[0]?.quantity || 0;
+  }
 }
 
 function buildBusinessCardMaterialOptions(productionType, currentValue) {
@@ -2182,12 +2197,10 @@ function calculateBusinessCardWorkbook(state) {
     const artCreationFee = getArtCreationFee(row);
     const rowDiscount = applyRowDiscount(row, baseTotal + artCreationFee, quantity);
     const warning = active && quantity <= 0
-      ? `Cartão ${index + 1}: informe uma quantidade maior que zero.`
+      ? `Cartão ${index + 1}: escolha uma quantidade da tabela.`
       : active && !tier
-        ? `Cartão ${index + 1}: não existe tabela para essa combinação de papel e impressão.`
-        : active && tier && quantity > tier.quantity
-          ? `Cartão ${index + 1}: quantidade acima da maior faixa cadastrada. O valor foi calculado pelo pacote de ${formatInteger(tier.quantity)} cartões.`
-          : "";
+        ? `Cartão ${index + 1}: escolha uma quantidade válida para essa combinação de papel e impressão.`
+        : "";
 
     return {
       ...row,
@@ -3257,7 +3270,7 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
     createConfigCardMarkup(
       "Tabela de cartões",
       "Inclui produção laser e offset, com opções de só frente e frente e verso conforme a tabela enviada.",
-      `<p class="helper-text">Use a aba Cartões de visitas para selecionar produção, papel/acabamento, impressão e quantidade. O sistema usa automaticamente o pacote da tabela mais próximo.</p>`
+      `<p class="helper-text">Use a aba Cartões de visitas para selecionar produção, papel/acabamento, impressão e somente uma das quantidades cadastradas na tabela.</p>`
     ),
   ];
 
@@ -4550,6 +4563,7 @@ async function initApp() {
     "select:not([disabled])",
     "textarea:not([disabled]):not([readonly])",
     "button[data-credential-lanyard-toggle]:not([disabled])",
+    "button[data-business-card-quantity-toggle]:not([disabled])",
     "button[data-m2-finish-toggle]:not([disabled])",
   ].join(", ");
 
@@ -4590,7 +4604,7 @@ async function initApp() {
       return false;
     }
 
-    if (target.closest("#credential-lanyard-popover") || target.closest("#m2-finish-popover")) {
+    if (target.closest("#credential-lanyard-popover") || target.closest("#business-card-quantity-popover") || target.closest("#m2-finish-popover")) {
       return false;
     }
 
@@ -5313,7 +5327,12 @@ async function initApp() {
             <td><select class="cell-select" name="productionType">${buildOptions(OPTIONS.businessCardProductions, row.productionType)}</select></td>
             <td><select class="cell-select" name="materialId">${buildBusinessCardMaterialOptions(row.productionType, row.materialId)}</select></td>
             <td><select class="cell-select" name="printMode">${buildBusinessCardPrintModeOptions(material, row.printMode)}</select></td>
-            <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${escapeHtml(row.quantity)}" placeholder="0"></td>
+            <td>
+              <button class="button finish-picker-button" type="button" data-business-card-quantity-toggle>
+                <span>${row.quantity > 0 ? `${formatInteger(row.quantity)} cartões` : "Escolher"}</span>
+                <span class="finish-picker-chevron">▾</span>
+              </button>
+            </td>
             <td><span class="readonly-value subtle">${escapeHtml(row.packageLabel || "-")}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.baseTotal)}</span></td>
             <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
@@ -5328,7 +5347,7 @@ async function initApp() {
 
     businessCardWarningList.innerHTML = businessCardWorkbook.warnings.length
       ? businessCardWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
-      : `<div class="warning-item is-success">Sem alertas no momento. O app usa o próximo pacote da tabela quando a quantidade não existe exatamente.</div>`;
+      : `<div class="warning-item is-success">Sem alertas no momento. Escolha a quantidade pelo popover para usar somente os pacotes cadastrados.</div>`;
     setBusinessCardFeedback(
       businessCardWorkbook.activeRows.length > 0
         ? "Cartões de visitas atualizados com sucesso."
@@ -5430,6 +5449,72 @@ async function initApp() {
     if (existing) {
       existing.remove();
     }
+  }
+
+  function closeBusinessCardQuantityPopover() {
+    const existing = document.getElementById("business-card-quantity-popover");
+    if (existing) {
+      existing.remove();
+    }
+  }
+
+  function openBusinessCardQuantityPopover(rowIndex, anchor) {
+    const row = state.businessCardItems[rowIndex];
+    if (!row || !anchor) {
+      return;
+    }
+
+    closeBusinessCardQuantityPopover();
+
+    const material = getBusinessCardMaterial(row.materialId, row.productionType);
+    const printMode = getBusinessCardValidPrintMode(material, row.printMode);
+    const options = getBusinessCardQuantityOptions(material, printMode);
+    const selectedQuantity = toWholeNumber(row.quantity);
+    const popover = document.createElement("div");
+    popover.id = "business-card-quantity-popover";
+    popover.className = "finish-popover";
+    popover.innerHTML = `
+      <div class="finish-popover-header">
+        <div class="finish-popover-title">
+          <strong>Quantidade de cartões</strong>
+          <span>${escapeHtml(row.productionType)} | ${escapeHtml(material?.label || "")} | ${escapeHtml(printMode)}</span>
+        </div>
+        <button type="button" class="button finish-popover-close" data-business-card-quantity-close>Fechar</button>
+      </div>
+      <div class="finish-popover-options">
+        ${options.length ? options.map((tier) => `
+          <label class="finish-option">
+            <input type="radio" name="business-card-quantity-option" value="${escapeHtml(tier.quantity)}"${selectedQuantity === tier.quantity ? " checked" : ""} data-business-card-quantity-option>
+            <span>
+              <strong>${formatInteger(tier.quantity)} cartões</strong>
+              <small>${formatCurrency(tier.total)}</small>
+            </span>
+          </label>
+        `).join("") : `<div class="empty-state"><strong>Sem tabela para esta combinação</strong><span>Troque o papel/acabamento ou o modo de impressão.</span></div>`}
+      </div>
+    `;
+
+    document.body.appendChild(popover);
+    const rect = anchor.getBoundingClientRect();
+    popover.style.top = `${window.scrollY + rect.bottom + 8}px`;
+    popover.style.left = `${Math.min(window.scrollX + rect.left, window.scrollX + window.innerWidth - popover.offsetWidth - 16)}px`;
+
+    popover.addEventListener("change", (event) => {
+      const option = event.target.closest("[data-business-card-quantity-option]");
+      if (!option) {
+        return;
+      }
+      row.quantity = toWholeNumber(option.value);
+      persistLocalOnly();
+      closeBusinessCardQuantityPopover();
+      renderRowsAndSummary();
+    });
+
+    popover.addEventListener("click", (event) => {
+      if (event.target.closest("[data-business-card-quantity-close]")) {
+        closeBusinessCardQuantityPopover();
+      }
+    });
   }
 
   function openCredentialLanyardPopover(rowIndex, anchor) {
@@ -6132,9 +6217,7 @@ async function initApp() {
     if (!field || !row) {
       return;
     }
-    if (field === "quantity") {
-      row[field] = toWholeNumber(target.value);
-    } else if (field === "artCreationFee" || field === "discountValue") {
+    if (field === "artCreationFee" || field === "discountValue") {
       row[field] = toMoneyNumber(target.value);
     } else if (field === "discountType") {
       row[field] = normalizeDiscountType(target.value);
@@ -6168,18 +6251,34 @@ async function initApp() {
       const material = getBusinessCardMaterials(row.productionType)[0];
       row.materialId = material?.id || "";
       row.printMode = getBusinessCardValidPrintMode(material, row.printMode);
+      normalizeBusinessCardRowChoice(row);
     } else if (field === "materialId") {
       const material = getBusinessCardMaterial(target.value, row.productionType);
       row.materialId = material?.id || "";
       row.printMode = getBusinessCardValidPrintMode(material, row.printMode);
+      normalizeBusinessCardRowChoice(row);
     } else if (field === "printMode") {
       const material = getBusinessCardMaterial(row.materialId, row.productionType);
       row.printMode = getBusinessCardValidPrintMode(material, target.value);
+      normalizeBusinessCardRowChoice(row);
     } else {
       row[field] = target.value;
     }
     persistLocalOnly();
     renderRowsAndSummary();
+  });
+
+  businessCardRowsTableBody.addEventListener("click", (event) => {
+    const toggle = event.target.closest("[data-business-card-quantity-toggle]");
+    if (!toggle) {
+      return;
+    }
+    event.preventDefault();
+    const rowElement = toggle.closest("tr[data-business-card-row-index]");
+    if (!rowElement) {
+      return;
+    }
+    openBusinessCardQuantityPopover(Number(rowElement.dataset.businessCardRowIndex), toggle);
   });
 
   credentialRowsTableBody.addEventListener("click", (event) => {
@@ -6260,11 +6359,14 @@ async function initApp() {
       || event.target.closest("#m2-finish-popover")
       || event.target.closest("[data-credential-lanyard-toggle]")
       || event.target.closest("#credential-lanyard-popover")
+      || event.target.closest("[data-business-card-quantity-toggle]")
+      || event.target.closest("#business-card-quantity-popover")
     ) {
       return;
     }
     closeM2FinishPopover();
     closeCredentialLanyardPopover();
+    closeBusinessCardQuantityPopover();
   });
 
   document.getElementById("apply-group-selected").addEventListener("click", () => {
