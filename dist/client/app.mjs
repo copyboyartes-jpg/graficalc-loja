@@ -494,6 +494,13 @@ function createDefaultConfig() {
         { min: 30, value: 5.0, label: "30 a 49" },
         { min: 50, value: 4.0, label: "50 ou mais" },
       ],
+      printedPackages: [
+        { quantity: 10, total: 80, label: "10 un" },
+        { quantity: 20, total: 130, label: "20 un" },
+        { quantity: 30, total: 150, label: "30 un" },
+        { quantity: 40, total: 200, label: "40 un" },
+        { quantity: 50, total: 200, label: "50 un" },
+      ],
     },
     cutPricing: {
       upToFiveSheets: [
@@ -860,6 +867,9 @@ function mergeConfig(candidate) {
       printed: Array.isArray(candidate.credentialLanyardPricing.printed)
         ? candidate.credentialLanyardPricing.printed
         : merged.credentialLanyardPricing.printed,
+      printedPackages: Array.isArray(candidate.credentialLanyardPricing.printedPackages)
+        ? candidate.credentialLanyardPricing.printedPackages
+        : merged.credentialLanyardPricing.printedPackages,
     };
   }
 
@@ -1510,19 +1520,40 @@ function isReadyProductRowActive(row) {
 
 function getReadyProductSelection(config, productType, quantity = 0) {
   const pricing = config?.credentialLanyardPricing || {};
-  const printedTiers = Array.isArray(pricing.printed) ? pricing.printed : [];
-  const printedUnit = lookupTier(printedTiers, Math.max(1, Number(quantity || 0)));
+  const printedPackages = Array.isArray(pricing.printedPackages) ? pricing.printedPackages : [];
+  const requestedQuantity = Math.max(1, toWholeNumber(quantity));
+  const packageQuantity = Math.ceil(requestedQuantity / 10) * 10;
+  const packageTier =
+    printedPackages.find((tier) => toWholeNumber(tier.quantity) >= packageQuantity) ||
+    printedPackages[printedPackages.length - 1] ||
+    null;
+  const tierQuantity = toWholeNumber(packageTier?.quantity);
+  const printedPackageQuantity = Math.max(packageQuantity, tierQuantity);
+  const printedPackageTotal = packageTier
+    ? printedPackageQuantity > tierQuantity && tierQuantity > 0
+      ? printedPackageQuantity * (toMoneyNumber(packageTier.total) / tierQuantity)
+      : toMoneyNumber(packageTier.total)
+    : 0;
   const options = READY_PRODUCT_CATALOG.map((item) => {
     let unitPrice = toMoneyNumber(item.unitPrice);
+    let totalPrice = null;
+    let billedQuantity = requestedQuantity;
+    let packageLabel = "";
     if (item.pricingMode === "plainBadge") {
       unitPrice = toMoneyNumber(pricing.plainBadge);
     } else if (item.pricingMode === "printedBadge") {
-      unitPrice = toMoneyNumber(printedUnit);
+      billedQuantity = printedPackageQuantity;
+      totalPrice = printedPackageTotal;
+      unitPrice = billedQuantity > 0 ? totalPrice / billedQuantity : 0;
+      packageLabel = packageTier?.label || `${billedQuantity} un`;
     }
 
     return {
       ...item,
       unitPrice,
+      totalPrice,
+      billedQuantity,
+      packageLabel,
     };
   });
   return options.find((item) => item.id === productType) || options[0];
@@ -1697,20 +1728,30 @@ function calculateReadyProductWorkbook(state, config) {
     const active = isReadyProductRowActive(row);
     const product = getReadyProductSelection(config, row.productType, quantity);
     const description = (row.description || "").trim();
-    const total = quantity * product.unitPrice;
+    const total = product.totalPrice === null || product.totalPrice === undefined
+      ? quantity * product.unitPrice
+      : product.totalPrice;
+    const packageWarning =
+      active &&
+      product.pricingMode === "printedBadge" &&
+      quantity > 0 &&
+      product.billedQuantity > quantity
+        ? `Produto pronto ${index + 1}: cordão estampado vendido de 10 em 10. ${quantity} un foi calculado como ${product.billedQuantity} un.`
+        : "";
 
     return {
       ...row,
       active,
       valid: active ? quantity > 0 : false,
       quantity,
+      billedQuantity: product.billedQuantity || quantity,
       productType: product.label,
       productLabel: product.label,
       description: description || product.label,
-      unitPrice: product.unitPrice,
+      unitPrice: product.totalPrice === null || product.totalPrice === undefined || quantity <= 0 ? product.unitPrice : total / quantity,
       total,
       unitValue: quantity > 0 ? total / quantity : 0,
-      warning: active && quantity <= 0 ? `Produto pronto ${index + 1}: informe uma quantidade maior que zero.` : "",
+      warning: active && quantity <= 0 ? `Produto pronto ${index + 1}: informe uma quantidade maior que zero.` : packageWarning,
     };
   });
 
@@ -3120,25 +3161,25 @@ function createCredentialLanyardPricingMarkup(credentialLanyardPricing) {
       `
         <div class="preset-card-head">
           <div>
-            <strong>Faixas de preço</strong>
-            <span class="helper-text">A mesma tabela vale para jacaré e mosquetão.</span>
+            <strong>Pacotes de venda</strong>
+            <span class="helper-text">A mesma tabela vale para jacaré e mosquetão. O cálculo sempre fecha no próximo múltiplo de 10.</span>
           </div>
           <div class="toolbar">
-            <button class="button button-small" type="button" data-add-credential-lanyard-band>Adicionar faixa</button>
+            <button class="button button-small" type="button" data-add-credential-lanyard-band>Adicionar pacote</button>
           </div>
         </div>
         ${createTableMarkup(
-          ["Qtd mínima", "Valor", "Faixa"],
-          pricing.printed || [],
-          "credential-lanyard-printed",
+          ["Quantidade", "Valor total", "Pacote"],
+          pricing.printedPackages || [],
+          "credential-lanyard-printed-package",
           [
-            { key: "min", type: "number", step: "1" },
-            { key: "value", type: "number", step: "0.01" },
+            { key: "quantity", type: "number", step: "10" },
+            { key: "total", type: "number", step: "0.01" },
             { key: "label", type: "text" },
           ]
         )}
       `,
-      "Essas faixas são usadas quando a credencial for vendida com cordão estampado."
+      "Esses pacotes são usados na aba de produtos prontos quando o cordão estampado for vendido avulso."
     ),
   ].join("");
 }
@@ -3405,6 +3446,7 @@ function getConfigArrayByPrefix(config, prefix) {
   if (prefix === "cut-up5") return config.cutPricing.upToFiveSheets;
   if (prefix === "cut-above5") return config.cutPricing;
   if (prefix === "credential-lanyard-printed") return config.credentialLanyardPricing?.printed;
+  if (prefix === "credential-lanyard-printed-package") return config.credentialLanyardPricing?.printedPackages;
   if (prefix.startsWith("m2-")) return config.m2Pricing[prefix.slice(3)];
   if (prefix.startsWith("color-")) return config.colorPrintPricing[prefix.slice(6)];
   if (prefix.startsWith("cover-")) {
@@ -5720,11 +5762,11 @@ async function initApp() {
       } else {
         array[rowIndex][key] = target.value;
       }
-    } else if (key === "min" || key === "maxSheets") {
+    } else if (key === "min" || key === "maxSheets" || key === "quantity") {
       array[rowIndex][key] = toWholeNumber(target.value);
     } else if (key === "minUp") {
       array[rowIndex][key] = toWholeNumber(target.value);
-    } else if (key === "value") {
+    } else if (key === "value" || key === "total") {
       array[rowIndex][key] = toMoneyNumber(target.value);
     } else {
       array[rowIndex][key] = target.value;
@@ -5852,18 +5894,19 @@ async function initApp() {
         return;
       }
 
-      const addCredentialLanyardBandButton = event.target.closest("[data-add-credential-lanyard-band]");
-      if (addCredentialLanyardBandButton) {
-        const bands = config.credentialLanyardPricing?.printed || (config.credentialLanyardPricing.printed = []);
-        const lastBand = bands[bands.length - 1] || { min: 1, value: 0, label: "Nova faixa" };
+    const addCredentialLanyardBandButton = event.target.closest("[data-add-credential-lanyard-band]");
+    if (addCredentialLanyardBandButton) {
+        const bands = config.credentialLanyardPricing?.printedPackages || (config.credentialLanyardPricing.printedPackages = []);
+        const lastBand = bands[bands.length - 1] || { quantity: 0, total: 0, label: "Novo pacote" };
+        const nextQuantity = Number(lastBand.quantity || 0) + 10;
         bands.push({
-          min: Number(lastBand.min || 0) + 10,
-          value: Number(lastBand.value || 0),
-          label: "Nova faixa",
+          quantity: nextQuantity,
+          total: Number(lastBand.total || 0),
+          label: `${nextQuantity} un`,
         });
         persist();
         renderConfig();
-        setConfigStatus("Nova faixa criada para cordão estampado.", "success");
+        setConfigStatus("Novo pacote criado para cordão estampado.", "success");
         return;
       }
 
