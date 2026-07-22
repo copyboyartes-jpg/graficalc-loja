@@ -149,7 +149,7 @@ export default {
 
     const directResponse = await fetchAsset(env, request, url.pathname);
     if (directResponse.status !== 404) {
-      if (url.pathname === "/" || url.pathname.endsWith(".html")) {
+      if (url.pathname === "/" || url.pathname.endsWith(".html") || url.pathname.endsWith(".mjs") || url.pathname.endsWith(".js") || url.pathname.endsWith(".css")) {
         return withCacheHeaders(directResponse, "no-store");
       }
       return directResponse;
