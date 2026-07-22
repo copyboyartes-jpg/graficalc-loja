@@ -50,6 +50,9 @@ const OPTIONS = {
   ],
   businessCardProductions: ["Laser", "Offset"],
   businessCardPrintModes: ["Só frente", "Frente e verso"],
+  flyerProductions: ["Laser", "Offset"],
+  flyerPrintModes: ["Só frente", "Frente e verso"],
+  flyerFolds: ["Sem dobra", "1 dobra", "2 dobras"],
   spiralOptions: ["Completa", "Sem capas plásticas"],
   calcModes: ["Independente", "Somar quantidades"],
   m2CalcModes: ["Independente", "Somar materiais iguais"],
@@ -294,6 +297,36 @@ const BUSINESS_CARD_CATALOG = [
     },
   },
 ];
+
+const FLYER_CATALOG = [
+  ...["Couche 120g", "Offset 120g"].flatMap((paper) => [
+    { production: "Laser", paper, size: "10x7cm", modes: { "Só frente": [[500, 131], [1000, 235], [2000, 433], [5000, 1040]], "Frente e verso": [[500, 261], [1000, 450], [2000, 830], [5000, 1870]] } },
+    { production: "Laser", paper, size: "10x14cm", modes: { "Só frente": [[200, 104], [500, 197], [1000, 362], [2000, 709], [5000, 1573]], "Frente e verso": [[200, 205], [500, 393], [1000, 707], [2000, 1337], [5000, 2831]] } },
+    { production: "Laser", paper, size: "14x20cm", modes: { "Só frente": [[100, 78], [200, 142], [300, 189], [500, 300], [750, 433], [1000, 591], [1500, 865], [2000, 1180], [3000, 1650]], "Frente e verso": [[100, 155], [200, 276], [300, 370], [500, 582], [750, 850], [1000, 1150], [1500, 1650], [2000, 2202], [3000, 3146]] } },
+    { production: "Laser", paper, size: "9,5x20cm", modes: { "Só frente": [[200, 105], [500, 182], [750, 321], [1000, 432], [2000, 866], [3000, 1225], [5000, 2163]], "Frente e verso": [[200, 208], [500, 432], [750, 624], [1000, 840], [2000, 1644], [3000, 2508], [5000, 4152]] } },
+    { production: "Laser", paper, size: "20x28,5cm", modes: { "Só frente": [[100, 138], [200, 268], [300, 398], [400, 519], [500, 657], [1000, 1297], [1500, 1947]], "Frente e verso": [[100, 288], [200, 514], [300, 796], [400, 1021], [500, 1297], [1000, 2561], [1500, 3875]] } },
+  ]),
+  { production: "Offset", paper: "Couche 90g", size: "10x14cm", modes: { "Só frente": [[2500, 290], [5000, 460], [10000, 684]], "Frente e verso": [[2500, 325], [5000, 470], [10000, 761]] } },
+  { production: "Offset", paper: "Couche 90g", size: "14x20cm", modes: { "Só frente": [[2500, 455], [5000, 726], [10000, 1268]], "Frente e verso": [[2500, 510], [5000, 838], [10000, 1413]] } },
+  { production: "Offset", paper: "Couche 90g", size: "20x28cm", modes: { "Só frente": [[2500, 891], [5000, 1345], [10000, 2344]], "Frente e verso": [[2500, 956], [5000, 1549], [10000, 2617]] } },
+  { production: "Offset", paper: "Couche 90g", size: "28x40cm", modes: { "Só frente": [[2500, 1653], [5000, 2490]], "Frente e verso": [[2500, 1742], [5000, 2871]] } },
+  { production: "Offset", paper: "Couche 115g", size: "10x15cm", modes: { "Só frente": [[2500, 379], [5000, 467], [10000, 924]], "Frente e verso": [[2500, 445], [5000, 527], [10000, 976]] } },
+  { production: "Offset", paper: "Couche 115g", size: "10x20cm", modes: { "Só frente": [[2500, 440], [5000, 697]], "Frente e verso": [[2500, 531], [5000, 784]] } },
+  { production: "Offset", paper: "Couche 115g", size: "15x20cm", modes: { "Só frente": [[2500, 597], [5000, 840], [10000, 1715]], "Frente e verso": [[2500, 702], [5000, 924], [10000, 1806]] } },
+  { production: "Offset", paper: "Couche 115g", size: "20x30cm", modes: { "Só frente": [[2500, 1101], [5000, 1719], [10000, 3180]], "Frente e verso": [[2500, 1297], [5000, 1806], [10000, 3591]] } },
+  { production: "Offset", paper: "Couche 115g", size: "30x40cm", modes: { "Só frente": [[2500, 2029], [5000, 3180]], "Frente e verso": [[2500, 2396], [5000, 3591]] } },
+  { production: "Offset", paper: "Couche 150g", size: "10x15cm", modes: { "Só frente": [[2500, 440], [5000, 796], [10000, 1475]], "Frente e verso": [[2500, 458], [5000, 808], [10000, 1497]] } },
+  { production: "Offset", paper: "Couche 150g", size: "10,5x21cm", modes: { "Só frente": [[2500, 796], [5000, 1475]], "Frente e verso": [[2500, 808], [5000, 1497]] } },
+  { production: "Offset", paper: "Couche 150g", size: "15x21cm", modes: { "Só frente": [[2500, 796], [5000, 1475], [10000, 2484]], "Frente e verso": [[2500, 808], [5000, 1376], [10000, 2771]] } },
+  { production: "Offset", paper: "Couche 150g", size: "20x29,7cm", modes: { "Só frente": [[2500, 1475], [5000, 2732], [10000, 5412]], "Frente e verso": [[2500, 1497], [5000, 2771], [10000, 5490]] } },
+].map((item, index) => ({
+  id: `flyer-${index + 1}`,
+  ...item,
+  modes: Object.fromEntries(Object.entries(item.modes).map(([mode, tiers]) => [
+    mode,
+    tiers.map(([quantity, total]) => ({ quantity, total })),
+  ])),
+}));
 
 const READY_PRODUCT_CATALOG = [
   {
@@ -943,6 +976,21 @@ function createDefaultBusinessCardRow(index) {
   };
 }
 
+function createDefaultFlyerRow(index) {
+  return {
+    id: `flyer-row-${index + 1}`,
+    description: "",
+    productionType: "Laser",
+    catalogId: FLYER_CATALOG[0]?.id || "",
+    printMode: "Só frente",
+    quantity: 0,
+    foldType: "Sem dobra",
+    artCreationFee: 0,
+    discountType: "R$",
+    discountValue: 0,
+  };
+}
+
 function getDefaultM2Description(productId) {
   return DEFAULT_M2_DESCRIPTIONS[productId] || "";
 }
@@ -973,6 +1021,7 @@ function createDefaultState() {
     m2Items: Array.from({ length: 5 }, (_, index) => createDefaultM2Row(index)),
     resinItems: Array.from({ length: 5 }, (_, index) => createDefaultResinRow(index)),
     businessCardItems: Array.from({ length: 5 }, (_, index) => createDefaultBusinessCardRow(index)),
+    flyerItems: Array.from({ length: 5 }, (_, index) => createDefaultFlyerRow(index)),
     client: {
       name: "",
       contact: "",
@@ -1010,7 +1059,7 @@ function normalizeCatalogSections(list) {
       continue;
     }
     if (Array.isArray(item.products)) {
-      const tab = item.tab === "calculo" || item.tab === "impressos" || item.tab === "credenciais" || item.tab === "produtos-prontos" || item.tab === "cartoes" || item.tab === "m2" ? item.tab : "m2";
+      const tab = item.tab === "calculo" || item.tab === "impressos" || item.tab === "credenciais" || item.tab === "produtos-prontos" || item.tab === "cartoes" || item.tab === "panfletos" || item.tab === "m2" ? item.tab : "m2";
       for (const product of item.products) {
         if (!product || typeof product !== "object") {
           continue;
@@ -1024,7 +1073,7 @@ function normalizeCatalogSections(list) {
       }
       continue;
     }
-    if (item.tab === "calculo" || item.tab === "impressos" || item.tab === "credenciais" || item.tab === "produtos-prontos" || item.tab === "cartoes" || item.tab === "m2") {
+    if (item.tab === "calculo" || item.tab === "impressos" || item.tab === "credenciais" || item.tab === "produtos-prontos" || item.tab === "cartoes" || item.tab === "panfletos" || item.tab === "m2") {
       normalized.push({
         id: item.id || `produto-${Date.now()}`,
         label: item.label || item.name || "Novo produto",
@@ -1353,6 +1402,21 @@ function mergeState(candidate) {
     }));
   }
 
+  if (Array.isArray(candidate.flyerItems) && candidate.flyerItems.length > 0) {
+    state.flyerItems = candidate.flyerItems.map((row, index) => ({
+      ...createDefaultFlyerRow(index),
+      ...row,
+      productionType: OPTIONS.flyerProductions.includes(row?.productionType) ? row.productionType : "Laser",
+      printMode: OPTIONS.flyerPrintModes.includes(row?.printMode) ? row.printMode : "Só frente",
+      quantity: toWholeNumber(row?.quantity),
+      foldType: OPTIONS.flyerFolds.includes(row?.foldType) ? row.foldType : "Sem dobra",
+      artCreationFee: toMoneyNumber(row?.artCreationFee),
+      discountType: normalizeDiscountType(row?.discountType),
+      discountValue: toMoneyNumber(row?.discountValue),
+      id: row?.id || `flyer-row-${index + 1}`,
+    }));
+  }
+
   return state;
 }
 
@@ -1451,7 +1515,7 @@ function loadConfigSection() {
 
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.configSection);
-    return raw === "impressos" || raw === "credenciais" || raw === "produtos-prontos" || raw === "cartoes" || raw === "m2" || raw === "resinados" ? raw : "calculo";
+    return raw === "impressos" || raw === "credenciais" || raw === "produtos-prontos" || raw === "cartoes" || raw === "panfletos" || raw === "m2" || raw === "resinados" ? raw : "calculo";
   } catch {
     return "calculo";
   }
@@ -1461,7 +1525,7 @@ function saveConfigSection(section) {
   if (typeof localStorage === "undefined") {
     return;
   }
-  const safeSection = section === "impressos" || section === "credenciais" || section === "produtos-prontos" || section === "cartoes" || section === "m2" || section === "resinados" ? section : "calculo";
+  const safeSection = section === "impressos" || section === "credenciais" || section === "produtos-prontos" || section === "cartoes" || section === "panfletos" || section === "m2" || section === "resinados" ? section : "calculo";
   localStorage.setItem(STORAGE_KEYS.configSection, safeSection);
 }
 
@@ -1885,6 +1949,79 @@ function buildBusinessCardQuantityOptions(material, printMode, currentValue) {
   ].join("");
 }
 
+function isFlyerRowActive(row) {
+  return Boolean(row.description?.trim() || Number(row.quantity) > 0);
+}
+
+function getFlyerCatalogByProduction(productionType) {
+  const production = OPTIONS.flyerProductions.includes(productionType) ? productionType : "Laser";
+  return FLYER_CATALOG.filter((item) => item.production === production);
+}
+
+function getFlyerSelection(catalogId, productionType) {
+  const options = getFlyerCatalogByProduction(productionType);
+  return options.find((item) => item.id === catalogId) || options[0] || FLYER_CATALOG[0];
+}
+
+function getFlyerValidPrintMode(item, printMode) {
+  const modes = Object.keys(item?.modes || {});
+  return modes.includes(printMode) ? printMode : modes[0] || "Só frente";
+}
+
+function getFlyerQuantityOptions(item, printMode) {
+  return [...(item?.modes?.[printMode] || [])].sort((a, b) => a.quantity - b.quantity);
+}
+
+function getFlyerTier(item, printMode, quantity) {
+  return getFlyerQuantityOptions(item, printMode).find((tier) => tier.quantity === quantity) || null;
+}
+
+function normalizeFlyerRowChoice(row) {
+  const item = getFlyerSelection(row.catalogId, row.productionType);
+  row.catalogId = item?.id || "";
+  row.printMode = getFlyerValidPrintMode(item, row.printMode);
+  const options = getFlyerQuantityOptions(item, row.printMode);
+  const quantity = toWholeNumber(row.quantity);
+  if (quantity > 0 && !options.some((tier) => tier.quantity === quantity)) {
+    row.quantity = options[0]?.quantity || 0;
+  }
+}
+
+function buildFlyerCatalogOptions(productionType, currentValue) {
+  return getFlyerCatalogByProduction(productionType)
+    .map((item) => `<option value="${escapeHtml(item.id)}"${item.id === currentValue ? " selected" : ""}>${escapeHtml(`${item.paper} | ${item.size}`)}</option>`)
+    .join("");
+}
+
+function buildFlyerPrintModeOptions(item, currentValue) {
+  return Object.keys(item?.modes || {})
+    .map((mode) => `<option value="${escapeHtml(mode)}"${mode === currentValue ? " selected" : ""}>${escapeHtml(mode)}</option>`)
+    .join("");
+}
+
+function buildFlyerQuantityOptions(item, printMode, currentValue) {
+  return [
+    `<option value="0"${toWholeNumber(currentValue) <= 0 ? " selected" : ""}>Escolher</option>`,
+    ...getFlyerQuantityOptions(item, printMode).map((tier) => `<option value="${escapeHtml(tier.quantity)}"${toWholeNumber(currentValue) === tier.quantity ? " selected" : ""}>${formatInteger(tier.quantity)} un - ${formatCurrency(tier.total)}</option>`),
+  ].join("");
+}
+
+function calculateFlyerFoldTotal(quantity, foldType) {
+  if (foldType === "1 dobra") {
+    if (quantity >= 1000) {
+      return Math.ceil(quantity / 1000) * 50;
+    }
+    return quantity >= 100 ? 10 + Math.ceil(quantity / 100) * 5 : 0;
+  }
+  if (foldType === "2 dobras") {
+    if (quantity >= 1000) {
+      return Math.ceil(quantity / 1000) * 100;
+    }
+    return quantity >= 100 ? 20 + Math.ceil(quantity / 100) * 10 : 0;
+  }
+  return 0;
+}
+
 function getCredentialMaterialConfig(materialType) {
   const material = materialType || "Couche 250g";
   if (material === "PS 1mm") {
@@ -2224,6 +2361,64 @@ function calculateBusinessCardWorkbook(state) {
       packageQuantity: tier?.quantity || 0,
       packageLabel: tier ? `${formatInteger(tier.quantity)} cartões` : "-",
       baseTotal,
+      artCreationFee,
+      ...rowDiscount,
+      warning,
+    };
+  });
+
+  const activeRows = rows.filter((row) => row.active && row.valid);
+  const warnings = rows.filter((row) => row.warning).map((row) => row.warning);
+  const totalQuantity = activeRows.reduce((sum, row) => sum + row.quantity, 0);
+  const totalGeneral = activeRows.reduce((sum, row) => sum + row.total, 0);
+
+  return {
+    rows,
+    activeRows,
+    warnings,
+    totals: {
+      activeLines: activeRows.length,
+      totalQuantity,
+      totalGeneral,
+      averageValue: totalQuantity > 0 ? totalGeneral / totalQuantity : 0,
+    },
+  };
+}
+
+function calculateFlyerWorkbook(state) {
+  const rows = state.flyerItems.map((row, index) => {
+    const productionType = OPTIONS.flyerProductions.includes(row.productionType) ? row.productionType : "Laser";
+    const item = getFlyerSelection(row.catalogId, productionType);
+    const printMode = getFlyerValidPrintMode(item, row.printMode);
+    const quantity = toWholeNumber(row.quantity);
+    const active = isFlyerRowActive(row);
+    const tier = getFlyerTier(item, printMode, quantity);
+    const baseTotal = active && tier ? toMoneyNumber(tier.total) : 0;
+    const foldType = OPTIONS.flyerFolds.includes(row.foldType) ? row.foldType : "Sem dobra";
+    const foldTotal = active ? calculateFlyerFoldTotal(quantity, foldType) : 0;
+    const artCreationFee = getArtCreationFee(row);
+    const rowDiscount = applyRowDiscount(row, baseTotal + foldTotal + artCreationFee, quantity);
+    const warning = active && quantity <= 0
+      ? `Panfleto ${index + 1}: escolha uma quantidade da tabela.`
+      : active && !tier
+        ? `Panfleto ${index + 1}: escolha uma quantidade válida para essa combinação.`
+        : active && foldType !== "Sem dobra" && quantity < 100
+          ? `Panfleto ${index + 1}: dobra tem mínimo de 100 unidades.`
+          : "";
+
+    return {
+      ...row,
+      active,
+      valid: active ? quantity > 0 && Boolean(tier) : false,
+      productionType,
+      catalogId: item?.id || "",
+      paper: item?.paper || "",
+      size: item?.size || "",
+      printMode,
+      quantity,
+      foldType,
+      baseTotal,
+      foldTotal,
       artCreationFee,
       ...rowDiscount,
       warning,
@@ -2962,6 +3157,15 @@ function ensureBusinessCardRowCount(state, minimumCount) {
   }
 }
 
+function ensureFlyerRowCount(state, minimumCount) {
+  if (!Array.isArray(state.flyerItems)) {
+    state.flyerItems = [];
+  }
+  while (state.flyerItems.length < minimumCount) {
+    state.flyerItems.push(createDefaultFlyerRow(state.flyerItems.length));
+  }
+}
+
 function trimEmptyRows(rows, minimumCount, isActive) {
   const trimmed = [...rows];
   while (trimmed.length > minimumCount && !isActive(trimmed[trimmed.length - 1])) {
@@ -2989,6 +3193,7 @@ function createConfigSectionTabsMarkup(activeSection = "calculo") {
     { id: "credenciais", label: "Credenciais", helper: "Materiais, laminação e cordões." },
     { id: "produtos-prontos", label: "Produtos prontos", helper: "Cordões e itens vendidos separadamente." },
     { id: "cartoes", label: "Cartões de visitas", helper: "Tabela laser e offset para cartões." },
+    { id: "panfletos", label: "Panfletos e folders", helper: "Tabela laser e offset para panfletos." },
     { id: "m2", label: "Cálculo de m²", helper: "Faixas, acabamentos e produtos por área." },
     { id: "resinados", label: "Resinados", helper: "Tabela A3, margem de resina e valor mínimo." },
   ];
@@ -3284,7 +3489,7 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
     ),
   ];
 
-  const safeSection = activeSection === "impressos" || activeSection === "credenciais" || activeSection === "produtos-prontos" || activeSection === "cartoes" || activeSection === "m2" || activeSection === "resinados" ? activeSection : "calculo";
+  const safeSection = activeSection === "impressos" || activeSection === "credenciais" || activeSection === "produtos-prontos" || activeSection === "cartoes" || activeSection === "panfletos" || activeSection === "m2" || activeSection === "resinados" ? activeSection : "calculo";
   const configGroups = {
     calculo: createConfigGroupMarkup(
       "calculo",
@@ -3315,6 +3520,18 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
       "Aba: Cartões de visitas",
       "Tabela de cartões laser e offset usada na aba de cartões de visitas.",
       cartoesCards
+    ),
+    panfletos: createConfigGroupMarkup(
+      "panfletos",
+      "Aba: Panfletos e folders",
+      "Tabela fixa de panfletos e folders laser/offset cadastrada no sistema.",
+      [
+        createConfigCardMarkup(
+          "Tabela de panfletos e folders",
+          "Inclui papéis, tamanhos, impressão só frente/frente e verso e adicional de dobra.",
+          `<p class="helper-text">A aba Panfletos e folders usa somente as quantidades cadastradas na tabela enviada.</p>`
+        ),
+      ]
     ),
     m2: createConfigGroupMarkup(
       "m2",
@@ -4230,7 +4447,7 @@ function calculateResinWorkbook(state, config) {
   };
 }
 
-function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, m2Workbook, resinWorkbook) {
+function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, flyerWorkbook, m2Workbook, resinWorkbook) {
   const dateText = new Intl.DateTimeFormat("pt-BR").format(new Date());
   const quoteEntries = [
     ...workbook.activeRows.map((row) => {
@@ -4278,6 +4495,15 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       discountDetail: row.discountDescription,
       total: row.total,
     })),
+    ...flyerWorkbook.activeRows.map((row) => ({
+      kind: "Panfletos e folders",
+      description: row.description || "Panfleto/folder",
+      detail: `${formatInteger(row.quantity)} unidades | ${row.productionType} | ${row.paper} | ${row.size} | ${row.printMode}${row.foldType !== "Sem dobra" ? ` | ${row.foldType}` : ""}`,
+      extraDetail: row.foldTotal > 0 ? `Dobra: ${formatCurrency(row.foldTotal)}` : "",
+      artDetail: formatArtCreationDetail(row),
+      discountDetail: row.discountDescription,
+      total: row.total,
+    })),
     ...m2Workbook.activeRows.map((row) => ({
       kind: "Cálculo de m²",
       description: getM2RowDescription(row),
@@ -4296,10 +4522,10 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       total: row.total,
     })),
   ];
-  const combinedSubtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
+  const combinedSubtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + flyerWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
   const quoteDiscount = calculateDiscount(combinedSubtotal, state.quoteDiscountType, state.quoteDiscountValue);
   const combinedTotal = quoteDiscount.total;
-  const combinedUnits = workbook.totals.totalQuantity + colorWorkbook.totals.totalQuantity + credentialWorkbook.totals.totalQuantity + readyWorkbook.totals.totalQuantity + businessCardWorkbook.totals.totalQuantity + m2Workbook.totals.totalQuantity + resinWorkbook.totals.totalQuantity;
+  const combinedUnits = workbook.totals.totalQuantity + colorWorkbook.totals.totalQuantity + credentialWorkbook.totals.totalQuantity + readyWorkbook.totals.totalQuantity + businessCardWorkbook.totals.totalQuantity + flyerWorkbook.totals.totalQuantity + m2Workbook.totals.totalQuantity + resinWorkbook.totals.totalQuantity;
   const lineItemsMarkup = quoteEntries.length
     ? quoteEntries
         .map(
@@ -4379,7 +4605,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
   `;
 }
 
-function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, m2Workbook, resinWorkbook) {
+function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, flyerWorkbook, m2Workbook, resinWorkbook) {
   const dateText = new Intl.DateTimeFormat("pt-BR").format(new Date());
   const lines = [
     `ORÇAMENTO | ${state.company.name || "Sua empresa"}`,
@@ -4415,6 +4641,9 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
     ...businessCardWorkbook.activeRows.map((row, index) => ({
       text: `- ${row.description || `Cartão de visita ${index + 1}`} | ${row.quantity} cartões | ${row.productionType} | ${row.materialLabel} | ${row.printMode} | Pacote: ${row.packageLabel}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
+    ...flyerWorkbook.activeRows.map((row, index) => ({
+      text: `- ${row.description || `Panfleto/folder ${index + 1}`} | ${row.quantity} unidades | ${row.productionType} | ${row.paper} | ${row.size} | ${row.printMode}${row.foldType !== "Sem dobra" ? ` | ${row.foldType}` : ""}${row.foldTotal > 0 ? ` | Dobra: ${formatCurrency(row.foldTotal)}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
+    })),
     ...m2Workbook.activeRows.map((row, index) => ({
       text: `- ${getM2RowDescription(row) || `M² ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.finishSummary ? `${row.finishSummary} | ` : ""}${formatArtCreationDetail(row) ? `${formatArtCreationDetail(row)} | ` : ""}${row.discountDescription ? `${row.discountDescription} | ` : ""}${formatCurrency(row.total)}`,
     })),
@@ -4429,7 +4658,7 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
     quoteEntries.forEach((entry) => lines.push(entry.text));
   }
 
-  const combinedSubtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
+  const combinedSubtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + flyerWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
   const quoteDiscount = calculateDiscount(combinedSubtotal, state.quoteDiscountType, state.quoteDiscountValue);
   if (quoteDiscount.hasDiscount) {
     lines.push("", `Subtotal: ${formatCurrency(combinedSubtotal)}`);
@@ -4451,7 +4680,7 @@ async function initApp() {
   const config = loadFromStorage(STORAGE_KEYS.config, mergeConfig);
   let configViewMode = loadConfigViewMode();
   let activeConfigSection = loadConfigSection();
-  let lastConfigSourceTab = activeConfigSection === "impressos" || activeConfigSection === "credenciais" || activeConfigSection === "produtos-prontos" || activeConfigSection === "cartoes" || activeConfigSection === "m2" || activeConfigSection === "resinados" ? activeConfigSection : "calculo";
+  let lastConfigSourceTab = activeConfigSection === "impressos" || activeConfigSection === "credenciais" || activeConfigSection === "produtos-prontos" || activeConfigSection === "cartoes" || activeConfigSection === "panfletos" || activeConfigSection === "m2" || activeConfigSection === "resinados" ? activeConfigSection : "calculo";
   let isConfigUnlocked = loadSessionFlag(SESSION_KEYS.configUnlocked);
   let sharedSyncTimer = null;
   let sharedSyncInFlight = false;
@@ -4466,6 +4695,7 @@ async function initApp() {
   ensureCredentialRowCount(state, 5);
   ensureReadyProductRowCount(state, 5);
   ensureBusinessCardRowCount(state, 5);
+  ensureFlyerRowCount(state, 5);
   ensureM2RowCount(state, 5);
   ensureResinRowCount(state, 5);
   state.rows = trimEmptyRows(state.rows, 5, isRowActive);
@@ -4473,6 +4703,7 @@ async function initApp() {
   state.credentialItems = trimEmptyRows(state.credentialItems, 5, isCredentialRowActive);
   state.readyProductItems = trimEmptyRows(state.readyProductItems, 5, isReadyProductRowActive);
   state.businessCardItems = trimEmptyRows(state.businessCardItems, 5, isBusinessCardRowActive);
+  state.flyerItems = trimEmptyRows(state.flyerItems, 5, isFlyerRowActive);
   state.m2Items = trimEmptyRows(state.m2Items, 5, (row) => Boolean(row.description?.trim() || Number(row.quantity) > 0 || Number(row.widthMm) > 0 || Number(row.heightMm) > 0));
   state.resinItems = trimEmptyRows(state.resinItems, 5, isResinRowActive);
 
@@ -4481,12 +4712,14 @@ async function initApp() {
   const credentialRowsTableBody = document.getElementById("credential-rows-table-body");
   const readyRowsTableBody = document.getElementById("ready-rows-table-body");
   const businessCardRowsTableBody = document.getElementById("business-card-rows-table-body");
+  const flyerRowsTableBody = document.getElementById("flyer-rows-table-body");
   const resinRowsTableBody = document.getElementById("resin-rows-table-body");
   const warningList = document.getElementById("warning-list");
   const colorWarningList = document.getElementById("color-warning-list");
   const credentialWarningList = document.getElementById("credential-warning-list");
   const readyWarningList = document.getElementById("ready-warning-list");
   const businessCardWarningList = document.getElementById("business-card-warning-list");
+  const flyerWarningList = document.getElementById("flyer-warning-list");
   const m2WarningList = document.getElementById("m2-warning-list");
   const resinWarningList = document.getElementById("resin-warning-list");
   const configSections = document.getElementById("config-sections");
@@ -4499,6 +4732,7 @@ async function initApp() {
   const credentialFeedback = document.getElementById("credential-feedback");
   const readyFeedback = document.getElementById("ready-feedback");
   const businessCardFeedback = document.getElementById("business-card-feedback");
+  const flyerFeedback = document.getElementById("flyer-feedback");
   const resinFeedback = document.getElementById("resin-feedback");
   const configStatus = document.getElementById("config-status");
   const syncStatus = document.getElementById("sync-status");
@@ -4554,6 +4788,10 @@ async function initApp() {
 
   function setBusinessCardFeedback(message, tone = "neutral") {
     setStatusMessage(businessCardFeedback, message, tone);
+  }
+
+  function setFlyerFeedback(message, tone = "neutral") {
+    setStatusMessage(flyerFeedback, message, tone);
   }
 
   function setResinFeedback(message, tone = "neutral") {
@@ -4888,14 +5126,14 @@ async function initApp() {
 
   function selectTab(tabName) {
     if (tabName === "configuracao") {
-      activeConfigSection = lastConfigSourceTab === "impressos" || lastConfigSourceTab === "credenciais" || lastConfigSourceTab === "produtos-prontos" || lastConfigSourceTab === "cartoes" || lastConfigSourceTab === "m2" || lastConfigSourceTab === "resinados" ? lastConfigSourceTab : "calculo";
+      activeConfigSection = lastConfigSourceTab === "impressos" || lastConfigSourceTab === "credenciais" || lastConfigSourceTab === "produtos-prontos" || lastConfigSourceTab === "cartoes" || lastConfigSourceTab === "panfletos" || lastConfigSourceTab === "m2" || lastConfigSourceTab === "resinados" ? lastConfigSourceTab : "calculo";
       saveConfigSection(activeConfigSection);
       renderConfig();
       if (!isConfigUnlocked) {
         setConfigStatus("Digite a senha para acessar a configuração.", "warning");
         focusConfigPasswordField();
       }
-    } else if (tabName === "calculo" || tabName === "impressos" || tabName === "credenciais" || tabName === "produtos-prontos" || tabName === "cartoes" || tabName === "m2" || tabName === "resinados") {
+    } else if (tabName === "calculo" || tabName === "impressos" || tabName === "credenciais" || tabName === "produtos-prontos" || tabName === "cartoes" || tabName === "panfletos" || tabName === "m2" || tabName === "resinados") {
       lastConfigSourceTab = tabName;
     }
     tabButtons.forEach((button) => {
@@ -5147,6 +5385,7 @@ async function initApp() {
     const credentialWorkbook = calculateCredentialWorkbook(state, config);
     const readyWorkbook = calculateReadyProductWorkbook(state, config);
     const businessCardWorkbook = calculateBusinessCardWorkbook(state);
+    const flyerWorkbook = calculateFlyerWorkbook(state);
     const m2Workbook = calculateM2WorkbookFromConfig(state, config);
     const resinWorkbook = calculateResinWorkbook(state, config);
     const m2Catalog = getM2Catalog(config);
@@ -5175,6 +5414,11 @@ async function initApp() {
     document.getElementById("business-summary-quantity").textContent = formatInteger(businessCardWorkbook.totals.totalQuantity);
     document.getElementById("business-summary-total").textContent = formatCurrency(businessCardWorkbook.totals.totalGeneral);
     document.getElementById("business-summary-average").textContent = formatCurrency(businessCardWorkbook.totals.averageValue);
+
+    document.getElementById("flyer-summary-active").textContent = formatInteger(flyerWorkbook.totals.activeLines);
+    document.getElementById("flyer-summary-quantity").textContent = formatInteger(flyerWorkbook.totals.totalQuantity);
+    document.getElementById("flyer-summary-total").textContent = formatCurrency(flyerWorkbook.totals.totalGeneral);
+    document.getElementById("flyer-summary-average").textContent = formatCurrency(flyerWorkbook.totals.averageValue);
 
     document.getElementById("m2-summary-active").textContent = formatInteger(m2Workbook.totals.activeLines);
     document.getElementById("m2-summary-quantity").textContent = formatInteger(m2Workbook.totals.totalQuantity);
@@ -5359,6 +5603,41 @@ async function initApp() {
       businessCardWorkbook.activeRows.length > 0 ? "success" : "neutral"
     );
 
+    flyerRowsTableBody.innerHTML = flyerWorkbook.rows
+      .map((row, index) => {
+        const item = getFlyerSelection(row.catalogId, row.productionType);
+        return `
+          <tr class="${row.active ? "" : "is-empty"}" data-flyer-row-index="${index}">
+            <td><strong>${String(index + 1).padStart(2, "0")}</strong></td>
+            <td><input class="cell-input description" name="description" value="${escapeHtml(row.description)}" placeholder="Ex.: Folder promocional"></td>
+            <td><select class="cell-select" name="productionType">${buildOptions(OPTIONS.flyerProductions, row.productionType)}</select></td>
+            <td><select class="cell-select" name="catalogId">${buildFlyerCatalogOptions(row.productionType, row.catalogId)}</select></td>
+            <td><span class="readonly-value subtle">${escapeHtml(row.size || item?.size || "-")}</span></td>
+            <td><select class="cell-select" name="printMode">${buildFlyerPrintModeOptions(item, row.printMode)}</select></td>
+            <td><select class="cell-select" name="quantity">${buildFlyerQuantityOptions(item, row.printMode, row.quantity)}</select></td>
+            <td><select class="cell-select" name="foldType">${buildOptions(OPTIONS.flyerFolds, row.foldType)}</select></td>
+            <td><span class="readonly-value subtle">${formatCurrency(row.baseTotal)}</span></td>
+            <td><span class="readonly-value subtle">${formatCurrency(row.foldTotal)}</span></td>
+            <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
+            <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
+            <td><input class="cell-input" name="discountValue" type="number" min="0" step="0.01" value="${escapeHtml(row.discountValue ?? 0)}" placeholder="0,00"></td>
+            <td><span class="readonly-value">${formatCurrency(row.total)}</span></td>
+            <td><span class="readonly-value subtle">${formatCurrency(row.unitValue)}</span></td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    flyerWarningList.innerHTML = flyerWorkbook.warnings.length
+      ? flyerWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
+      : `<div class="warning-item is-success">Sem alertas no momento. Escolha uma quantidade da tabela para fechar o valor.</div>`;
+    setFlyerFeedback(
+      flyerWorkbook.activeRows.length > 0
+        ? "Panfletos e folders atualizados com sucesso."
+        : "Use esta aba para orçar vários panfletos ou folders no mesmo orçamento.",
+      flyerWorkbook.activeRows.length > 0 ? "success" : "neutral"
+    );
+
     m2WarningList.innerHTML = m2Workbook.warnings.length
       ? m2Workbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
       : `<div class="warning-item is-success">Sem alertas no momento. Preencha as medidas e acabamentos para o app montar o valor final com segurança.</div>`;
@@ -5437,8 +5716,8 @@ async function initApp() {
       ? resinWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
       : `<div class="warning-item is-success">Sem alertas no momento. Você pode montar várias medidas de resinados no mesmo orçamento por aqui.</div>`;
 
-    quotePreview.innerHTML = createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, m2Workbook, resinWorkbook);
-    return { workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, m2Workbook, resinWorkbook };
+    quotePreview.innerHTML = createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, flyerWorkbook, m2Workbook, resinWorkbook);
+    return { workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, flyerWorkbook, m2Workbook, resinWorkbook };
   }
 
   function closeM2FinishPopover() {
@@ -5922,6 +6201,12 @@ async function initApp() {
     renderRowsAndSummary();
   });
 
+  document.getElementById("add-flyer-row-button").addEventListener("click", () => {
+    state.flyerItems.push(createDefaultFlyerRow(state.flyerItems.length));
+    persistLocalOnly();
+    renderRowsAndSummary();
+  });
+
   document.getElementById("add-m2-row-button").addEventListener("click", () => {
     state.m2Items.push(createDefaultM2Row(state.m2Items.length));
     persist();
@@ -6018,6 +6303,23 @@ async function initApp() {
     persistLocalOnly();
     renderRowsAndSummary();
     setBusinessCardFeedback("As linhas de cartões de visitas foram limpas.", "warning");
+  });
+
+  document.getElementById("clear-flyer-rows-button").addEventListener("click", async () => {
+    if (!(await confirmAppAction({
+      kicker: "Limpeza",
+      title: "Limpar panfletos e folders",
+      message: "Deseja realmente limpar todas as linhas da aba de panfletos e folders?",
+      confirmLabel: "Limpar",
+      danger: true,
+    }))) {
+      setFlyerFeedback("A limpeza dos panfletos e folders foi cancelada.", "warning");
+      return;
+    }
+    state.flyerItems = Array.from({ length: 5 }, (_, index) => createDefaultFlyerRow(index));
+    persistLocalOnly();
+    renderRowsAndSummary();
+    setFlyerFeedback("As linhas de panfletos e folders foram limpas.", "warning");
   });
 
   document.getElementById("clear-m2-rows-button").addEventListener("click", async () => {
@@ -6268,6 +6570,45 @@ async function initApp() {
     } else {
       row[field] = target.value;
     }
+    persistLocalOnly();
+    renderRowsAndSummary();
+  });
+
+  flyerRowsTableBody.addEventListener("change", (event) => {
+    const target = event.target;
+    const rowElement = target.closest("tr[data-flyer-row-index]");
+    if (!rowElement) {
+      return;
+    }
+    const row = state.flyerItems[Number(rowElement.dataset.flyerRowIndex)];
+    const field = target.name;
+    if (!field || !row) {
+      return;
+    }
+
+    if (field === "quantity") {
+      row[field] = toWholeNumber(target.value);
+    } else if (field === "artCreationFee" || field === "discountValue") {
+      row[field] = toMoneyNumber(target.value);
+    } else if (field === "discountType") {
+      row[field] = normalizeDiscountType(target.value);
+    } else if (field === "productionType") {
+      row.productionType = OPTIONS.flyerProductions.includes(target.value) ? target.value : "Laser";
+      row.catalogId = getFlyerCatalogByProduction(row.productionType)[0]?.id || "";
+      normalizeFlyerRowChoice(row);
+    } else if (field === "catalogId") {
+      row.catalogId = target.value;
+      normalizeFlyerRowChoice(row);
+    } else if (field === "printMode") {
+      const item = getFlyerSelection(row.catalogId, row.productionType);
+      row.printMode = getFlyerValidPrintMode(item, target.value);
+      normalizeFlyerRowChoice(row);
+    } else if (field === "foldType") {
+      row.foldType = OPTIONS.flyerFolds.includes(target.value) ? target.value : "Sem dobra";
+    } else {
+      row[field] = target.value;
+    }
+
     persistLocalOnly();
     renderRowsAndSummary();
   });
@@ -6556,7 +6897,7 @@ async function initApp() {
 
     const sectionButton = event.target.closest("[data-config-section]");
     if (sectionButton) {
-      activeConfigSection = sectionButton.dataset.configSection === "impressos" || sectionButton.dataset.configSection === "credenciais" || sectionButton.dataset.configSection === "produtos-prontos" || sectionButton.dataset.configSection === "cartoes" || sectionButton.dataset.configSection === "m2" || sectionButton.dataset.configSection === "resinados"
+      activeConfigSection = sectionButton.dataset.configSection === "impressos" || sectionButton.dataset.configSection === "credenciais" || sectionButton.dataset.configSection === "produtos-prontos" || sectionButton.dataset.configSection === "cartoes" || sectionButton.dataset.configSection === "panfletos" || sectionButton.dataset.configSection === "m2" || sectionButton.dataset.configSection === "resinados"
         ? sectionButton.dataset.configSection
         : "calculo";
       saveConfigSection(activeConfigSection);
@@ -6830,9 +7171,10 @@ async function initApp() {
     const credentialWorkbook = calculateCredentialWorkbook(state, config);
     const readyWorkbook = calculateReadyProductWorkbook(state, config);
     const businessCardWorkbook = calculateBusinessCardWorkbook(state);
+    const flyerWorkbook = calculateFlyerWorkbook(state);
     const m2Workbook = calculateM2WorkbookFromConfig(state, config);
     const resinWorkbook = calculateResinWorkbook(state, config);
-    const text = createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, m2Workbook, resinWorkbook);
+    const text = createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, flyerWorkbook, m2Workbook, resinWorkbook);
     try {
       await navigator.clipboard.writeText(text);
       setMainFeedback("Resumo do orçamento copiado com sucesso.", "success");
@@ -6907,11 +7249,12 @@ async function initApp() {
     const credentialWorkbook = calculateCredentialWorkbook(state, config);
     const readyWorkbook = calculateReadyProductWorkbook(state, config);
     const businessCardWorkbook = calculateBusinessCardWorkbook(state);
+    const flyerWorkbook = calculateFlyerWorkbook(state);
     const m2Workbook = calculateM2WorkbookFromConfig(state, config);
     const resinWorkbook = calculateResinWorkbook(state, config);
     const title = state.client.name.trim() || `Orçamento ${new Date().toLocaleDateString("pt-BR")}`;
-    const summary = createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, m2Workbook, resinWorkbook).split("\n").slice(0, 10).join(" • ");
-    const subtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
+    const summary = createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, flyerWorkbook, m2Workbook, resinWorkbook).split("\n").slice(0, 10).join(" • ");
+    const subtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + flyerWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
     const quoteDiscount = calculateDiscount(subtotal, state.quoteDiscountType, state.quoteDiscountValue);
 
     state.quoteHistory.unshift({

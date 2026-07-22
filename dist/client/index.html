@@ -24,6 +24,7 @@
       <button class="tab-button" data-tab-target="credenciais">Credenciais</button>
       <button class="tab-button" data-tab-target="produtos-prontos">Produtos prontos</button>
       <button class="tab-button" data-tab-target="cartoes">Cartões de visitas</button>
+      <button class="tab-button" data-tab-target="panfletos">Panfletos e folders</button>
       <button class="tab-button" data-tab-target="m2">Cálculo de m²</button>
       <button class="tab-button" data-tab-target="resinados">Resinados</button>
       <button class="tab-button" data-tab-target="configuracao">Configuração</button>
@@ -544,6 +545,72 @@
         </article>
       </section>
 
+      <section class="tab-panel" data-tab-panel="panfletos">
+        <div class="summary-grid">
+          <article class="summary-card">
+            <span class="summary-label">Linhas ativas</span>
+            <strong id="flyer-summary-active">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Unidades</span>
+            <strong id="flyer-summary-quantity">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Total geral</span>
+            <strong id="flyer-summary-total">R$ 0,00</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Valor médio</span>
+            <strong id="flyer-summary-average">R$ 0,00</strong>
+          </article>
+        </div>
+
+        <article class="panel panel-table">
+          <div class="panel-heading">
+            <div>
+              <h2>Panfletos e folders</h2>
+              <p class="panel-copy">Escolha produção laser ou offset, papel, tamanho, impressão e uma quantidade cadastrada na tabela.</p>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <button id="add-flyer-row-button" class="button button-primary" type="button">Adicionar linha</button>
+            <button id="clear-flyer-rows-button" class="button button-danger" type="button">Limpar linhas</button>
+          </div>
+
+          <p class="helper-text status-note" id="flyer-feedback">
+            Use esta aba para orçar vários panfletos ou folders no mesmo orçamento.
+          </p>
+
+          <div class="table-shell">
+            <table class="budget-table flyer-budget-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Descrição</th>
+                  <th>Produção</th>
+                  <th>Papel</th>
+                  <th>Tamanho</th>
+                  <th>Impressão</th>
+                  <th>Quantidade</th>
+                  <th>Dobra</th>
+                  <th>Valor base</th>
+                  <th>Dobra total</th>
+                  <th>Criação de arte</th>
+                  <th>Tipo desc.</th>
+                  <th>Desconto</th>
+                  <th>Total item</th>
+                  <th>Valor un.</th>
+                </tr>
+              </thead>
+              <tbody id="flyer-rows-table-body"></tbody>
+            </table>
+          </div>
+
+          <div class="warning-list" id="flyer-warning-list"></div>
+        </article>
+      </section>
+
       <section class="tab-panel" data-tab-panel="resinados">
         <div class="summary-grid">
           <article class="summary-card">
@@ -891,7 +958,7 @@
     </div>
   </div>
 
-  <script src="./app.mjs?v=ca113cf8f6d2"></script>
+  <script src="./app.mjs?v=6038cb04296a"></script>
 </body>
 </html>
 
