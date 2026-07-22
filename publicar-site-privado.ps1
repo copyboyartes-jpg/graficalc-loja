@@ -118,8 +118,11 @@ if (-not (Test-Path (Join-Path $scriptDirectory '.git'))) {
     Invoke-Git -GitPath $gitPath -WorkingDirectory $scriptDirectory -Arguments @('init', '-b', $branchName)
 }
 
-$existingOrigin = (& $gitPath -C $scriptDirectory -c ("safe.directory=" + $scriptDirectory) remote) -join "`n"
-if (-not ($existingOrigin -match '(^|`n)origin($|`n)')) {
+$configuredRemotes = @(& $gitPath -C $scriptDirectory -c ("safe.directory=" + $scriptDirectory) remote)
+if ($configuredRemotes -contains 'origin') {
+    Invoke-Git -GitPath $gitPath -WorkingDirectory $scriptDirectory -Arguments @('remote', 'set-url', 'origin', $remoteUrl)
+}
+else {
     Invoke-Git -GitPath $gitPath -WorkingDirectory $scriptDirectory -Arguments @('remote', 'add', 'origin', $remoteUrl)
 }
 
