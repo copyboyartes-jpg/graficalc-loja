@@ -207,6 +207,42 @@ const READY_PRODUCT_CATALOG = [
     pricingMode: "printedBadge",
   },
   {
+    id: "Crachá PVC 4x0",
+    label: "Crachá PVC 4x0",
+    category: "Crachás",
+    pricingMode: "tieredUnit",
+    tiers: [
+      { min: 1, value: 12.1, label: "01 un" },
+      { min: 6, value: 11, label: "Acima de 05" },
+      { min: 11, value: 9.9, label: "Acima de 10" },
+      { min: 21, value: 8.8, label: "Acima de 20" },
+    ],
+  },
+  {
+    id: "Crachá PVC 4x1",
+    label: "Crachá PVC 4x1",
+    category: "Crachás",
+    pricingMode: "tieredUnit",
+    tiers: [
+      { min: 1, value: 13.2, label: "01 un" },
+      { min: 6, value: 11.1, label: "Acima de 05" },
+      { min: 11, value: 10.5, label: "Acima de 10" },
+      { min: 21, value: 9.35, label: "Acima de 20" },
+    ],
+  },
+  {
+    id: "Crachá PVC 4x4",
+    label: "Crachá PVC 4x4",
+    category: "Crachás",
+    pricingMode: "tieredUnit",
+    tiers: [
+      { min: 1, value: 16, label: "01 un" },
+      { min: 6, value: 14.3, label: "Acima de 05" },
+      { min: 11, value: 13.2, label: "Acima de 10" },
+      { min: 21, value: 12.7, label: "Acima de 20" },
+    ],
+  },
+  {
     id: "P10 | Área 10x27mm",
     label: "P10 | Área 10x27mm",
     category: "Carimbos automáticos",
@@ -1546,6 +1582,8 @@ function getReadyProductSelection(config, productType, quantity = 0) {
       totalPrice = printedPackageTotal;
       unitPrice = billedQuantity > 0 ? totalPrice / billedQuantity : 0;
       packageLabel = packageTier?.label || `${billedQuantity} un`;
+    } else if (item.pricingMode === "tieredUnit") {
+      unitPrice = lookupTier(item.tiers || [], requestedQuantity);
     }
 
     return {
