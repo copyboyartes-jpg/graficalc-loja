@@ -767,6 +767,35 @@ function createDefaultConfig() {
         { min: 301, value: 4.4, label: "Acima de 300 (assumido)" },
       ],
     },
+    colorPrintExtras: {
+      holes: [
+        { min: 1, value: 10.0, label: "Até 100" },
+        { min: 101, value: 3.0, label: "A cada 100" },
+      ],
+      folds: [
+        { min: 1, value: 10.0, label: "Até 100" },
+        { min: 101, value: 5.0, label: "A cada 100" },
+      ],
+      laminationWhole: {
+        a4: [
+          { min: 1, value: 4.65, label: "A4" },
+          { min: 11, value: 4.10, label: "Acima de 10" },
+          { min: 51, value: 3.85, label: "Acima de 50" },
+          { min: 101, value: 3.70, label: "Acima de 100" },
+        ],
+        a3: [
+          { min: 1, value: 10.40, label: "A3" },
+          { min: 6, value: 8.70, label: "Acima de 5" },
+          { min: 51, value: 8.10, label: "Acima de 50" },
+        ],
+      },
+      laminationCombo: [
+        { quantity: 2, total: 8.0, label: "02 por folha" },
+        { quantity: 4, total: 10.0, label: "04 por folha" },
+        { quantity: 6, total: 12.0, label: "06 por folha" },
+        { quantity: 8, total: 14.0, label: "08 por folha" },
+      ],
+    },
     credentialLanyardPricing: {
       roundWhite2mm: 0.75,
       plainBadge: 2.75,
@@ -1212,6 +1241,22 @@ function mergeConfig(candidate) {
         merged.colorPrintPricing[key] = candidate.colorPrintPricing[key];
       }
     }
+  }
+
+  if (candidate.colorPrintExtras && typeof candidate.colorPrintExtras === "object") {
+    merged.colorPrintExtras = {
+      ...merged.colorPrintExtras,
+      ...candidate.colorPrintExtras,
+      holes: Array.isArray(candidate.colorPrintExtras.holes) ? candidate.colorPrintExtras.holes : merged.colorPrintExtras.holes,
+      folds: Array.isArray(candidate.colorPrintExtras.folds) ? candidate.colorPrintExtras.folds : merged.colorPrintExtras.folds,
+      laminationWhole: {
+        ...merged.colorPrintExtras.laminationWhole,
+        ...(candidate.colorPrintExtras.laminationWhole || {}),
+      },
+      laminationCombo: Array.isArray(candidate.colorPrintExtras.laminationCombo)
+        ? candidate.colorPrintExtras.laminationCombo
+        : merged.colorPrintExtras.laminationCombo,
+    };
   }
 
   if (candidate.credentialLanyardPricing && typeof candidate.credentialLanyardPricing === "object") {
@@ -1936,27 +1981,28 @@ function calculatePolasealFit(widthMm, heightMm) {
   };
 }
 
-function calculateColorExtras(row, widthMm, heightMm, quantity) {
-  const holeTotal = row.holeOption && row.holeOption !== "Sem furo" ? calculateHundredExtra(quantity, 10, 3) : 0;
-  const foldTotal = row.foldOption === "Dobra" ? calculateHundredExtra(quantity, 10, 5) : 0;
+function calculateColorExtras(row, widthMm, heightMm, quantity, config) {
+  const extras = config?.colorPrintExtras || createDefaultConfig().colorPrintExtras;
+  const holeMinimum = Number(extras.holes?.[0]?.value || 10);
+  const holeEachHundred = Number(extras.holes?.[1]?.value || 3);
+  const foldMinimum = Number(extras.folds?.[0]?.value || 10);
+  const foldEachHundred = Number(extras.folds?.[1]?.value || 5);
+  const holeTotal = row.holeOption && row.holeOption !== "Sem furo" ? calculateHundredExtra(quantity, holeMinimum, holeEachHundred) : 0;
+  const foldTotal = row.foldOption === "Dobra" ? calculateHundredExtra(quantity, foldMinimum, foldEachHundred) : 0;
   let laminationTotal = 0;
-  let laminationFit = calculatePolasealFit(widthMm, heightMm);
+  const laminationFit = calculatePolasealFit(widthMm, heightMm);
 
   if (row.laminationOption === "Plastificação inteira") {
+    const wholeA4 = extras.laminationWhole?.a4 || [];
     const sheet = laminationFit.best?.id === "a3" ? "a3" : "a4";
-    laminationTotal = quantity * getWholeLaminationUnit(sheet, quantity);
+    const chosenTier = lookupTier(sheet === "a3" ? extras.laminationWhole?.a3 || [] : wholeA4, quantity);
+    laminationTotal = quantity * chosenTier;
   } else if (row.laminationOption === "Plastificação com corte") {
     laminationTotal = quantity * 23;
   } else {
-    const perSheetMap = {
-      "02 por polaseal": { perSheet: 2, price: 8 },
-      "04 por polaseal": { perSheet: 4, price: 10 },
-      "06 por polaseal": { perSheet: 6, price: 12 },
-      "08 por polaseal": { perSheet: 8, price: 14 },
-    };
-    const selected = perSheetMap[row.laminationOption];
+    const selected = (extras.laminationCombo || []).find((item) => Number(item.quantity || 0) > 0 && row.laminationOption === item.label);
     if (selected) {
-      laminationTotal = Math.ceil(quantity / selected.perSheet) * selected.price;
+      laminationTotal = Math.ceil(quantity / Number(selected.quantity || 1)) * Number(selected.total || 0);
     }
   }
 
@@ -3069,7 +3115,7 @@ function calculateColorPrintWorkbook(state, config) {
     }
 
     const finalCutPrice = row.cutPriceOverride === "" ? suggestedCutPrice : toMoneyNumber(row.cutPriceOverride);
-    const colorExtras = calculateColorExtras(row, effectiveWidth, effectiveHeight, quantity);
+    const colorExtras = calculateColorExtras(row, effectiveWidth, effectiveHeight, quantity, config);
     const artCreationFee = getArtCreationFee(row);
     const rowDiscount = applyRowDiscount(row, printTotal + finalCutPrice + colorExtras.total + artCreationFee, quantity);
 
@@ -3723,6 +3769,11 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
       ].join("")
     ),
     createConfigCardMarkup(
+      "Adicionais da impressão",
+      "Ajuste aqui os adicionais de furo, dobra e plastificação usados na aba de impressos coloridos.",
+      createColorExtrasConfigMarkup(config.colorPrintExtras)
+    ),
+    createConfigCardMarkup(
       "Cordões e produtos prontos",
       "Configure aqui os cordões usados na credencial e os itens vendidos separadamente na aba de produtos prontos.",
       createCredentialLanyardPricingMarkup(config.credentialLanyardPricing)
@@ -4115,6 +4166,79 @@ function createColorCutTableMarkup(cutPricing) {
   `;
 }
 
+function createColorExtrasConfigMarkup(colorPrintExtras) {
+  const extras = colorPrintExtras || createDefaultConfig().colorPrintExtras;
+  return [
+    createInlineConfigBlockMarkup(
+      "Furo 6mm e 4mm",
+      createTableMarkup(
+        ["Qtd mínima", "Valor", "Faixa"],
+        extras.holes,
+        "color-extra-hole",
+        [
+          { key: "min", type: "number", step: "1" },
+          { key: "value", type: "number", step: "0.01" },
+          { key: "label", type: "text" },
+        ]
+      ),
+      "Os dois tipos de furo usam os mesmos valores."
+    ),
+    createInlineConfigBlockMarkup(
+      "Dobra",
+      createTableMarkup(
+        ["Qtd mínima", "Valor", "Faixa"],
+        extras.folds,
+        "color-extra-fold",
+        [
+          { key: "min", type: "number", step: "1" },
+          { key: "value", type: "number", step: "0.01" },
+          { key: "label", type: "text" },
+        ]
+      )
+    ),
+    createInlineConfigBlockMarkup(
+      "Plastificação inteira",
+      createTableMarkup(
+        ["Qtd mínima", "Valor", "Faixa"],
+        extras.laminationWhole?.a4 || [],
+        "color-extra-lam-whole-a4",
+        [
+          { key: "min", type: "number", step: "1" },
+          { key: "value", type: "number", step: "0.01" },
+          { key: "label", type: "text" },
+        ]
+      ),
+      "A aba de cálculo escolhe automaticamente entre A4, ofício e A3 conforme o melhor aproveitamento."
+    ),
+    createInlineConfigBlockMarkup(
+      "Plastificação A3",
+      createTableMarkup(
+        ["Qtd mínima", "Valor", "Faixa"],
+        extras.laminationWhole?.a3 || [],
+        "color-extra-lam-whole-a3",
+        [
+          { key: "min", type: "number", step: "1" },
+          { key: "value", type: "number", step: "0.01" },
+          { key: "label", type: "text" },
+        ]
+      )
+    ),
+    createInlineConfigBlockMarkup(
+      "Plastificação com mais de um por polaseal",
+      createTableMarkup(
+        ["Qtd por folha", "Valor total", "Faixa"],
+        extras.laminationCombo || [],
+        "color-extra-lam-combo",
+        [
+          { key: "quantity", type: "number", step: "1" },
+          { key: "total", type: "number", step: "0.01" },
+          { key: "label", type: "text" },
+        ]
+      )
+    ),
+  ].join("");
+}
+
 function createResinConfigMarkup(resinPricing) {
   return [
     `
@@ -4490,6 +4614,11 @@ function getConfigArrayByPrefix(config, prefix) {
   if (prefix === "cut-above5") return config.cutPricing;
   if (prefix === "credential-lanyard-printed") return config.credentialLanyardPricing?.printed;
   if (prefix === "credential-lanyard-printed-package") return config.credentialLanyardPricing?.printedPackages;
+  if (prefix === "color-extra-hole") return config.colorPrintExtras?.holes;
+  if (prefix === "color-extra-fold") return config.colorPrintExtras?.folds;
+  if (prefix === "color-extra-lam-whole-a4") return config.colorPrintExtras?.laminationWhole?.a4;
+  if (prefix === "color-extra-lam-whole-a3") return config.colorPrintExtras?.laminationWhole?.a3;
+  if (prefix === "color-extra-lam-combo") return config.colorPrintExtras?.laminationCombo;
   if (prefix.startsWith("m2-")) return config.m2Pricing[prefix.slice(3)];
   if (prefix.startsWith("color-")) return config.colorPrintPricing[prefix.slice(6)];
   if (prefix.startsWith("cover-")) {
