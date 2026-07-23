@@ -874,6 +874,14 @@ textarea {
   color: var(--muted-strong);
 }
 
+.free-quote-table {
+  min-width: 1180px;
+}
+
+.free-quote-table .cell-input.description {
+  min-width: 320px;
+}
+
 .ready-products-table {
   min-width: 980px;
 }
