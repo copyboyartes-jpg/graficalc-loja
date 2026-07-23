@@ -57,6 +57,7 @@ const OPTIONS = {
   spiralOptions: ["Completa", "Sem capas plásticas"],
   calcModes: ["Independente", "Somar quantidades"],
   m2CalcModes: ["Independente", "Somar materiais iguais"],
+  freeQuoteDiscountTypes: ["R$", "%"],
 };
 
 const BLOCK_CATALOG = Array.isArray(window.BLOCK_CATALOG) ? window.BLOCK_CATALOG : [];
@@ -1049,6 +1050,18 @@ function createDefaultFlyerRow(index) {
   };
 }
 
+function createDefaultFreeQuoteRow(index) {
+  return {
+    id: `free-quote-row-${index + 1}`,
+    description: "",
+    quantity: 1,
+    unitValue: 0,
+    artCreationFee: 0,
+    discountType: "R$",
+    discountValue: 0,
+  };
+}
+
 function createDefaultBlockRow(index, tab = "sulfite") {
   const first = BLOCK_CATALOG.find((item) => item.tab === tab) || BLOCK_CATALOG[0] || {};
   return {
@@ -1090,6 +1103,7 @@ function createDefaultState() {
     colorPrintItems: Array.from({ length: 5 }, (_, index) => createDefaultColorPrintRow(index)),
     credentialItems: Array.from({ length: 5 }, (_, index) => createDefaultCredentialRow(index)),
     readyProductItems: Array.from({ length: 5 }, (_, index) => createDefaultReadyProductRow(index)),
+    freeQuoteItems: Array.from({ length: 5 }, (_, index) => createDefaultFreeQuoteRow(index)),
     m2Items: Array.from({ length: 5 }, (_, index) => createDefaultM2Row(index)),
     resinItems: Array.from({ length: 5 }, (_, index) => createDefaultResinRow(index)),
     businessCardItems: Array.from({ length: 5 }, (_, index) => createDefaultBusinessCardRow(index)),
@@ -1423,6 +1437,19 @@ function mergeState(candidate) {
       discountType: normalizeDiscountType(row?.discountType),
       discountValue: toMoneyNumber(row?.discountValue),
       id: row?.id || `ready-product-row-${index + 1}`,
+    }));
+  }
+
+  if (Array.isArray(candidate.freeQuoteItems) && candidate.freeQuoteItems.length > 0) {
+    state.freeQuoteItems = candidate.freeQuoteItems.map((row, index) => ({
+      ...createDefaultFreeQuoteRow(index),
+      ...row,
+      quantity: toWholeNumber(row?.quantity),
+      unitValue: toMoneyNumber(row?.unitValue),
+      artCreationFee: toMoneyNumber(row?.artCreationFee),
+      discountType: normalizeDiscountType(row?.discountType),
+      discountValue: toMoneyNumber(row?.discountValue),
+      id: row?.id || `free-quote-row-${index + 1}`,
     }));
   }
 
@@ -2550,6 +2577,60 @@ function calculateReadyProductWorkbook(state, config) {
       unitPrice: product.totalPrice === null || product.totalPrice === undefined || quantity <= 0 ? product.unitPrice : subtotal / quantity,
       ...rowDiscount,
       warning: active && quantity <= 0 ? `Produto pronto ${index + 1}: informe uma quantidade maior que zero.` : packageWarning,
+    };
+  });
+
+  const activeRows = rows.filter((row) => row.active && row.valid);
+  const warnings = rows.filter((row) => row.warning).map((row) => row.warning);
+  const totalQuantity = activeRows.reduce((sum, row) => sum + row.quantity, 0);
+  const totalGeneral = activeRows.reduce((sum, row) => sum + row.total, 0);
+
+  return {
+    rows,
+    activeRows,
+    warnings,
+    totals: {
+      activeLines: activeRows.length,
+      totalQuantity,
+      totalGeneral,
+      averageValue: totalQuantity > 0 ? totalGeneral / totalQuantity : 0,
+    },
+  };
+}
+
+function isFreeQuoteRowActive(row) {
+  return Boolean((row.description || "").trim() || Number(row.quantity) > 0 || Number(row.unitValue) > 0);
+}
+
+function calculateFreeQuoteWorkbook(state) {
+  const rows = state.freeQuoteItems.map((row, index) => {
+    const quantity = toWholeNumber(row.quantity);
+    const unitValue = toMoneyNumber(row.unitValue);
+    const active = isFreeQuoteRowActive(row);
+    const description = (row.description || "").trim();
+    const subtotal = active ? quantity * unitValue : 0;
+    const artCreationFee = getArtCreationFee(row);
+    const rowDiscount = applyRowDiscount(row, subtotal + artCreationFee, quantity);
+    const warning = active && !description
+      ? `Orçamento livre ${index + 1}: digite uma descrição para este serviço.`
+      : active && quantity <= 0
+        ? `Orçamento livre ${index + 1}: informe uma quantidade maior que zero.`
+        : active && unitValue <= 0
+          ? `Orçamento livre ${index + 1}: informe um valor unitário maior que zero.`
+          : "";
+
+    return {
+      ...row,
+      active,
+      valid: active ? quantity > 0 && unitValue > 0 && Boolean(description) : false,
+      quantity,
+      unitValue,
+      baseTotal: subtotal,
+      artCreationFee,
+      unitFinalValue: quantity > 0 ? rowDiscount.total / quantity : 0,
+      ...rowDiscount,
+      warning,
+      description: description || `Orçamento livre ${index + 1}`,
     };
   });
 
@@ -4910,7 +4991,7 @@ function calculateResinWorkbook(state, config) {
   };
 }
 
-function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, m2Workbook, resinWorkbook) {
+function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, m2Workbook, resinWorkbook) {
   const dateText = new Intl.DateTimeFormat("pt-BR").format(new Date());
   const quoteEntries = [
     ...workbook.activeRows.map((row) => {
@@ -4948,6 +5029,14 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       description: row.description || row.productLabel,
       detail: `${formatInteger(row.quantity)} unidades | ${row.productLabel}`,
       artDetail: formatArtCreationDetail(row),
+      discountDetail: row.discountDescription,
+      total: row.total,
+    })),
+    ...freeQuoteWorkbook.activeRows.map((row, index) => ({
+      kind: "Orçamento livre",
+      description: row.description || `Serviço livre ${index + 1}`,
+      detail: `${formatInteger(row.quantity)} un. | ${formatCurrency(row.unitValue)} por un. | ${formatCurrency(row.baseTotal)} base`,
+      extraDetail: row.artCreationFee > 0 ? `Criação de arte: ${formatCurrency(row.artCreationFee)}` : "",
       discountDetail: row.discountDescription,
       total: row.total,
     })),
@@ -5003,10 +5092,10 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       total: row.total,
     })),
   ];
-  const combinedSubtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + flyerWorkbook.totals.totalGeneral + blockSulfiteWorkbook.totals.totalGeneral + blockAutocopiativoWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
+  const combinedSubtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + freeQuoteWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + flyerWorkbook.totals.totalGeneral + blockSulfiteWorkbook.totals.totalGeneral + blockAutocopiativoWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
   const quoteDiscount = calculateDiscount(combinedSubtotal, state.quoteDiscountType, state.quoteDiscountValue);
   const combinedTotal = quoteDiscount.total;
-  const combinedUnits = workbook.totals.totalQuantity + colorWorkbook.totals.totalQuantity + credentialWorkbook.totals.totalQuantity + readyWorkbook.totals.totalQuantity + businessCardWorkbook.totals.totalQuantity + flyerWorkbook.totals.totalQuantity + blockSulfiteWorkbook.totals.totalQuantity + blockAutocopiativoWorkbook.totals.totalQuantity + m2Workbook.totals.totalQuantity + resinWorkbook.totals.totalQuantity;
+  const combinedUnits = workbook.totals.totalQuantity + colorWorkbook.totals.totalQuantity + credentialWorkbook.totals.totalQuantity + readyWorkbook.totals.totalQuantity + freeQuoteWorkbook.totals.totalQuantity + businessCardWorkbook.totals.totalQuantity + flyerWorkbook.totals.totalQuantity + blockSulfiteWorkbook.totals.totalQuantity + blockAutocopiativoWorkbook.totals.totalQuantity + m2Workbook.totals.totalQuantity + resinWorkbook.totals.totalQuantity;
   const lineItemsMarkup = quoteEntries.length
     ? quoteEntries
         .map(
@@ -5086,7 +5175,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
   `;
 }
 
-function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, m2Workbook, resinWorkbook) {
+function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, m2Workbook, resinWorkbook) {
   const dateText = new Intl.DateTimeFormat("pt-BR").format(new Date());
   const lines = [
     `ORÇAMENTO | ${state.company.name || "Sua empresa"}`,
@@ -5119,6 +5208,9 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
     ...readyWorkbook.activeRows.map((row, index) => ({
       text: `- ${row.description || `Produto pronto ${index + 1}`} | ${row.quantity} unidades | ${row.productLabel}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
+    ...freeQuoteWorkbook.activeRows.map((row, index) => ({
+      text: `- ${row.description || `Serviço livre ${index + 1}`} | ${formatInteger(row.quantity)} un. | ${formatCurrency(row.unitValue)} por un. | ${formatCurrency(row.baseTotal)} base${row.artCreationFee > 0 ? ` | Criação de arte: ${formatCurrency(row.artCreationFee)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
+    })),
     ...businessCardWorkbook.activeRows.map((row, index) => ({
       text: `- ${row.description || `Cartão de visita ${index + 1}`} | ${row.quantity} cartões | ${row.productionType} | ${row.materialLabel} | ${row.printMode} | Pacote: ${row.packageLabel}${row.extraFinishTotal > 0 ? ` | Acabamento adicional: ${formatCurrency(row.extraFinishTotal)}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
@@ -5145,7 +5237,7 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
     quoteEntries.forEach((entry) => lines.push(entry.text));
   }
 
-  const combinedSubtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + flyerWorkbook.totals.totalGeneral + blockSulfiteWorkbook.totals.totalGeneral + blockAutocopiativoWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
+  const combinedSubtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + freeQuoteWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + flyerWorkbook.totals.totalGeneral + blockSulfiteWorkbook.totals.totalGeneral + blockAutocopiativoWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
   const quoteDiscount = calculateDiscount(combinedSubtotal, state.quoteDiscountType, state.quoteDiscountValue);
   if (quoteDiscount.hasDiscount) {
     lines.push("", `Subtotal: ${formatCurrency(combinedSubtotal)}`);
@@ -5167,7 +5259,7 @@ async function initApp() {
   const config = loadFromStorage(STORAGE_KEYS.config, mergeConfig);
   let configViewMode = loadConfigViewMode();
   let activeConfigSection = loadConfigSection();
-  let lastConfigSourceTab = activeConfigSection === "impressos" || activeConfigSection === "credenciais" || activeConfigSection === "produtos-prontos" || activeConfigSection === "cartoes" || activeConfigSection === "panfletos" || activeConfigSection === "m2" || activeConfigSection === "resinados" ? activeConfigSection : "calculo";
+  let lastConfigSourceTab = activeConfigSection === "impressos" || activeConfigSection === "credenciais" || activeConfigSection === "produtos-prontos" || activeConfigSection === "cartoes" || activeConfigSection === "panfletos" || activeConfigSection === "m2" || activeConfigSection === "resinados" || activeConfigSection === "orcamento-livre" ? activeConfigSection : "calculo";
   let isConfigUnlocked = loadSessionFlag(SESSION_KEYS.configUnlocked);
   let sharedSyncTimer = null;
   let sharedSyncInFlight = false;
@@ -5191,6 +5283,7 @@ async function initApp() {
   state.colorPrintItems = trimEmptyRows(state.colorPrintItems, 5, isColorPrintRowActive);
   state.credentialItems = trimEmptyRows(state.credentialItems, 5, isCredentialRowActive);
   state.readyProductItems = trimEmptyRows(state.readyProductItems, 5, isReadyProductRowActive);
+  state.freeQuoteItems = trimEmptyRows(state.freeQuoteItems, 5, (row) => Boolean((row.description || "").trim() || Number(row.quantity) > 0 || Number(row.unitValue) > 0 || Number(row.artCreationFee) > 0));
   state.businessCardItems = trimEmptyRows(state.businessCardItems, 5, isBusinessCardRowActive);
   state.flyerItems = trimEmptyRows(state.flyerItems, 5, isFlyerRowActive);
   state.blockItems.sulfite = trimEmptyRows(state.blockItems.sulfite, 5, isBlockRowActive);
@@ -5202,6 +5295,7 @@ async function initApp() {
   const colorRowsTableBody = document.getElementById("color-rows-table-body");
   const credentialRowsTableBody = document.getElementById("credential-rows-table-body");
   const readyRowsTableBody = document.getElementById("ready-rows-table-body");
+  const freeQuoteRowsTableBody = document.getElementById("free-quote-rows-table-body");
   const businessCardRowsTableBody = document.getElementById("business-card-rows-table-body");
   const flyerRowsTableBody = document.getElementById("flyer-rows-table-body");
   const blockSulfiteRowsTableBody = document.getElementById("block-sulfite-rows-table-body");
@@ -5211,6 +5305,7 @@ async function initApp() {
   const colorWarningList = document.getElementById("color-warning-list");
   const credentialWarningList = document.getElementById("credential-warning-list");
   const readyWarningList = document.getElementById("ready-warning-list");
+  const freeQuoteWarningList = document.getElementById("free-quote-warning-list");
   const businessCardWarningList = document.getElementById("business-card-warning-list");
   const flyerWarningList = document.getElementById("flyer-warning-list");
   const blockSulfiteWarningList = document.getElementById("block-sulfite-warning-list");
@@ -5226,6 +5321,7 @@ async function initApp() {
   const colorFeedback = document.getElementById("color-feedback");
   const credentialFeedback = document.getElementById("credential-feedback");
   const readyFeedback = document.getElementById("ready-feedback");
+  const freeQuoteFeedback = document.getElementById("free-quote-feedback");
   const businessCardFeedback = document.getElementById("business-card-feedback");
   const flyerFeedback = document.getElementById("flyer-feedback");
   const blockSulfiteFeedback = document.getElementById("block-sulfite-feedback");
@@ -5627,14 +5723,14 @@ async function initApp() {
 
   function selectTab(tabName) {
     if (tabName === "configuracao") {
-      activeConfigSection = lastConfigSourceTab === "impressos" || lastConfigSourceTab === "credenciais" || lastConfigSourceTab === "produtos-prontos" || lastConfigSourceTab === "cartoes" || lastConfigSourceTab === "panfletos" || lastConfigSourceTab === "m2" || lastConfigSourceTab === "resinados" ? lastConfigSourceTab : "calculo";
+      activeConfigSection = lastConfigSourceTab === "impressos" || lastConfigSourceTab === "credenciais" || lastConfigSourceTab === "produtos-prontos" || lastConfigSourceTab === "cartoes" || lastConfigSourceTab === "panfletos" || lastConfigSourceTab === "m2" || lastConfigSourceTab === "resinados" || lastConfigSourceTab === "orcamento-livre" ? lastConfigSourceTab : "calculo";
       saveConfigSection(activeConfigSection);
       renderConfig();
       if (!isConfigUnlocked) {
         setConfigStatus("Digite a senha para acessar a configuração.", "warning");
         focusConfigPasswordField();
       }
-    } else if (tabName === "calculo" || tabName === "impressos" || tabName === "credenciais" || tabName === "produtos-prontos" || tabName === "cartoes" || tabName === "panfletos" || tabName === "blocos-sulfite" || tabName === "blocos-autocopiativo" || tabName === "m2" || tabName === "resinados") {
+    } else if (tabName === "calculo" || tabName === "impressos" || tabName === "credenciais" || tabName === "produtos-prontos" || tabName === "cartoes" || tabName === "panfletos" || tabName === "blocos-sulfite" || tabName === "blocos-autocopiativo" || tabName === "m2" || tabName === "resinados" || tabName === "orcamento-livre") {
       lastConfigSourceTab = tabName;
     }
     tabButtons.forEach((button) => {
@@ -5885,6 +5981,7 @@ async function initApp() {
     const colorWorkbook = calculateColorPrintWorkbook(state, config);
     const credentialWorkbook = calculateCredentialWorkbook(state, config);
     const readyWorkbook = calculateReadyProductWorkbook(state, config);
+    const freeQuoteWorkbook = calculateFreeQuoteWorkbook(state);
     const businessCardWorkbook = calculateBusinessCardWorkbook(state);
     const flyerWorkbook = calculateFlyerWorkbook(state);
     const blockSulfiteWorkbook = calculateBlockWorkbook(state, "sulfite");
@@ -5912,6 +6009,10 @@ async function initApp() {
     document.getElementById("ready-summary-quantity").textContent = formatInteger(readyWorkbook.totals.totalQuantity);
     document.getElementById("ready-summary-total").textContent = formatCurrency(readyWorkbook.totals.totalGeneral);
     document.getElementById("ready-summary-average").textContent = formatCurrency(readyWorkbook.totals.averageValue);
+
+    document.getElementById("free-quote-summary-active").textContent = formatInteger(freeQuoteWorkbook.totals.activeLines);
+    document.getElementById("free-quote-summary-total").textContent = formatCurrency(freeQuoteWorkbook.totals.totalGeneral);
+    document.getElementById("free-quote-summary-average").textContent = formatCurrency(freeQuoteWorkbook.totals.averageValue);
 
     document.getElementById("business-summary-active").textContent = formatInteger(businessCardWorkbook.totals.activeLines);
     document.getElementById("business-summary-quantity").textContent = formatInteger(businessCardWorkbook.totals.totalQuantity);
@@ -6086,6 +6187,36 @@ async function initApp() {
         ? "Produtos prontos atualizados com sucesso."
         : "Use esta aba para vender cordões, carimbos e outros itens prontos por unidade, separados da credencial.",
       readyWorkbook.activeRows.length > 0 ? "success" : "neutral"
+    );
+
+    freeQuoteRowsTableBody.innerHTML = freeQuoteWorkbook.rows
+      .map(
+        (row, index) => `
+          <tr class="${row.active ? "" : "is-empty"}" data-free-quote-row-index="${index}">
+            <td><strong>${String(index + 1).padStart(2, "0")}</strong></td>
+            <td><input class="cell-input description" name="description" value="${escapeHtml(row.description)}" placeholder="Ex.: Serviço avulso"></td>
+            <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${escapeHtml(row.quantity)}" placeholder="0"></td>
+            <td><input class="cell-input" name="unitValue" type="number" min="0" step="0.01" value="${escapeHtml(row.unitValue)}" placeholder="0,00"></td>
+            <td><span class="readonly-value subtle">${formatCurrency(row.baseTotal || 0)}</span></td>
+            <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
+            <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
+            <td><input class="cell-input" name="discountValue" type="number" min="0" step="0.01" value="${escapeHtml(row.discountValue ?? 0)}" placeholder="0,00"></td>
+            <td><span class="readonly-value">${formatCurrency(row.total || 0)}</span></td>
+            <td><span class="readonly-value subtle">${formatCurrency(row.unitFinalValue || 0)}</span></td>
+          </tr>
+        `
+      )
+      .join("");
+
+    freeQuoteWarningList.innerHTML = freeQuoteWorkbook.warnings.length
+      ? freeQuoteWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
+      : `<div class="warning-item is-success">Sem alertas no momento. Use esta aba para lançar serviços personalizados com valor livre.</div>`;
+    setStatusMessage(
+      freeQuoteFeedback,
+      freeQuoteWorkbook.activeRows.length > 0
+        ? "Orçamento livre atualizado com sucesso."
+        : "Use esta aba para lançar serviços personalizados que também entram no orçamento final.",
+      freeQuoteWorkbook.activeRows.length > 0 ? "success" : "neutral"
     );
 
     businessCardRowsTableBody.innerHTML = businessCardWorkbook.rows
@@ -6271,8 +6402,8 @@ async function initApp() {
       ? resinWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
       : `<div class="warning-item is-success">Sem alertas no momento. Você pode montar várias medidas de resinados no mesmo orçamento por aqui.</div>`;
 
-    quotePreview.innerHTML = createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, m2Workbook, resinWorkbook);
-    return { workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, m2Workbook, resinWorkbook };
+    quotePreview.innerHTML = createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, m2Workbook, resinWorkbook);
+    return { workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, m2Workbook, resinWorkbook };
   }
 
   function closeM2FinishPopover() {
@@ -7135,6 +7266,30 @@ async function initApp() {
     renderRowsAndSummary();
   });
 
+  freeQuoteRowsTableBody.addEventListener("change", (event) => {
+    const target = event.target;
+    const rowElement = target.closest("tr[data-free-quote-row-index]");
+    if (!rowElement) {
+      return;
+    }
+    const row = state.freeQuoteItems[Number(rowElement.dataset.freeQuoteRowIndex)];
+    const field = target.name;
+    if (!field || !row) {
+      return;
+    }
+    if (field === "quantity") {
+      row[field] = toWholeNumber(target.value);
+    } else if (field === "unitValue" || field === "artCreationFee" || field === "discountValue") {
+      row[field] = toMoneyNumber(target.value);
+    } else if (field === "discountType") {
+      row[field] = normalizeDiscountType(target.value);
+    } else {
+      row[field] = target.value;
+    }
+    persistLocalOnly();
+    renderRowsAndSummary();
+  });
+
   businessCardRowsTableBody.addEventListener("change", (event) => {
     const target = event.target;
     const rowElement = target.closest("tr[data-business-card-row-index]");
@@ -7807,13 +7962,14 @@ async function initApp() {
     const colorWorkbook = calculateColorPrintWorkbook(state, config);
     const credentialWorkbook = calculateCredentialWorkbook(state, config);
     const readyWorkbook = calculateReadyProductWorkbook(state, config);
+    const freeQuoteWorkbook = calculateFreeQuoteWorkbook(state);
     const businessCardWorkbook = calculateBusinessCardWorkbook(state);
     const flyerWorkbook = calculateFlyerWorkbook(state);
     const m2Workbook = calculateM2WorkbookFromConfig(state, config);
     const resinWorkbook = calculateResinWorkbook(state, config);
     const blockSulfiteWorkbook = calculateBlockWorkbook(state, "sulfite");
     const blockAutocopiativoWorkbook = calculateBlockWorkbook(state, "autocopiativo");
-    const text = createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, m2Workbook, resinWorkbook);
+    const text = createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, m2Workbook, resinWorkbook);
     try {
       await navigator.clipboard.writeText(text);
       setMainFeedback("Resumo do orçamento copiado com sucesso.", "success");
@@ -7835,6 +7991,34 @@ async function initApp() {
     window.print();
     setTimeout(restoreTitle, 1000);
   });
+
+  const addFreeQuoteRowButton = document.getElementById("add-free-quote-row-button");
+  if (addFreeQuoteRowButton) {
+    addFreeQuoteRowButton.addEventListener("click", () => {
+      state.freeQuoteItems.push(createDefaultFreeQuoteRow(state.freeQuoteItems.length));
+      persistLocalOnly();
+      renderRowsAndSummary();
+    });
+  }
+
+  const clearFreeQuoteRowsButton = document.getElementById("clear-free-quote-rows-button");
+  if (clearFreeQuoteRowsButton) {
+    clearFreeQuoteRowsButton.addEventListener("click", async () => {
+      const confirmed = await confirmAppAction({
+        kicker: "Limpar linhas",
+        title: "Limpar orçamento livre",
+        message: "Deseja apagar todas as linhas da aba de orçamento livre?",
+        confirmLabel: "Limpar",
+        danger: true,
+      });
+      if (!confirmed) {
+        return;
+      }
+      state.freeQuoteItems = Array.from({ length: 5 }, (_, index) => createDefaultFreeQuoteRow(index));
+      persistLocalOnly();
+      renderRowsAndSummary();
+    });
+  }
 
   document.getElementById("save-client-button").addEventListener("click", () => {
     const formValues = readClientRecordForm();
@@ -7887,6 +8071,7 @@ async function initApp() {
     const colorWorkbook = calculateColorPrintWorkbook(state, config);
     const credentialWorkbook = calculateCredentialWorkbook(state, config);
     const readyWorkbook = calculateReadyProductWorkbook(state, config);
+    const freeQuoteWorkbook = calculateFreeQuoteWorkbook(state);
     const businessCardWorkbook = calculateBusinessCardWorkbook(state);
     const flyerWorkbook = calculateFlyerWorkbook(state);
     const m2Workbook = calculateM2WorkbookFromConfig(state, config);
@@ -7894,8 +8079,8 @@ async function initApp() {
     const title = state.client.name.trim() || `Orçamento ${new Date().toLocaleDateString("pt-BR")}`;
     const blockSulfiteWorkbook = calculateBlockWorkbook(state, "sulfite");
     const blockAutocopiativoWorkbook = calculateBlockWorkbook(state, "autocopiativo");
-    const summary = createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, m2Workbook, resinWorkbook).split("\n").slice(0, 10).join(" • ");
-    const subtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + flyerWorkbook.totals.totalGeneral + blockSulfiteWorkbook.totals.totalGeneral + blockAutocopiativoWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
+    const summary = createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, m2Workbook, resinWorkbook).split("\n").slice(0, 10).join(" • ");
+    const subtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + freeQuoteWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + flyerWorkbook.totals.totalGeneral + blockSulfiteWorkbook.totals.totalGeneral + blockAutocopiativoWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
     const quoteDiscount = calculateDiscount(subtotal, state.quoteDiscountType, state.quoteDiscountValue);
 
     state.quoteHistory.unshift({

@@ -29,6 +29,7 @@
       <button class="tab-button" data-tab-target="blocos-autocopiativo">Blocos autocopiativos</button>
       <button class="tab-button" data-tab-target="m2">Cálculo de m²</button>
       <button class="tab-button" data-tab-target="resinados">Resinados</button>
+      <button class="tab-button" data-tab-target="orcamento-livre">Orçamento livre</button>
       <button class="tab-button" data-tab-target="configuracao">Configuração</button>
       <button class="tab-button" data-tab-target="clientes">Clientes</button>
       <button class="tab-button" data-tab-target="historico">Histórico</button>
@@ -814,6 +815,63 @@
         </article>
       </section>
 
+      <section class="tab-panel" data-tab-panel="orcamento-livre">
+        <div class="summary-grid">
+          <article class="summary-card">
+            <span class="summary-label">Linhas ativas</span>
+            <strong id="free-quote-summary-active">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Itens</span>
+            <strong id="free-quote-summary-total">R$ 0,00</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Valor médio</span>
+            <strong id="free-quote-summary-average">R$ 0,00</strong>
+          </article>
+        </div>
+
+        <article class="panel panel-table">
+          <div class="panel-heading">
+            <div>
+              <h2>Orçamento livre</h2>
+              <p class="panel-copy">Use esta aba para digitar serviços avulsos com descrição, quantidade e valor livre. Tudo entra no orçamento final junto com as demais abas.</p>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <button id="add-free-quote-row-button" class="button button-primary" type="button">Adicionar linha</button>
+            <button id="clear-free-quote-rows-button" class="button button-danger" type="button">Limpar linhas</button>
+          </div>
+
+          <p class="helper-text status-note" id="free-quote-feedback">
+            O orçamento livre permite lançar serviços personalizados que não dependem de tabela fixa.
+          </p>
+
+          <div class="table-shell">
+            <table class="budget-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Serviço</th>
+                  <th>Quantidade</th>
+                  <th>Valor un.</th>
+                  <th>Total base</th>
+                  <th>Criação de arte</th>
+                  <th>Tipo desc.</th>
+                  <th>Desconto</th>
+                  <th>Total item</th>
+                  <th>Valor un. final</th>
+                </tr>
+              </thead>
+              <tbody id="free-quote-rows-table-body"></tbody>
+            </table>
+          </div>
+
+          <div class="warning-list" id="free-quote-warning-list"></div>
+        </article>
+      </section>
+
       <section class="tab-panel" data-tab-panel="configuracao">
         <div class="workspace-grid config-top-grid">
           <article class="panel">
@@ -1094,7 +1152,7 @@
   </div>
 
   <script src="./blocos-data.js?v=45a769731c54"></script>
-  <script src="./app.mjs?v=af65e4f7a511"></script>
+  <script src="./app.mjs?v=c547ce87cfa1"></script>
 </body>
 </html>
 
