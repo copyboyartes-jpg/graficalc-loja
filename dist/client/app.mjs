@@ -188,6 +188,24 @@ const DEFAULT_M2_DESCRIPTIONS = {
 
 const A4_WIDTH_MM = 210;
 const A4_HEIGHT_MM = 297;
+const POLASEAL_SIZES = [
+  { id: "a4", label: "A4", width: 220, height: 307 },
+  { id: "oficio", label: "Ofício", width: 222, height: 336 },
+  { id: "a3", label: "A3", width: 303, height: 426 },
+];
+const COLOR_EXTRA_OPTIONS = {
+  holes: ["Sem furo", "Furo 6mm", "Furo 4mm"],
+  folds: ["Sem dobra", "Dobra"],
+  lamination: [
+    "Sem plastificação",
+    "Plastificação inteira",
+    "Plastificação com corte",
+    "02 por polaseal",
+    "04 por polaseal",
+    "06 por polaseal",
+    "08 por polaseal",
+  ],
+};
 const A3_WIDTH_MM = 420;
 const A3_HEIGHT_MM = 297;
 const RESIN_MARGIN_MM = 3;
@@ -902,6 +920,9 @@ function createDefaultColorPrintRow(index) {
     paperType: "Sulfite 75g",
     quantity: 0,
     cutPriceOverride: "",
+    holeOption: "Sem furo",
+    foldOption: "Sem dobra",
+    laminationOption: "Sem plastificação",
     artCreationFee: 0,
     discountType: "R$",
     discountValue: 0,
@@ -1324,6 +1345,9 @@ function mergeState(candidate) {
       cutPriceOverride: row?.cutPriceOverride === "" || row?.cutPriceOverride === null || typeof row?.cutPriceOverride === "undefined"
         ? ""
         : toMoneyNumber(row?.cutPriceOverride),
+      holeOption: COLOR_EXTRA_OPTIONS.holes.includes(row?.holeOption) ? row.holeOption : "Sem furo",
+      foldOption: COLOR_EXTRA_OPTIONS.folds.includes(row?.foldOption) ? row.foldOption : "Sem dobra",
+      laminationOption: COLOR_EXTRA_OPTIONS.lamination.includes(row?.laminationOption) ? row.laminationOption : "Sem plastificação",
       artCreationFee: toMoneyNumber(row?.artCreationFee),
       discountType: normalizeDiscountType(row?.discountType),
       discountValue: toMoneyNumber(row?.discountValue),
@@ -1847,6 +1871,109 @@ function getBestFitOnA4(widthMm, heightMm) {
   }
 
   return { itemsPerSheet: normalTotal, cols: normalCols, rows: normalRows, rotated: false };
+}
+
+function getBestFitOnSheet(widthMm, heightMm, sheetWidth, sheetHeight) {
+  if (widthMm <= 0 || heightMm <= 0) {
+    return { itemsPerSheet: 0, cols: 0, rows: 0, rotated: false };
+  }
+
+  const normalCols = Math.floor(sheetWidth / widthMm);
+  const normalRows = Math.floor(sheetHeight / heightMm);
+  const normalTotal = normalCols * normalRows;
+  const rotatedCols = Math.floor(sheetWidth / heightMm);
+  const rotatedRows = Math.floor(sheetHeight / widthMm);
+  const rotatedTotal = rotatedCols * rotatedRows;
+
+  if (rotatedTotal > normalTotal) {
+    return { itemsPerSheet: rotatedTotal, cols: rotatedCols, rows: rotatedRows, rotated: true };
+  }
+
+  return { itemsPerSheet: normalTotal, cols: normalCols, rows: normalRows, rotated: false };
+}
+
+function calculateHundredExtra(quantity, minimumValue, eachHundredValue) {
+  const totalQuantity = toWholeNumber(quantity);
+  if (totalQuantity <= 0) return 0;
+  if (totalQuantity <= 100) return minimumValue;
+  return minimumValue + Math.ceil((totalQuantity - 100) / 100) * eachHundredValue;
+}
+
+function getWholeLaminationUnit(sheetId, quantity) {
+  const totalQuantity = toWholeNumber(quantity);
+  if (sheetId === "a3") {
+    if (totalQuantity > 50) return 8.10;
+    if (totalQuantity > 5) return 8.70;
+    return 10.40;
+  }
+  if (totalQuantity > 100) return 3.70;
+  if (totalQuantity > 50) return 3.85;
+  if (totalQuantity > 10) return 4.10;
+  return 4.65;
+}
+
+function calculatePolasealFit(widthMm, heightMm) {
+  const pieceWidth = widthMm + 10;
+  const pieceHeight = heightMm + 10;
+  const fits = POLASEAL_SIZES.map((sheet) => ({
+    ...sheet,
+    ...getBestFitOnSheet(pieceWidth, pieceHeight, sheet.width, sheet.height),
+  }));
+  const a4 = fits.find((fit) => fit.id === "a4");
+  const oficio = fits.find((fit) => fit.id === "oficio");
+  const a3 = fits.find((fit) => fit.id === "a3");
+  const regularBest = [a4, oficio].sort((a, b) => b.itemsPerSheet - a.itemsPerSheet)[0];
+  const shouldUseA3 = (regularBest.itemsPerSheet <= 0 && a3.itemsPerSheet > 0) || (regularBest.itemsPerSheet === 1 && a3.itemsPerSheet >= 3);
+  const best = shouldUseA3 ? a3 : regularBest;
+
+  return {
+    pieceWidth,
+    pieceHeight,
+    best,
+    description: best?.itemsPerSheet > 0
+      ? `${best.label}: ${best.itemsPerSheet} por polaseal${best.rotated ? " (girado)" : ""}`
+      : "Não cabe nos tamanhos de polaseal cadastrados",
+  };
+}
+
+function calculateColorExtras(row, widthMm, heightMm, quantity) {
+  const holeTotal = row.holeOption && row.holeOption !== "Sem furo" ? calculateHundredExtra(quantity, 10, 3) : 0;
+  const foldTotal = row.foldOption === "Dobra" ? calculateHundredExtra(quantity, 10, 5) : 0;
+  let laminationTotal = 0;
+  let laminationFit = calculatePolasealFit(widthMm, heightMm);
+
+  if (row.laminationOption === "Plastificação inteira") {
+    const sheet = laminationFit.best?.id === "a3" ? "a3" : "a4";
+    laminationTotal = quantity * getWholeLaminationUnit(sheet, quantity);
+  } else if (row.laminationOption === "Plastificação com corte") {
+    laminationTotal = quantity * 23;
+  } else {
+    const perSheetMap = {
+      "02 por polaseal": { perSheet: 2, price: 8 },
+      "04 por polaseal": { perSheet: 4, price: 10 },
+      "06 por polaseal": { perSheet: 6, price: 12 },
+      "08 por polaseal": { perSheet: 8, price: 14 },
+    };
+    const selected = perSheetMap[row.laminationOption];
+    if (selected) {
+      laminationTotal = Math.ceil(quantity / selected.perSheet) * selected.price;
+    }
+  }
+
+  const total = holeTotal + foldTotal + laminationTotal;
+  const labels = [];
+  if (holeTotal > 0) labels.push(`${row.holeOption}: ${formatCurrency(holeTotal)}`);
+  if (foldTotal > 0) labels.push(`Dobra: ${formatCurrency(foldTotal)}`);
+  if (laminationTotal > 0) labels.push(`${row.laminationOption}: ${formatCurrency(laminationTotal)}`);
+
+  return {
+    holeTotal,
+    foldTotal,
+    laminationTotal,
+    total,
+    summary: labels.join(" | "),
+    laminationFit,
+  };
 }
 
 function estimateCuts(cols, rows) {
@@ -2888,6 +3015,9 @@ function calculateColorPrintWorkbook(state, config) {
         printTotal: 0,
         suggestedCutPrice: 0,
         finalCutPrice: row.cutPriceOverride === "" ? 0 : toMoneyNumber(row.cutPriceOverride),
+        colorExtrasTotal: 0,
+        colorExtrasSummary: "",
+        laminationFitDescription: "",
         artCreationFee: getArtCreationFee(row),
         ...applyRowDiscount(row, (row.cutPriceOverride === "" ? 0 : toMoneyNumber(row.cutPriceOverride)) + getArtCreationFee(row), quantity),
         estimatedCuts: 0,
@@ -2912,6 +3042,9 @@ function calculateColorPrintWorkbook(state, config) {
         printTotal: 0,
         suggestedCutPrice: 0,
         finalCutPrice: row.cutPriceOverride === "" ? 0 : toMoneyNumber(row.cutPriceOverride),
+        colorExtrasTotal: 0,
+        colorExtrasSummary: "",
+        laminationFitDescription: "",
         artCreationFee: getArtCreationFee(row),
         ...applyRowDiscount(row, (row.cutPriceOverride === "" ? 0 : toMoneyNumber(row.cutPriceOverride)) + getArtCreationFee(row), quantity),
         estimatedCuts: 0,
@@ -2936,8 +3069,9 @@ function calculateColorPrintWorkbook(state, config) {
     }
 
     const finalCutPrice = row.cutPriceOverride === "" ? suggestedCutPrice : toMoneyNumber(row.cutPriceOverride);
+    const colorExtras = calculateColorExtras(row, effectiveWidth, effectiveHeight, quantity);
     const artCreationFee = getArtCreationFee(row);
-    const rowDiscount = applyRowDiscount(row, printTotal + finalCutPrice + artCreationFee, quantity);
+    const rowDiscount = applyRowDiscount(row, printTotal + finalCutPrice + colorExtras.total + artCreationFee, quantity);
 
     return {
       ...row,
@@ -2952,6 +3086,9 @@ function calculateColorPrintWorkbook(state, config) {
       printTotal,
       suggestedCutPrice,
       finalCutPrice,
+      colorExtrasTotal: colorExtras.total,
+      colorExtrasSummary: colorExtras.summary,
+      laminationFitDescription: colorExtras.laminationFit.description,
       artCreationFee,
       ...rowDiscount,
       estimatedCuts,
@@ -4663,6 +4800,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       kind: "Impresso colorido",
       description: row.description,
       detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.paperType} | ${row.printMode}`,
+      extraDetail: row.colorExtrasSummary || "",
       artDetail: formatArtCreationDetail(row),
       discountDetail: row.discountDescription,
       total: row.total,
@@ -4844,7 +4982,7 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
       };
     }),
     ...colorWorkbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || `Impresso ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.paperType} | ${row.printMode}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
+      text: `- ${row.description || `Impresso ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.paperType} | ${row.printMode}${row.colorExtrasSummary ? ` | ${row.colorExtrasSummary}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...credentialWorkbook.activeRows.map((row, index) => ({
       text: `- ${row.description || `Credencial ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthCm)} x ${formatMeasure(row.heightCm)} cm | ${row.materialLabel} | ${row.printMode}${row.lamination === "Com laminação" ? " | Com laminação" : ""}${row.lanyardType !== "none" ? ` | ${row.lanyardLabel}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
@@ -5730,6 +5868,11 @@ async function initApp() {
             <td><span class="readonly-value subtle">${formatCurrency(row.printTotal)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.suggestedCutPrice)}</span></td>
             <td><input class="cell-input" name="cutPriceOverride" type="number" min="0" step="0.01" value="${escapeHtml(row.cutPriceOverride)}" placeholder="${row.suggestedCutPrice > 0 ? row.suggestedCutPrice.toFixed(2) : "0.00"}"></td>
+            <td><select class="cell-select" name="holeOption">${buildOptions(COLOR_EXTRA_OPTIONS.holes, row.holeOption || "Sem furo")}</select></td>
+            <td><select class="cell-select" name="foldOption">${buildOptions(COLOR_EXTRA_OPTIONS.folds, row.foldOption || "Sem dobra")}</select></td>
+            <td><select class="cell-select" name="laminationOption">${buildOptions(COLOR_EXTRA_OPTIONS.lamination, row.laminationOption || "Sem plastificação")}</select></td>
+            <td><span class="readonly-value subtle">${formatCurrency(row.colorExtrasTotal || 0)}</span></td>
+            <td><span class="readonly-value subtle">${escapeHtml(row.laminationFitDescription || "-")}</span></td>
             <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
             <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
             <td><input class="cell-input" name="discountValue" type="number" min="0" step="0.01" value="${escapeHtml(row.discountValue ?? 0)}" placeholder="0,00"></td>
@@ -7623,7 +7766,7 @@ async function initApp() {
     const blockSulfiteWorkbook = calculateBlockWorkbook(state, "sulfite");
     const blockAutocopiativoWorkbook = calculateBlockWorkbook(state, "autocopiativo");
     const summary = createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, m2Workbook, resinWorkbook).split("\n").slice(0, 10).join(" • ");
-    const subtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + flyerWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
+    const subtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + flyerWorkbook.totals.totalGeneral + blockSulfiteWorkbook.totals.totalGeneral + blockAutocopiativoWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
     const quoteDiscount = calculateDiscount(subtotal, state.quoteDiscountType, state.quoteDiscountValue);
 
     state.quoteHistory.unshift({
