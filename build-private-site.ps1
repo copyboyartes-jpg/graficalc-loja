@@ -24,15 +24,18 @@ New-Item -ItemType Directory -Path $openaiOutput -Force | Out-Null
 Copy-Item (Join-Path $clientSource 'index.html') (Join-Path $clientOutput 'index.html')
 Copy-Item (Join-Path $clientSource 'styles.css') (Join-Path $clientOutput 'styles.css')
 Copy-Item (Join-Path $clientSource 'app.mjs') (Join-Path $clientOutput 'app.mjs')
+Copy-Item (Join-Path $clientSource 'blocos-data.js') (Join-Path $clientOutput 'blocos-data.js')
 if (Test-Path (Join-Path $clientSource 'assets')) {
     Copy-Item (Join-Path $clientSource 'assets') (Join-Path $clientOutput 'assets') -Recurse -Force
 }
 
 $appHash = (Get-FileHash (Join-Path $clientOutput 'app.mjs') -Algorithm SHA256).Hash.Substring(0, 12).ToLower()
+$blocosHash = (Get-FileHash (Join-Path $clientOutput 'blocos-data.js') -Algorithm SHA256).Hash.Substring(0, 12).ToLower()
 $stylesHash = (Get-FileHash (Join-Path $clientOutput 'styles.css') -Algorithm SHA256).Hash.Substring(0, 12).ToLower()
 $indexPath = Join-Path $clientOutput 'index.html'
 $indexContent = Get-Content -Path $indexPath -Raw
 $indexContent = $indexContent.Replace('./styles.css', "./styles.css?v=$stylesHash")
+$indexContent = $indexContent.Replace('./blocos-data.js', "./blocos-data.js?v=$blocosHash")
 $indexContent = $indexContent.Replace('./app.mjs', "./app.mjs?v=$appHash")
 Set-Content -Path $indexPath -Value $indexContent -Encoding UTF8
 

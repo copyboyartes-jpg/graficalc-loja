@@ -25,6 +25,8 @@
       <button class="tab-button" data-tab-target="produtos-prontos">Produtos prontos</button>
       <button class="tab-button" data-tab-target="cartoes">Cartões de visitas</button>
       <button class="tab-button" data-tab-target="panfletos">Panfletos e folders</button>
+      <button class="tab-button" data-tab-target="blocos-sulfite">Blocos sulfite</button>
+      <button class="tab-button" data-tab-target="blocos-autocopiativo">Blocos autocopiativos</button>
       <button class="tab-button" data-tab-target="m2">Cálculo de m²</button>
       <button class="tab-button" data-tab-target="resinados">Resinados</button>
       <button class="tab-button" data-tab-target="configuracao">Configuração</button>
@@ -613,6 +615,132 @@
         </article>
       </section>
 
+      <section class="tab-panel" data-tab-panel="blocos-sulfite">
+        <div class="summary-grid">
+          <article class="summary-card">
+            <span class="summary-label">Linhas ativas</span>
+            <strong id="block-sulfite-summary-active">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Blocos</span>
+            <strong id="block-sulfite-summary-quantity">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Total geral</span>
+            <strong id="block-sulfite-summary-total">R$ 0,00</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Valor médio</span>
+            <strong id="block-sulfite-summary-average">R$ 0,00</strong>
+          </article>
+        </div>
+
+        <article class="panel panel-table">
+          <div class="panel-heading">
+            <div>
+              <h2>Blocos em papel sulfite 75g</h2>
+              <p class="panel-copy">Selecione formato, vias e quantidade para puxar o preço cadastrado na tabela de blocos.</p>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <button id="add-block-sulfite-row-button" class="button button-primary" type="button">Adicionar linha</button>
+            <button id="clear-block-sulfite-rows-button" class="button button-danger" type="button">Limpar linhas</button>
+          </div>
+
+          <p class="helper-text status-note" id="block-sulfite-feedback">
+            Use esta aba para orçar vários blocos em sulfite no mesmo orçamento.
+          </p>
+
+          <div class="table-shell">
+            <table class="budget-table block-budget-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Descrição</th>
+                  <th>Formato</th>
+                  <th>Medida</th>
+                  <th>Vias</th>
+                  <th>Quantidade</th>
+                  <th>Valor base</th>
+                  <th>Criação de arte</th>
+                  <th>Tipo desc.</th>
+                  <th>Desconto</th>
+                  <th>Total item</th>
+                  <th>Valor un.</th>
+                </tr>
+              </thead>
+              <tbody id="block-sulfite-rows-table-body"></tbody>
+            </table>
+          </div>
+
+          <div class="warning-list" id="block-sulfite-warning-list"></div>
+        </article>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="blocos-autocopiativo">
+        <div class="summary-grid">
+          <article class="summary-card">
+            <span class="summary-label">Linhas ativas</span>
+            <strong id="block-autocopiativo-summary-active">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Blocos</span>
+            <strong id="block-autocopiativo-summary-quantity">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Total geral</span>
+            <strong id="block-autocopiativo-summary-total">R$ 0,00</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Valor médio</span>
+            <strong id="block-autocopiativo-summary-average">R$ 0,00</strong>
+          </article>
+        </div>
+
+        <article class="panel panel-table">
+          <div class="panel-heading">
+            <div>
+              <h2>Blocos em papel autocopiativo</h2>
+              <p class="panel-copy">Selecione formato, vias e quantidade para puxar o preço cadastrado na tabela de blocos autocopiativos.</p>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <button id="add-block-autocopiativo-row-button" class="button button-primary" type="button">Adicionar linha</button>
+            <button id="clear-block-autocopiativo-rows-button" class="button button-danger" type="button">Limpar linhas</button>
+          </div>
+
+          <p class="helper-text status-note" id="block-autocopiativo-feedback">
+            Use esta aba para orçar vários blocos autocopiativos no mesmo orçamento.
+          </p>
+
+          <div class="table-shell">
+            <table class="budget-table block-budget-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Descrição</th>
+                  <th>Formato</th>
+                  <th>Medida</th>
+                  <th>Vias</th>
+                  <th>Quantidade</th>
+                  <th>Valor base</th>
+                  <th>Criação de arte</th>
+                  <th>Tipo desc.</th>
+                  <th>Desconto</th>
+                  <th>Total item</th>
+                  <th>Valor un.</th>
+                </tr>
+              </thead>
+              <tbody id="block-autocopiativo-rows-table-body"></tbody>
+            </table>
+          </div>
+
+          <div class="warning-list" id="block-autocopiativo-warning-list"></div>
+        </article>
+      </section>
+
       <section class="tab-panel" data-tab-panel="resinados">
         <div class="summary-grid">
           <article class="summary-card">
@@ -960,7 +1088,8 @@
     </div>
   </div>
 
-  <script src="./app.mjs?v=9e54c9fdcf70"></script>
+  <script src="./blocos-data.js?v=9b338f99289a"></script>
+  <script src="./app.mjs?v=8860d04bc588"></script>
 </body>
 </html>
 

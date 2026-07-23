@@ -59,6 +59,12 @@ const OPTIONS = {
   m2CalcModes: ["Independente", "Somar materiais iguais"],
 };
 
+const BLOCK_CATALOG = Array.isArray(window.BLOCK_CATALOG) ? window.BLOCK_CATALOG : [];
+const BLOCK_TAB_LABELS = {
+  sulfite: "Blocos em papel sulfite 75g",
+  autocopiativo: "Blocos em papel autocopiativo",
+};
+
 const M2_PRODUCTS = [
   {
     id: "adesivo-corte-especial",
@@ -993,6 +999,20 @@ function createDefaultFlyerRow(index) {
   };
 }
 
+function createDefaultBlockRow(index, tab = "sulfite") {
+  const first = BLOCK_CATALOG.find((item) => item.tab === tab) || BLOCK_CATALOG[0] || {};
+  return {
+    id: `block-${tab}-row-${index + 1}`,
+    description: "",
+    format: first.format || "",
+    vias: first.vias || 1,
+    quantity: first.quantity || 0,
+    artCreationFee: 0,
+    discountType: "R$",
+    discountValue: 0,
+  };
+}
+
 function getDefaultM2Description(productId) {
   return DEFAULT_M2_DESCRIPTIONS[productId] || "";
 }
@@ -1024,6 +1044,10 @@ function createDefaultState() {
     resinItems: Array.from({ length: 5 }, (_, index) => createDefaultResinRow(index)),
     businessCardItems: Array.from({ length: 5 }, (_, index) => createDefaultBusinessCardRow(index)),
     flyerItems: Array.from({ length: 5 }, (_, index) => createDefaultFlyerRow(index)),
+    blockItems: {
+      sulfite: Array.from({ length: 5 }, (_, index) => createDefaultBlockRow(index, "sulfite")),
+      autocopiativo: Array.from({ length: 5 }, (_, index) => createDefaultBlockRow(index, "autocopiativo")),
+    },
     client: {
       name: "",
       contact: "",
@@ -1418,6 +1442,35 @@ function mergeState(candidate) {
       discountValue: toMoneyNumber(row?.discountValue),
       id: row?.id || `flyer-row-${index + 1}`,
     }));
+  }
+
+  if (candidate.blockItems && typeof candidate.blockItems === "object") {
+    state.blockItems = {
+      sulfite: Array.isArray(candidate.blockItems.sulfite) && candidate.blockItems.sulfite.length > 0
+        ? candidate.blockItems.sulfite.map((row, index) => ({
+            ...createDefaultBlockRow(index, "sulfite"),
+            ...row,
+            vias: toWholeNumber(row?.vias) || 1,
+            quantity: toWholeNumber(row?.quantity),
+            artCreationFee: toMoneyNumber(row?.artCreationFee),
+            discountType: normalizeDiscountType(row?.discountType),
+            discountValue: toMoneyNumber(row?.discountValue),
+            id: row?.id || `block-sulfite-row-${index + 1}`,
+          }))
+        : state.blockItems.sulfite,
+      autocopiativo: Array.isArray(candidate.blockItems.autocopiativo) && candidate.blockItems.autocopiativo.length > 0
+        ? candidate.blockItems.autocopiativo.map((row, index) => ({
+            ...createDefaultBlockRow(index, "autocopiativo"),
+            ...row,
+            vias: toWholeNumber(row?.vias) || 1,
+            quantity: toWholeNumber(row?.quantity),
+            artCreationFee: toMoneyNumber(row?.artCreationFee),
+            discountType: normalizeDiscountType(row?.discountType),
+            discountValue: toMoneyNumber(row?.discountValue),
+            id: row?.id || `block-autocopiativo-row-${index + 1}`,
+          }))
+        : state.blockItems.autocopiativo,
+    };
   }
 
   return state;
@@ -2462,6 +2515,119 @@ function calculateFlyerWorkbook(state) {
   };
 }
 
+function isBlockRowActive(row) {
+  return Boolean(row.description?.trim() || Number(row.quantity) > 0);
+}
+
+function getBlockCatalogByTab(tab) {
+  return BLOCK_CATALOG.filter((item) => item.tab === tab);
+}
+
+function getBlockFormats(tab) {
+  return [...new Set(getBlockCatalogByTab(tab).map((item) => item.format))];
+}
+
+function getBlockViasOptions(tab, format) {
+  return [...new Set(getBlockCatalogByTab(tab).filter((item) => item.format === format).map((item) => Number(item.vias)))].sort((a, b) => a - b);
+}
+
+function getBlockQuantityOptions(tab, format, vias) {
+  return getBlockCatalogByTab(tab)
+    .filter((item) => item.format === format && Number(item.vias) === Number(vias))
+    .sort((a, b) => Number(a.quantity) - Number(b.quantity));
+}
+
+function getBlockPriceItem(tab, row) {
+  return getBlockCatalogByTab(tab).find((item) =>
+    item.format === row.format &&
+    Number(item.vias) === Number(row.vias) &&
+    Number(item.quantity) === Number(row.quantity)
+  ) || null;
+}
+
+function normalizeBlockRowChoice(row, tab) {
+  const formats = getBlockFormats(tab);
+  if (!formats.includes(row.format)) {
+    row.format = formats[0] || "";
+  }
+  const viasOptions = getBlockViasOptions(tab, row.format);
+  if (!viasOptions.includes(Number(row.vias))) {
+    row.vias = viasOptions[0] || 1;
+  }
+  const quantityOptions = getBlockQuantityOptions(tab, row.format, row.vias);
+  const quantity = toWholeNumber(row.quantity);
+  if (quantity > 0 && !quantityOptions.some((item) => Number(item.quantity) === quantity)) {
+    row.quantity = Number(quantityOptions[0]?.quantity) || 0;
+  }
+}
+
+function buildBlockFormatOptions(tab, currentValue) {
+  return getBlockFormats(tab)
+    .map((format) => `<option value="${escapeHtml(format)}"${format === currentValue ? " selected" : ""}>${escapeHtml(format)}</option>`)
+    .join("");
+}
+
+function buildBlockViasOptions(tab, format, currentValue) {
+  return getBlockViasOptions(tab, format)
+    .map((vias) => `<option value="${escapeHtml(vias)}"${Number(currentValue) === vias ? " selected" : ""}>${formatInteger(vias)} via${vias > 1 ? "s" : ""}</option>`)
+    .join("");
+}
+
+function buildBlockQuantityOptions(tab, format, vias, currentValue) {
+  const quantity = toWholeNumber(currentValue);
+  return [
+    `<option value="0"${quantity <= 0 ? " selected" : ""}>Escolher</option>`,
+    ...getBlockQuantityOptions(tab, format, vias).map((item) => `<option value="${escapeHtml(item.quantity)}"${quantity === Number(item.quantity) ? " selected" : ""}>${formatInteger(item.quantity)} blocos - ${formatCurrency(item.price)}</option>`),
+  ].join("");
+}
+
+function calculateBlockWorkbook(state, tab) {
+  const rows = (state.blockItems?.[tab] || []).map((row, index) => {
+    const quantity = toWholeNumber(row.quantity);
+    const active = isBlockRowActive(row);
+    const priceItem = getBlockPriceItem(tab, row);
+    const baseTotal = active && priceItem ? toMoneyNumber(priceItem.price) : 0;
+    const artCreationFee = getArtCreationFee(row);
+    const rowDiscount = applyRowDiscount(row, baseTotal + artCreationFee, quantity);
+    const warning = active && quantity <= 0
+      ? `Bloco ${index + 1}: escolha uma quantidade da tabela.`
+      : active && !priceItem
+        ? `Bloco ${index + 1}: escolha uma combinação válida de formato, vias e quantidade.`
+        : "";
+
+    return {
+      ...row,
+      active,
+      valid: active ? quantity > 0 && Boolean(priceItem) : false,
+      quantity,
+      vias: toWholeNumber(row.vias) || 1,
+      measure: priceItem?.measure || "",
+      tabLabel: BLOCK_TAB_LABELS[tab] || "Blocos",
+      baseTotal,
+      artCreationFee,
+      ...rowDiscount,
+      warning,
+    };
+  });
+
+  const activeRows = rows.filter((row) => row.active && row.valid);
+  const warnings = rows.filter((row) => row.warning).map((row) => row.warning);
+  const totalQuantity = activeRows.reduce((sum, row) => sum + row.quantity, 0);
+  const totalGeneral = activeRows.reduce((sum, row) => sum + row.total, 0);
+
+  return {
+    rows,
+    activeRows,
+    warnings,
+    totals: {
+      activeLines: activeRows.length,
+      totalQuantity,
+      totalGeneral,
+      averageValue: totalQuantity > 0 ? totalGeneral / totalQuantity : 0,
+    },
+  };
+}
+
 function calculateWorkbook(state, config) {
   const rows = state.rows.map((row) => ({
     ...row,
@@ -3182,6 +3348,18 @@ function ensureFlyerRowCount(state, minimumCount) {
   }
   while (state.flyerItems.length < minimumCount) {
     state.flyerItems.push(createDefaultFlyerRow(state.flyerItems.length));
+  }
+}
+
+function ensureBlockRowCount(state, tab, minimumCount) {
+  if (!state.blockItems || typeof state.blockItems !== "object") {
+    state.blockItems = {};
+  }
+  if (!Array.isArray(state.blockItems[tab])) {
+    state.blockItems[tab] = [];
+  }
+  while (state.blockItems[tab].length < minimumCount) {
+    state.blockItems[tab].push(createDefaultBlockRow(state.blockItems[tab].length, tab));
   }
 }
 
@@ -4466,7 +4644,7 @@ function calculateResinWorkbook(state, config) {
   };
 }
 
-function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, flyerWorkbook, m2Workbook, resinWorkbook) {
+function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, m2Workbook, resinWorkbook) {
   const dateText = new Intl.DateTimeFormat("pt-BR").format(new Date());
   const quoteEntries = [
     ...workbook.activeRows.map((row) => {
@@ -4524,6 +4702,22 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       discountDetail: row.discountDescription,
       total: row.total,
     })),
+    ...blockSulfiteWorkbook.activeRows.map((row) => ({
+      kind: "Blocos sulfite",
+      description: row.description || "Bloco sulfite",
+      detail: `${formatInteger(row.quantity)} blocos | ${row.format} | ${row.measure} | ${formatInteger(row.vias)} via${row.vias > 1 ? "s" : ""}`,
+      artDetail: formatArtCreationDetail(row),
+      discountDetail: row.discountDescription,
+      total: row.total,
+    })),
+    ...blockAutocopiativoWorkbook.activeRows.map((row) => ({
+      kind: "Blocos autocopiativos",
+      description: row.description || "Bloco autocopiativo",
+      detail: `${formatInteger(row.quantity)} blocos | ${row.format} | ${row.measure} | ${formatInteger(row.vias)} via${row.vias > 1 ? "s" : ""}`,
+      artDetail: formatArtCreationDetail(row),
+      discountDetail: row.discountDescription,
+      total: row.total,
+    })),
     ...m2Workbook.activeRows.map((row) => ({
       kind: "Cálculo de m²",
       description: getM2RowDescription(row),
@@ -4542,10 +4736,10 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       total: row.total,
     })),
   ];
-  const combinedSubtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + flyerWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
+  const combinedSubtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + flyerWorkbook.totals.totalGeneral + blockSulfiteWorkbook.totals.totalGeneral + blockAutocopiativoWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
   const quoteDiscount = calculateDiscount(combinedSubtotal, state.quoteDiscountType, state.quoteDiscountValue);
   const combinedTotal = quoteDiscount.total;
-  const combinedUnits = workbook.totals.totalQuantity + colorWorkbook.totals.totalQuantity + credentialWorkbook.totals.totalQuantity + readyWorkbook.totals.totalQuantity + businessCardWorkbook.totals.totalQuantity + flyerWorkbook.totals.totalQuantity + m2Workbook.totals.totalQuantity + resinWorkbook.totals.totalQuantity;
+  const combinedUnits = workbook.totals.totalQuantity + colorWorkbook.totals.totalQuantity + credentialWorkbook.totals.totalQuantity + readyWorkbook.totals.totalQuantity + businessCardWorkbook.totals.totalQuantity + flyerWorkbook.totals.totalQuantity + blockSulfiteWorkbook.totals.totalQuantity + blockAutocopiativoWorkbook.totals.totalQuantity + m2Workbook.totals.totalQuantity + resinWorkbook.totals.totalQuantity;
   const lineItemsMarkup = quoteEntries.length
     ? quoteEntries
         .map(
@@ -4625,7 +4819,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
   `;
 }
 
-function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, flyerWorkbook, m2Workbook, resinWorkbook) {
+function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, m2Workbook, resinWorkbook) {
   const dateText = new Intl.DateTimeFormat("pt-BR").format(new Date());
   const lines = [
     `ORÇAMENTO | ${state.company.name || "Sua empresa"}`,
@@ -4664,6 +4858,12 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
     ...flyerWorkbook.activeRows.map((row, index) => ({
       text: `- ${row.description || `Panfleto/folder ${index + 1}`} | ${row.quantity} unidades | ${row.productionType} | ${row.paper} | ${row.size} | ${row.printMode}${row.foldType !== "Sem dobra" ? ` | ${row.foldType}` : ""}${row.foldTotal > 0 ? ` | Dobra: ${formatCurrency(row.foldTotal)}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
+    ...blockSulfiteWorkbook.activeRows.map((row, index) => ({
+      text: `- ${row.description || `Bloco sulfite ${index + 1}`} | ${row.quantity} blocos | ${row.format} | ${row.measure} | ${row.vias} via${row.vias > 1 ? "s" : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
+    })),
+    ...blockAutocopiativoWorkbook.activeRows.map((row, index) => ({
+      text: `- ${row.description || `Bloco autocopiativo ${index + 1}`} | ${row.quantity} blocos | ${row.format} | ${row.measure} | ${row.vias} via${row.vias > 1 ? "s" : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
+    })),
     ...m2Workbook.activeRows.map((row, index) => ({
       text: `- ${getM2RowDescription(row) || `M² ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.finishSummary ? `${row.finishSummary} | ` : ""}${formatArtCreationDetail(row) ? `${formatArtCreationDetail(row)} | ` : ""}${row.discountDescription ? `${row.discountDescription} | ` : ""}${formatCurrency(row.total)}`,
     })),
@@ -4678,7 +4878,7 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
     quoteEntries.forEach((entry) => lines.push(entry.text));
   }
 
-  const combinedSubtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + flyerWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
+  const combinedSubtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + flyerWorkbook.totals.totalGeneral + blockSulfiteWorkbook.totals.totalGeneral + blockAutocopiativoWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
   const quoteDiscount = calculateDiscount(combinedSubtotal, state.quoteDiscountType, state.quoteDiscountValue);
   if (quoteDiscount.hasDiscount) {
     lines.push("", `Subtotal: ${formatCurrency(combinedSubtotal)}`);
@@ -4716,6 +4916,8 @@ async function initApp() {
   ensureReadyProductRowCount(state, 5);
   ensureBusinessCardRowCount(state, 5);
   ensureFlyerRowCount(state, 5);
+  ensureBlockRowCount(state, "sulfite", 5);
+  ensureBlockRowCount(state, "autocopiativo", 5);
   ensureM2RowCount(state, 5);
   ensureResinRowCount(state, 5);
   state.rows = trimEmptyRows(state.rows, 5, isRowActive);
@@ -4724,6 +4926,8 @@ async function initApp() {
   state.readyProductItems = trimEmptyRows(state.readyProductItems, 5, isReadyProductRowActive);
   state.businessCardItems = trimEmptyRows(state.businessCardItems, 5, isBusinessCardRowActive);
   state.flyerItems = trimEmptyRows(state.flyerItems, 5, isFlyerRowActive);
+  state.blockItems.sulfite = trimEmptyRows(state.blockItems.sulfite, 5, isBlockRowActive);
+  state.blockItems.autocopiativo = trimEmptyRows(state.blockItems.autocopiativo, 5, isBlockRowActive);
   state.m2Items = trimEmptyRows(state.m2Items, 5, (row) => Boolean(row.description?.trim() || Number(row.quantity) > 0 || Number(row.widthMm) > 0 || Number(row.heightMm) > 0));
   state.resinItems = trimEmptyRows(state.resinItems, 5, isResinRowActive);
 
@@ -4733,6 +4937,8 @@ async function initApp() {
   const readyRowsTableBody = document.getElementById("ready-rows-table-body");
   const businessCardRowsTableBody = document.getElementById("business-card-rows-table-body");
   const flyerRowsTableBody = document.getElementById("flyer-rows-table-body");
+  const blockSulfiteRowsTableBody = document.getElementById("block-sulfite-rows-table-body");
+  const blockAutocopiativoRowsTableBody = document.getElementById("block-autocopiativo-rows-table-body");
   const resinRowsTableBody = document.getElementById("resin-rows-table-body");
   const warningList = document.getElementById("warning-list");
   const colorWarningList = document.getElementById("color-warning-list");
@@ -4740,6 +4946,8 @@ async function initApp() {
   const readyWarningList = document.getElementById("ready-warning-list");
   const businessCardWarningList = document.getElementById("business-card-warning-list");
   const flyerWarningList = document.getElementById("flyer-warning-list");
+  const blockSulfiteWarningList = document.getElementById("block-sulfite-warning-list");
+  const blockAutocopiativoWarningList = document.getElementById("block-autocopiativo-warning-list");
   const m2WarningList = document.getElementById("m2-warning-list");
   const resinWarningList = document.getElementById("resin-warning-list");
   const configSections = document.getElementById("config-sections");
@@ -4753,6 +4961,8 @@ async function initApp() {
   const readyFeedback = document.getElementById("ready-feedback");
   const businessCardFeedback = document.getElementById("business-card-feedback");
   const flyerFeedback = document.getElementById("flyer-feedback");
+  const blockSulfiteFeedback = document.getElementById("block-sulfite-feedback");
+  const blockAutocopiativoFeedback = document.getElementById("block-autocopiativo-feedback");
   const resinFeedback = document.getElementById("resin-feedback");
   const configStatus = document.getElementById("config-status");
   const syncStatus = document.getElementById("sync-status");
@@ -4812,6 +5022,10 @@ async function initApp() {
 
   function setFlyerFeedback(message, tone = "neutral") {
     setStatusMessage(flyerFeedback, message, tone);
+  }
+
+  function setBlockFeedback(tab, message, tone = "neutral") {
+    setStatusMessage(tab === "autocopiativo" ? blockAutocopiativoFeedback : blockSulfiteFeedback, message, tone);
   }
 
   function setResinFeedback(message, tone = "neutral") {
@@ -5153,7 +5367,7 @@ async function initApp() {
         setConfigStatus("Digite a senha para acessar a configuração.", "warning");
         focusConfigPasswordField();
       }
-    } else if (tabName === "calculo" || tabName === "impressos" || tabName === "credenciais" || tabName === "produtos-prontos" || tabName === "cartoes" || tabName === "panfletos" || tabName === "m2" || tabName === "resinados") {
+    } else if (tabName === "calculo" || tabName === "impressos" || tabName === "credenciais" || tabName === "produtos-prontos" || tabName === "cartoes" || tabName === "panfletos" || tabName === "blocos-sulfite" || tabName === "blocos-autocopiativo" || tabName === "m2" || tabName === "resinados") {
       lastConfigSourceTab = tabName;
     }
     tabButtons.forEach((button) => {
@@ -5406,6 +5620,8 @@ async function initApp() {
     const readyWorkbook = calculateReadyProductWorkbook(state, config);
     const businessCardWorkbook = calculateBusinessCardWorkbook(state);
     const flyerWorkbook = calculateFlyerWorkbook(state);
+    const blockSulfiteWorkbook = calculateBlockWorkbook(state, "sulfite");
+    const blockAutocopiativoWorkbook = calculateBlockWorkbook(state, "autocopiativo");
     const m2Workbook = calculateM2WorkbookFromConfig(state, config);
     const resinWorkbook = calculateResinWorkbook(state, config);
     const m2Catalog = getM2Catalog(config);
@@ -5439,6 +5655,16 @@ async function initApp() {
     document.getElementById("flyer-summary-quantity").textContent = formatInteger(flyerWorkbook.totals.totalQuantity);
     document.getElementById("flyer-summary-total").textContent = formatCurrency(flyerWorkbook.totals.totalGeneral);
     document.getElementById("flyer-summary-average").textContent = formatCurrency(flyerWorkbook.totals.averageValue);
+
+    document.getElementById("block-sulfite-summary-active").textContent = formatInteger(blockSulfiteWorkbook.totals.activeLines);
+    document.getElementById("block-sulfite-summary-quantity").textContent = formatInteger(blockSulfiteWorkbook.totals.totalQuantity);
+    document.getElementById("block-sulfite-summary-total").textContent = formatCurrency(blockSulfiteWorkbook.totals.totalGeneral);
+    document.getElementById("block-sulfite-summary-average").textContent = formatCurrency(blockSulfiteWorkbook.totals.averageValue);
+
+    document.getElementById("block-autocopiativo-summary-active").textContent = formatInteger(blockAutocopiativoWorkbook.totals.activeLines);
+    document.getElementById("block-autocopiativo-summary-quantity").textContent = formatInteger(blockAutocopiativoWorkbook.totals.totalQuantity);
+    document.getElementById("block-autocopiativo-summary-total").textContent = formatCurrency(blockAutocopiativoWorkbook.totals.totalGeneral);
+    document.getElementById("block-autocopiativo-summary-average").textContent = formatCurrency(blockAutocopiativoWorkbook.totals.averageValue);
 
     document.getElementById("m2-summary-active").textContent = formatInteger(m2Workbook.totals.activeLines);
     document.getElementById("m2-summary-quantity").textContent = formatInteger(m2Workbook.totals.totalQuantity);
@@ -5660,6 +5886,41 @@ async function initApp() {
       flyerWorkbook.activeRows.length > 0 ? "success" : "neutral"
     );
 
+    function renderBlockRows(tab, blockWorkbook, tableBody, warningList) {
+      tableBody.innerHTML = blockWorkbook.rows
+        .map((row, index) => `
+          <tr class="${row.active ? "" : "is-empty"}" data-block-tab="${escapeHtml(tab)}" data-block-row-index="${index}">
+            <td><strong>${String(index + 1).padStart(2, "0")}</strong></td>
+            <td><input class="cell-input description" name="description" value="${escapeHtml(row.description)}" placeholder="Ex.: Bloco de pedido"></td>
+            <td><select class="cell-select" name="format">${buildBlockFormatOptions(tab, row.format)}</select></td>
+            <td><span class="readonly-value subtle">${escapeHtml(row.measure || "-")}</span></td>
+            <td><select class="cell-select" name="vias">${buildBlockViasOptions(tab, row.format, row.vias)}</select></td>
+            <td><select class="cell-select" name="quantity">${buildBlockQuantityOptions(tab, row.format, row.vias, row.quantity)}</select></td>
+            <td><span class="readonly-value subtle">${formatCurrency(row.baseTotal || 0)}</span></td>
+            <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
+            <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
+            <td><input class="cell-input" name="discountValue" type="number" min="0" step="0.01" value="${escapeHtml(row.discountValue ?? 0)}" placeholder="0,00"></td>
+            <td><span class="readonly-value">${formatCurrency(row.total || 0)}</span></td>
+            <td><span class="readonly-value subtle">${formatCurrency(row.unitValue || 0)}</span></td>
+          </tr>
+        `)
+        .join("");
+
+      warningList.innerHTML = blockWorkbook.warnings.length
+        ? blockWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
+        : `<div class="warning-item is-success">Sem alertas no momento. Escolha uma quantidade da tabela para fechar o valor.</div>`;
+      setBlockFeedback(
+        tab,
+        blockWorkbook.activeRows.length > 0
+          ? `${BLOCK_TAB_LABELS[tab]} atualizados com sucesso.`
+          : `Use esta aba para orçar ${BLOCK_TAB_LABELS[tab].toLowerCase()} no mesmo orçamento.`,
+        blockWorkbook.activeRows.length > 0 ? "success" : "neutral"
+      );
+    }
+
+    renderBlockRows("sulfite", blockSulfiteWorkbook, blockSulfiteRowsTableBody, blockSulfiteWarningList);
+    renderBlockRows("autocopiativo", blockAutocopiativoWorkbook, blockAutocopiativoRowsTableBody, blockAutocopiativoWarningList);
+
     m2WarningList.innerHTML = m2Workbook.warnings.length
       ? m2Workbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
       : `<div class="warning-item is-success">Sem alertas no momento. Preencha as medidas e acabamentos para o app montar o valor final com segurança.</div>`;
@@ -5738,8 +5999,8 @@ async function initApp() {
       ? resinWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
       : `<div class="warning-item is-success">Sem alertas no momento. Você pode montar várias medidas de resinados no mesmo orçamento por aqui.</div>`;
 
-    quotePreview.innerHTML = createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, flyerWorkbook, m2Workbook, resinWorkbook);
-    return { workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, flyerWorkbook, m2Workbook, resinWorkbook };
+    quotePreview.innerHTML = createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, m2Workbook, resinWorkbook);
+    return { workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, m2Workbook, resinWorkbook };
   }
 
   function closeM2FinishPopover() {
@@ -6229,6 +6490,18 @@ async function initApp() {
     renderRowsAndSummary();
   });
 
+  document.getElementById("add-block-sulfite-row-button").addEventListener("click", () => {
+    state.blockItems.sulfite.push(createDefaultBlockRow(state.blockItems.sulfite.length, "sulfite"));
+    persistLocalOnly();
+    renderRowsAndSummary();
+  });
+
+  document.getElementById("add-block-autocopiativo-row-button").addEventListener("click", () => {
+    state.blockItems.autocopiativo.push(createDefaultBlockRow(state.blockItems.autocopiativo.length, "autocopiativo"));
+    persistLocalOnly();
+    renderRowsAndSummary();
+  });
+
   document.getElementById("add-m2-row-button").addEventListener("click", () => {
     state.m2Items.push(createDefaultM2Row(state.m2Items.length));
     persist();
@@ -6342,6 +6615,40 @@ async function initApp() {
     persistLocalOnly();
     renderRowsAndSummary();
     setFlyerFeedback("As linhas de panfletos e folders foram limpas.", "warning");
+  });
+
+  document.getElementById("clear-block-sulfite-rows-button").addEventListener("click", async () => {
+    if (!(await confirmAppAction({
+      kicker: "Limpeza",
+      title: "Limpar blocos sulfite",
+      message: "Deseja realmente limpar todas as linhas da aba de blocos sulfite?",
+      confirmLabel: "Limpar",
+      danger: true,
+    }))) {
+      setBlockFeedback("sulfite", "A limpeza dos blocos sulfite foi cancelada.", "warning");
+      return;
+    }
+    state.blockItems.sulfite = Array.from({ length: 5 }, (_, index) => createDefaultBlockRow(index, "sulfite"));
+    persistLocalOnly();
+    renderRowsAndSummary();
+    setBlockFeedback("sulfite", "As linhas de blocos sulfite foram limpas.", "warning");
+  });
+
+  document.getElementById("clear-block-autocopiativo-rows-button").addEventListener("click", async () => {
+    if (!(await confirmAppAction({
+      kicker: "Limpeza",
+      title: "Limpar blocos autocopiativos",
+      message: "Deseja realmente limpar todas as linhas da aba de blocos autocopiativos?",
+      confirmLabel: "Limpar",
+      danger: true,
+    }))) {
+      setBlockFeedback("autocopiativo", "A limpeza dos blocos autocopiativos foi cancelada.", "warning");
+      return;
+    }
+    state.blockItems.autocopiativo = Array.from({ length: 5 }, (_, index) => createDefaultBlockRow(index, "autocopiativo"));
+    persistLocalOnly();
+    renderRowsAndSummary();
+    setBlockFeedback("autocopiativo", "As linhas de blocos autocopiativos foram limpas.", "warning");
   });
 
   document.getElementById("clear-m2-rows-button").addEventListener("click", async () => {
@@ -6634,6 +6941,42 @@ async function initApp() {
     persistLocalOnly();
     renderRowsAndSummary();
   });
+
+  function handleBlockTableChange(event, tab) {
+    const target = event.target;
+    const rowElement = target.closest("tr[data-block-row-index]");
+    if (!rowElement) {
+      return;
+    }
+    const row = state.blockItems[tab][Number(rowElement.dataset.blockRowIndex)];
+    const field = target.name;
+    if (!field || !row) {
+      return;
+    }
+
+    if (field === "vias" || field === "quantity") {
+      row[field] = toWholeNumber(target.value);
+    } else if (field === "artCreationFee" || field === "discountValue") {
+      row[field] = toMoneyNumber(target.value);
+    } else if (field === "discountType") {
+      row[field] = normalizeDiscountType(target.value);
+    } else {
+      row[field] = target.value;
+    }
+
+    if (field === "format" || field === "vias") {
+      normalizeBlockRowChoice(row, tab);
+      if (field === "format") {
+        row.quantity = 0;
+      }
+    }
+
+    persistLocalOnly();
+    renderRowsAndSummary();
+  }
+
+  blockSulfiteRowsTableBody.addEventListener("change", (event) => handleBlockTableChange(event, "sulfite"));
+  blockAutocopiativoRowsTableBody.addEventListener("change", (event) => handleBlockTableChange(event, "autocopiativo"));
 
   credentialRowsTableBody.addEventListener("click", (event) => {
     const toggle = event.target.closest("[data-credential-lanyard-toggle]");
@@ -7196,7 +7539,9 @@ async function initApp() {
     const flyerWorkbook = calculateFlyerWorkbook(state);
     const m2Workbook = calculateM2WorkbookFromConfig(state, config);
     const resinWorkbook = calculateResinWorkbook(state, config);
-    const text = createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, flyerWorkbook, m2Workbook, resinWorkbook);
+    const blockSulfiteWorkbook = calculateBlockWorkbook(state, "sulfite");
+    const blockAutocopiativoWorkbook = calculateBlockWorkbook(state, "autocopiativo");
+    const text = createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, m2Workbook, resinWorkbook);
     try {
       await navigator.clipboard.writeText(text);
       setMainFeedback("Resumo do orçamento copiado com sucesso.", "success");
@@ -7275,7 +7620,9 @@ async function initApp() {
     const m2Workbook = calculateM2WorkbookFromConfig(state, config);
     const resinWorkbook = calculateResinWorkbook(state, config);
     const title = state.client.name.trim() || `Orçamento ${new Date().toLocaleDateString("pt-BR")}`;
-    const summary = createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, flyerWorkbook, m2Workbook, resinWorkbook).split("\n").slice(0, 10).join(" • ");
+    const blockSulfiteWorkbook = calculateBlockWorkbook(state, "sulfite");
+    const blockAutocopiativoWorkbook = calculateBlockWorkbook(state, "autocopiativo");
+    const summary = createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, m2Workbook, resinWorkbook).split("\n").slice(0, 10).join(" • ");
     const subtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + flyerWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
     const quoteDiscount = calculateDiscount(subtotal, state.quoteDiscountType, state.quoteDiscountValue);
 
