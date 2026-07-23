@@ -1056,7 +1056,7 @@ function createDefaultBlockRow(index, tab = "sulfite") {
     description: "",
     format: first.format || "",
     vias: first.vias || 1,
-    quantity: first.quantity || 0,
+    quantity: 0,
     artCreationFee: 0,
     discountType: "R$",
     discountValue: 0,
@@ -6764,13 +6764,13 @@ async function initApp() {
 
   document.getElementById("add-block-sulfite-row-button").addEventListener("click", () => {
     state.blockItems.sulfite.push(createDefaultBlockRow(state.blockItems.sulfite.length, "sulfite"));
-    persistLocalOnly();
+    persist();
     renderRowsAndSummary();
   });
 
   document.getElementById("add-block-autocopiativo-row-button").addEventListener("click", () => {
     state.blockItems.autocopiativo.push(createDefaultBlockRow(state.blockItems.autocopiativo.length, "autocopiativo"));
-    persistLocalOnly();
+    persist();
     renderRowsAndSummary();
   });
 
@@ -6901,7 +6901,7 @@ async function initApp() {
       return;
     }
     state.blockItems.sulfite = Array.from({ length: 5 }, (_, index) => createDefaultBlockRow(index, "sulfite"));
-    persistLocalOnly();
+    persist();
     renderRowsAndSummary();
     setBlockFeedback("sulfite", "As linhas de blocos sulfite foram limpas.", "warning");
   });
@@ -6918,7 +6918,7 @@ async function initApp() {
       return;
     }
     state.blockItems.autocopiativo = Array.from({ length: 5 }, (_, index) => createDefaultBlockRow(index, "autocopiativo"));
-    persistLocalOnly();
+    persist();
     renderRowsAndSummary();
     setBlockFeedback("autocopiativo", "As linhas de blocos autocopiativos foram limpas.", "warning");
   });
@@ -7243,7 +7243,7 @@ async function initApp() {
       }
     }
 
-    persistLocalOnly();
+    persist();
     renderRowsAndSummary();
   }
 
