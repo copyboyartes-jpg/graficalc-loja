@@ -233,9 +233,9 @@
   { tab: "sulfite", format: "10x7cm (8 por folha)", measure: "8 por folha A4", vias: 2, quantity: 200, price: 552 },
   { tab: "sulfite", format: "10x7cm (8 por folha)", measure: "8 por folha A4", vias: 2, quantity: 304, price: 825 },
   { tab: "sulfite", format: "10x7cm (8 por folha)", measure: "8 por folha A4", vias: 2, quantity: 400, price: 1068 },
-  { tab: "autocopiativo", format: "A4", measure: "20x29cm", vias: 2, quantity: 4, price: 0 },
-  { tab: "autocopiativo", format: "A4", measure: "20x29cm", vias: 3, quantity: 4, price: 0 },
-  { tab: "autocopiativo", format: "A5", measure: "14,4x20,4cm", vias: 2, quantity: 6, price: 0 },
-  { tab: "autocopiativo", format: "A5", measure: "14,4x20,4cm", vias: 3, quantity: 6, price: 0 },
+  { tab: "autocopiativo", format: "20,4x9,2cm", measure: "20,4x9,2cm", vias: 2, quantity: 4, price: 0 },
+  { tab: "autocopiativo", format: "20,4x9,2cm", measure: "20,4x9,2cm", vias: 3, quantity: 4, price: 0 },
+  { tab: "autocopiativo", format: "14,4x10cm", measure: "14,4x10cm", vias: 2, quantity: 6, price: 0 },
+  { tab: "autocopiativo", format: "14,4x10cm", measure: "14,4x10cm", vias: 3, quantity: 6, price: 0 },
 ].map((item, index) => ({ id: `block-price-`, ...item }));
 
