@@ -16,6 +16,7 @@ const SHARED_SYNC_INTERVAL_MS = 20000;
 const OPTIONS = {
   printTypes: ["Preto e branco", "Colorido jato de tinta", "Colorido laser"],
   sizes: ["A4", "A5"],
+  colorPrintSizes: ["A4", "A3", "Tamanho personalizado"],
   printModes: ["Só frente", "Frente e verso"],
   bleedModes: ["Sem sangra", "Com sangra"],
   finishing: ["Sem acabamento", "Encadernação espiral", "Livreto"],
@@ -768,6 +769,51 @@ function createDefaultConfig() {
         { min: 301, value: 4.4, label: "Acima de 300 (assumido)" },
       ],
     },
+    colorPrintPricingA3: {
+      "Sulfite 75g": [
+        { min: 1, value: 7.0, label: "1 a 5" },
+        { min: 6, value: 5.0, label: "6 a 10" },
+        { min: 11, value: 3.95, label: "11 a 50" },
+        { min: 51, value: 3.75, label: "51 a 100" },
+        { min: 101, value: 3.5, label: "101 a 300" },
+        { min: 301, value: 3.05, label: "Acima de 300" },
+      ],
+      "Offset 120g": [
+        { min: 1, value: 8.0, label: "1 a 5" },
+        { min: 6, value: 7.0, label: "6 a 10" },
+        { min: 11, value: 4.8, label: "11 a 50" },
+        { min: 51, value: 4.55, label: "51 a 100" },
+        { min: 101, value: 4.15, label: "101 a 300" },
+        { min: 301, value: 3.75, label: "Acima de 300" },
+      ],
+      "170g": [
+        { min: 1, value: 8.0, label: "1 a 5" },
+        { min: 6, value: 7.0, label: "6 a 10" },
+        { min: 11, value: 5.5, label: "11 a 30" },
+        { min: 31, value: 4.8, label: "31 a 100" },
+        { min: 101, value: 4.4, label: "101 a 300" },
+        { min: 301, value: 3.95, label: "Acima de 300" },
+      ],
+      "250g": [
+        { min: 1, value: 8.0, label: "1 a 5" },
+        { min: 6, value: 7.0, label: "6 a 10" },
+        { min: 11, value: 5.95, label: "11 a 30" },
+        { min: 31, value: 5.4, label: "31 a 100" },
+        { min: 101, value: 5.15, label: "101 a 300" },
+        { min: 301, value: 4.8, label: "Acima de 300" },
+      ],
+      "300g": [
+        { min: 1, value: 14.0, label: "1 a 5" },
+        { min: 6, value: 13.0, label: "6 a 10" },
+        { min: 11, value: 9.2, label: "11 a 30" },
+        { min: 31, value: 8.55, label: "31 a 100" },
+        { min: 101, value: 7.85, label: "101 a 300" },
+      ],
+    },
+    colorPrintSheetArea: {
+      widthMm: 210,
+      heightMm: 297,
+    },
     colorPrintExtras: {
       holes: [
         { min: 1, value: 10.0, label: "Até 100" },
@@ -945,6 +991,7 @@ function createDefaultColorPrintRow(index) {
     description: "",
     widthMm: 0,
     heightMm: 0,
+    size: "A4",
     bleedMode: "Sem sangra",
     printMode: "Só frente",
     paperType: "Sulfite 75g",
@@ -1255,6 +1302,23 @@ function mergeConfig(candidate) {
         merged.colorPrintPricing[key] = candidate.colorPrintPricing[key];
       }
     }
+  }
+
+  if (candidate.colorPrintPricingA3 && typeof candidate.colorPrintPricingA3 === "object") {
+    for (const key of Object.keys(merged.colorPrintPricingA3)) {
+      if (Array.isArray(candidate.colorPrintPricingA3[key])) {
+        merged.colorPrintPricingA3[key] = candidate.colorPrintPricingA3[key];
+      }
+    }
+  }
+
+  if (candidate.colorPrintSheetArea && typeof candidate.colorPrintSheetArea === "object") {
+    merged.colorPrintSheetArea = {
+      ...merged.colorPrintSheetArea,
+      ...candidate.colorPrintSheetArea,
+      widthMm: Number.isFinite(Number(candidate.colorPrintSheetArea.widthMm)) ? Number(candidate.colorPrintSheetArea.widthMm) : merged.colorPrintSheetArea.widthMm,
+      heightMm: Number.isFinite(Number(candidate.colorPrintSheetArea.heightMm)) ? Number(candidate.colorPrintSheetArea.heightMm) : merged.colorPrintSheetArea.heightMm,
+    };
   }
 
   if (candidate.colorPrintExtras && typeof candidate.colorPrintExtras === "object") {
@@ -1677,7 +1741,7 @@ function saveConfigSection(section) {
   if (typeof localStorage === "undefined") {
     return;
   }
-  const safeSection = section === "impressos" || section === "credenciais" || section === "produtos-prontos" || section === "cartoes" || section === "panfletos" || section === "m2" || section === "resinados" ? section : "calculo";
+  const safeSection = section === "impressos" || section === "credenciais" || section === "produtos-prontos" || section === "cartoes" || section === "panfletos" || section === "m2" || section === "resinados" || section === "orcamento-livre" ? section : "calculo";
   localStorage.setItem(STORAGE_KEYS.configSection, safeSection);
 }
 
@@ -1929,13 +1993,46 @@ function getColorPaperPricingKey(paperType) {
   return "300g";
 }
 
-function getBestFitOnA4(widthMm, heightMm) {
-  const normalCols = Math.floor(A4_WIDTH_MM / widthMm);
-  const normalRows = Math.floor(A4_HEIGHT_MM / heightMm);
+function getColorPrintSheetDefinition(size, config) {
+  const customSheet = config?.colorPrintSheetArea || createDefaultConfig().colorPrintSheetArea;
+  if (size === "A3") {
+    return {
+      key: "A3",
+      label: "A3",
+      widthMm: A3_WIDTH_MM,
+      heightMm: A3_HEIGHT_MM,
+      pricingMap: config?.colorPrintPricingA3 || createDefaultConfig().colorPrintPricingA3,
+    };
+  }
+  if (size === "Tamanho personalizado") {
+    return {
+      key: "custom",
+      label: "Tamanho personalizado",
+      widthMm: Number(customSheet.widthMm || 0),
+      heightMm: Number(customSheet.heightMm || 0),
+      pricingMap: config?.colorPrintPricing,
+    };
+  }
+  return {
+    key: "A4",
+    label: "A4",
+    widthMm: A4_WIDTH_MM,
+    heightMm: A4_HEIGHT_MM,
+    pricingMap: config?.colorPrintPricing,
+  };
+}
+
+function getBestFitOnSheet(sheetWidthMm, sheetHeightMm, itemWidthMm, itemHeightMm) {
+  if (sheetWidthMm <= 0 || sheetHeightMm <= 0 || itemWidthMm <= 0 || itemHeightMm <= 0) {
+    return { itemsPerSheet: 0, cols: 0, rows: 0, rotated: false };
+  }
+
+  const normalCols = Math.floor(sheetWidthMm / itemWidthMm);
+  const normalRows = Math.floor(sheetHeightMm / itemHeightMm);
   const normalTotal = normalCols * normalRows;
 
-  const rotatedCols = Math.floor(A4_WIDTH_MM / heightMm);
-  const rotatedRows = Math.floor(A4_HEIGHT_MM / widthMm);
+  const rotatedCols = Math.floor(sheetWidthMm / itemHeightMm);
+  const rotatedRows = Math.floor(sheetHeightMm / itemWidthMm);
   const rotatedTotal = rotatedCols * rotatedRows;
 
   if (rotatedTotal > normalTotal) {
@@ -3121,14 +3218,23 @@ function calculateColorPrintWorkbook(state, config) {
     const effectiveWidth = widthMm + (hasBleed ? 2 : 0);
     const effectiveHeight = heightMm + (hasBleed ? 2 : 0);
     const active = isColorPrintRowActive(row);
+    const sheet = getColorPrintSheetDefinition(row.size, config);
+    const pricingMap = sheet.pricingMap || config.colorPrintPricing;
+    const sizeLabel = sheet.label || row.size || "A4";
 
-    if ((effectiveWidth > A4_WIDTH_MM && effectiveWidth > A4_HEIGHT_MM) || (effectiveHeight > A4_HEIGHT_MM && effectiveHeight > A4_WIDTH_MM)) {
+    if (sheet.key === "custom" && (sheet.widthMm <= 0 || sheet.heightMm <= 0)) {
       if (active) {
-        warnings.push(`Impresso ${index + 1}: o tamanho informado não cabe em uma folha A4.`);
+        warnings.push(`Impresso ${index + 1}: configure a área imprimível do tamanho personalizado antes de calcular.`);
       }
     }
 
-    if (effectiveWidth <= 0 || effectiveHeight <= 0 || quantity <= 0) {
+    if ((effectiveWidth > sheet.widthMm && effectiveWidth > sheet.heightMm) || (effectiveHeight > sheet.heightMm && effectiveHeight > sheet.widthMm)) {
+      if (active) {
+        warnings.push(`Impresso ${index + 1}: o tamanho informado não cabe em uma folha ${sizeLabel}.`);
+      }
+    }
+
+    if (effectiveWidth <= 0 || effectiveHeight <= 0 || quantity <= 0 || (sheet.key === "custom" && (sheet.widthMm <= 0 || sheet.heightMm <= 0))) {
       return {
         ...row,
         widthMm: widthCm,
@@ -3136,6 +3242,8 @@ function calculateColorPrintWorkbook(state, config) {
         effectiveWidth,
         effectiveHeight,
         active,
+        sheetSizeLabel: sizeLabel,
+        pricingSizeLabel: sizeLabel,
         itemsPerSheet: 0,
         a4Sheets: 0,
         a4Impressions: 0,
@@ -3151,10 +3259,10 @@ function calculateColorPrintWorkbook(state, config) {
       };
     }
 
-    const fit = getBestFitOnA4(effectiveWidth, effectiveHeight);
+    const fit = getBestFitOnSheet(sheet.widthMm, sheet.heightMm, effectiveWidth, effectiveHeight);
     if (fit.itemsPerSheet <= 0) {
       if (active) {
-        warnings.push(`Impresso ${index + 1}: o tamanho informado não cabe em uma folha A4.`);
+        warnings.push(`Impresso ${index + 1}: o tamanho informado não cabe em uma folha ${sizeLabel}.`);
       }
       return {
         ...row,
@@ -3163,6 +3271,8 @@ function calculateColorPrintWorkbook(state, config) {
         effectiveWidth,
         effectiveHeight,
         active,
+        sheetSizeLabel: sizeLabel,
+        pricingSizeLabel: sizeLabel,
         itemsPerSheet: 0,
         a4Sheets: 0,
         a4Impressions: 0,
@@ -3182,7 +3292,7 @@ function calculateColorPrintWorkbook(state, config) {
     const a4Sheets = Math.ceil(quantity / fit.itemsPerSheet);
     const a4Impressions = a4Sheets * sides;
     const pricingKey = getColorPaperPricingKey(row.paperType);
-    const printUnit = lookupTier(config.colorPrintPricing[pricingKey], a4Impressions);
+    const printUnit = lookupTier(pricingMap[pricingKey], a4Impressions);
     const printTotal = a4Impressions * printUnit;
     const estimatedCuts = estimateCuts(fit.cols, fit.rows);
     let suggestedCutPrice = 0;
@@ -3207,6 +3317,8 @@ function calculateColorPrintWorkbook(state, config) {
       effectiveWidth,
       effectiveHeight,
       active,
+      sheetSizeLabel: sizeLabel,
+      pricingSizeLabel: sizeLabel,
       itemsPerSheet: fit.itemsPerSheet,
       a4Sheets,
       a4Impressions,
@@ -3657,6 +3769,7 @@ function createConfigSectionTabsMarkup(activeSection = "calculo") {
     { id: "panfletos", label: "Panfletos e folders", helper: "Tabela laser e offset para panfletos." },
     { id: "m2", label: "Cálculo de m²", helper: "Faixas, acabamentos e produtos por área." },
     { id: "resinados", label: "Resinados", helper: "Tabela A3, margem de resina e valor mínimo." },
+    { id: "orcamento-livre", label: "Orçamento livre", helper: "Itens avulsos digitados manualmente." },
   ];
 
   return `
@@ -3847,6 +3960,11 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
             ]
           )
         ),
+        createInlineConfigBlockMarkup(
+          "Tabela A3",
+          createColorPrintA3ConfigMarkup(config.colorPrintPricingA3)
+        ),
+        createColorPrintSheetAreaMarkup(config.colorPrintSheetArea),
       ].join("")
     ),
     createConfigCardMarkup(
@@ -3955,37 +4073,42 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
     ),
   ];
 
-  const safeSection = activeSection === "impressos" || activeSection === "credenciais" || activeSection === "produtos-prontos" || activeSection === "cartoes" || activeSection === "panfletos" || activeSection === "m2" || activeSection === "resinados" ? activeSection : "calculo";
+  const safeSection = activeSection === "impressos" || activeSection === "credenciais" || activeSection === "produtos-prontos" || activeSection === "cartoes" || activeSection === "panfletos" || activeSection === "m2" || activeSection === "resinados" || activeSection === "orcamento-livre" ? activeSection : "calculo";
   const configGroups = {
     calculo: createConfigGroupMarkup(
       "calculo",
       "Aba: Cálculo de apostila",
       "Tudo o que aparece aqui afeta somente a aba de apostilas.",
-      apostilaCards
+      apostilaCards,
+      safeSection
     ),
     impressos: createConfigGroupMarkup(
       "impressos",
       "Aba: Impressos coloridos",
       "Use este bloco para ajustar preços, cortes e produtos extras dos impressos coloridos.",
-      impressosCards
+      impressosCards,
+      safeSection
     ),
     credenciais: createConfigGroupMarkup(
       "credenciais",
       "Aba: Credenciais",
       "Use este bloco para ajustar materiais, laminação e cordões da aba de credenciais.",
-      credenciaisCards
+      credenciaisCards,
+      safeSection
     ),
     "produtos-prontos": createConfigGroupMarkup(
       "produtos-prontos",
       "Aba: Produtos prontos",
       "Aqui ficam os valores dos cordões e itens vendidos separadamente na aba de produtos prontos.",
-      produtosProntosCards
+      produtosProntosCards,
+      safeSection
     ),
     cartoes: createConfigGroupMarkup(
       "cartoes",
       "Aba: Cartões de visitas",
       "Tabela de cartões laser e offset usada na aba de cartões de visitas.",
-      cartoesCards
+      cartoesCards,
+      safeSection
     ),
     panfletos: createConfigGroupMarkup(
       "panfletos",
@@ -4003,13 +4126,22 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
       "m2",
       "Aba: Cálculo de m²",
       "Aqui ficam as faixas de preço, acabamentos e produtos extras do cálculo por área.",
-      m2Cards
+      m2Cards,
+      safeSection
     ),
     resinados: createConfigGroupMarkup(
       "resinados",
       "Aba: Resinados",
       "Ajuste aqui a tabela A3 usada no cálculo de adesivos resinados.",
-      resinadosCards
+      resinadosCards,
+      safeSection
+    ),
+    "orcamento-livre": createConfigGroupMarkup(
+      "orcamento-livre",
+      "Aba: Orçamento livre",
+      "Aqui você digita serviços avulsos com descrição e valor manual.",
+      freeQuoteCards,
+      safeSection
     ),
   };
 
@@ -4121,9 +4253,10 @@ function createInlineConfigBlockMarkup(title, innerMarkup, copy = "") {
   `;
 }
 
-function createConfigGroupMarkup(id, title, copy, cards) {
+function createConfigGroupMarkup(id, title, copy, cards, activeSection = id) {
+  const isActive = activeSection === id;
   return `
-    <section class="config-group" id="config-group-${escapeHtml(id)}">
+    <section class="config-group${isActive ? "" : " is-hidden"}" id="config-group-${escapeHtml(id)}"${isActive ? "" : " hidden"}>
       <div class="config-group-heading">
         <span class="config-group-kicker">Área de configuração</span>
         <h3>${escapeHtml(title)}</h3>
@@ -4318,6 +4451,97 @@ function createColorExtrasConfigMarkup(colorPrintExtras) {
       )
     ),
   ].join("");
+}
+
+function createColorPrintA3ConfigMarkup(colorPrintPricingA3) {
+  const pricing = colorPrintPricingA3 || createDefaultConfig().colorPrintPricingA3;
+  return [
+    createInlineConfigBlockMarkup(
+      "Sulfite 75g",
+      createTableMarkup(
+        ["Qtd mínima", "Valor", "Faixa"],
+        pricing["Sulfite 75g"],
+        "color-a3-Sulfite 75g",
+        [
+          { key: "min", type: "number", step: "1" },
+          { key: "value", type: "number", step: "0.01" },
+          { key: "label", type: "text" },
+        ]
+      )
+    ),
+    createInlineConfigBlockMarkup(
+      "Offset 120g",
+      createTableMarkup(
+        ["Qtd mínima", "Valor", "Faixa"],
+        pricing["Offset 120g"],
+        "color-a3-Offset 120g",
+        [
+          { key: "min", type: "number", step: "1" },
+          { key: "value", type: "number", step: "0.01" },
+          { key: "label", type: "text" },
+        ]
+      )
+    ),
+    createInlineConfigBlockMarkup(
+      "Couche 170 / Offset 170 / Reciclato 170",
+      createTableMarkup(
+        ["Qtd mínima", "Valor", "Faixa"],
+        pricing["170g"],
+        "color-a3-170g",
+        [
+          { key: "min", type: "number", step: "1" },
+          { key: "value", type: "number", step: "0.01" },
+          { key: "label", type: "text" },
+        ]
+      )
+    ),
+    createInlineConfigBlockMarkup(
+      "Couche 250 / Offset 240 / Reciclato 240",
+      createTableMarkup(
+        ["Qtd mínima", "Valor", "Faixa"],
+        pricing["250g"],
+        "color-a3-250g",
+        [
+          { key: "min", type: "number", step: "1" },
+          { key: "value", type: "number", step: "0.01" },
+          { key: "label", type: "text" },
+        ]
+      )
+    ),
+    createInlineConfigBlockMarkup(
+      "Couche 300 / Metalizados",
+      createTableMarkup(
+        ["Qtd mínima", "Valor", "Faixa"],
+        pricing["300g"],
+        "color-a3-300g",
+        [
+          { key: "min", type: "number", step: "1" },
+          { key: "value", type: "number", step: "0.01" },
+          { key: "label", type: "text" },
+        ]
+      )
+    ),
+  ].join("");
+}
+
+function createColorPrintSheetAreaMarkup(sheetArea) {
+  const area = sheetArea || createDefaultConfig().colorPrintSheetArea;
+  return createInlineConfigBlockMarkup(
+    "Área imprimível da folha personalizada",
+    `
+      <div class="config-grid compact-grid">
+        <label>
+          <span>Largura útil (mm)</span>
+          <input data-config-prefix="color-sheet-area" data-config-row="0" data-config-key="widthMm" type="number" step="1" value="${escapeHtml(area.widthMm)}">
+        </label>
+        <label>
+          <span>Altura útil (mm)</span>
+          <input data-config-prefix="color-sheet-area" data-config-row="0" data-config-key="heightMm" type="number" step="1" value="${escapeHtml(area.heightMm)}">
+        </label>
+      </div>
+    `,
+    "Usado somente quando o tamanho personalizado estiver selecionado na aba de impressos coloridos."
+  );
 }
 
 function createResinConfigMarkup(resinPricing) {
@@ -4701,6 +4925,7 @@ function getConfigArrayByPrefix(config, prefix) {
   if (prefix === "color-extra-lam-whole-a3") return config.colorPrintExtras?.laminationWhole?.a3;
   if (prefix === "color-extra-lam-combo") return config.colorPrintExtras?.laminationCombo;
   if (prefix.startsWith("m2-")) return config.m2Pricing[prefix.slice(3)];
+  if (prefix.startsWith("color-a3-")) return config.colorPrintPricingA3?.[prefix.slice(9)];
   if (prefix.startsWith("color-")) return config.colorPrintPricing[prefix.slice(6)];
   if (prefix.startsWith("cover-")) {
     return config.coverPricing[prefix.slice(6)];
@@ -5013,7 +5238,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       sourceIndex: index,
       kind: "Impresso colorido",
       description: row.description,
-      detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.paperType} | ${row.printMode}`,
+      detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.size || "A4"} | ${row.paperType} | ${row.printMode}`,
       extraDetail: row.colorExtrasSummary || "",
       artDetail: formatArtCreationDetail(row),
       discountDetail: row.discountDescription,
@@ -5233,7 +5458,7 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
       };
     }),
     ...colorWorkbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || `Impresso ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.paperType} | ${row.printMode}${row.colorExtrasSummary ? ` | ${row.colorExtrasSummary}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
+      text: `- ${row.description || `Impresso ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.size || "A4"} | ${row.paperType} | ${row.printMode}${row.colorExtrasSummary ? ` | ${row.colorExtrasSummary}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...credentialWorkbook.activeRows.map((row, index) => ({
       text: `- ${row.description || `Credencial ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthCm)} x ${formatMeasure(row.heightCm)} cm | ${row.materialLabel} | ${row.printMode}${row.lamination === "Com laminação" ? " | Com laminação" : ""}${row.lanyardType !== "none" ? ` | ${row.lanyardLabel}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
@@ -6123,6 +6348,7 @@ async function initApp() {
             <td><input class="cell-input" name="heightMm" type="number" min="0" step="0.1" value="${escapeHtml(row.heightMm)}"></td>
             <td><select class="cell-select" name="bleedMode">${buildOptions(OPTIONS.bleedModes, row.bleedMode)}</select></td>
             <td><select class="cell-select" name="printMode">${buildOptions(OPTIONS.printModes, row.printMode)}</select></td>
+            <td><select class="cell-select" name="size">${buildOptions(OPTIONS.colorPrintSizes, row.size || "A4")}</select></td>
             <td><select class="cell-select" name="paperType">${buildOptions(OPTIONS.colorPaperTypes, row.paperType)}</select></td>
             <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${escapeHtml(row.quantity)}"></td>
             <td><span class="readonly-value subtle">${formatInteger(row.itemsPerSheet)}</span></td>
@@ -7748,6 +7974,21 @@ async function initApp() {
       persist();
       renderRowsAndSummary();
       setConfigStatus("Tabela de resinados atualizada.", "success");
+      return;
+    }
+
+    if (prefix === "color-sheet-area") {
+      if (!config.colorPrintSheetArea) {
+        return;
+      }
+      if (key === "widthMm" || key === "heightMm") {
+        config.colorPrintSheetArea[key] = toWholeNumber(target.value);
+      } else {
+        config.colorPrintSheetArea[key] = target.value;
+      }
+      persist();
+      renderRowsAndSummary();
+      setConfigStatus("Área imprimível do tamanho personalizado atualizada.", "success");
       return;
     }
 
