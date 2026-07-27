@@ -4994,9 +4994,11 @@ function calculateResinWorkbook(state, config) {
 function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, m2Workbook, resinWorkbook) {
   const dateText = new Intl.DateTimeFormat("pt-BR").format(new Date());
   const quoteEntries = [
-    ...workbook.activeRows.map((row) => {
+    ...workbook.activeRows.map((row, index) => {
       const coverDetail = buildApostilaCoverDetail(row);
       return {
+        source: "apostila",
+        sourceIndex: index,
         kind: "Apostila",
         description: row.description,
         detail: `${formatInteger(row.quantity)} apostilas | ${formatInteger(row.pages)} páginas${row.colorPages > 0 ? ` (${formatInteger(row.blackWhitePages)} PB + ${formatInteger(row.colorPages)} coloridas)` : ""} | ${buildApostilaPrintDetail(row)} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}`,
@@ -5006,7 +5008,9 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
         total: row.total,
       };
     }),
-    ...colorWorkbook.activeRows.map((row) => ({
+    ...colorWorkbook.activeRows.map((row, index) => ({
+      source: "color",
+      sourceIndex: index,
       kind: "Impresso colorido",
       description: row.description,
       detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.paperType} | ${row.printMode}`,
@@ -5015,7 +5019,9 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       discountDetail: row.discountDescription,
       total: row.total,
     })),
-    ...credentialWorkbook.activeRows.map((row) => ({
+    ...credentialWorkbook.activeRows.map((row, index) => ({
+      source: "credential",
+      sourceIndex: index,
       kind: "Credencial",
       description: row.description || "Credencial",
       detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthCm)} x ${formatMeasure(row.heightCm)} cm | ${row.materialLabel} | ${row.printMode}${row.lamination === "Com laminação" ? " | Com laminação" : ""}${row.lanyardType !== "none" ? ` | ${row.lanyardLabel}` : ""}`,
@@ -5024,7 +5030,9 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       discountDetail: row.discountDescription,
       total: row.total,
     })),
-    ...readyWorkbook.activeRows.map((row) => ({
+    ...readyWorkbook.activeRows.map((row, index) => ({
+      source: "ready",
+      sourceIndex: index,
       kind: "Produto pronto",
       description: row.description || row.productLabel,
       detail: `${formatInteger(row.quantity)} unidades | ${row.productLabel}`,
@@ -5033,6 +5041,8 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       total: row.total,
     })),
     ...freeQuoteWorkbook.activeRows.map((row, index) => ({
+      source: "freeQuote",
+      sourceIndex: index,
       kind: "Orçamento livre",
       description: row.description || `Serviço livre ${index + 1}`,
       detail: `${formatInteger(row.quantity)} un. | ${formatCurrency(row.unitValue)} por un. | ${formatCurrency(row.baseTotal)} base`,
@@ -5040,7 +5050,9 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       discountDetail: row.discountDescription,
       total: row.total,
     })),
-    ...businessCardWorkbook.activeRows.map((row) => ({
+    ...businessCardWorkbook.activeRows.map((row, index) => ({
+      source: "businessCard",
+      sourceIndex: index,
       kind: "Cartões de visitas",
       description: row.description || "Cartão de visita",
       detail: `${formatInteger(row.quantity)} cartões | ${row.productionType} | ${row.materialLabel} | ${row.printMode} | Pacote: ${row.packageLabel}`,
@@ -5049,7 +5061,9 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       discountDetail: row.discountDescription,
       total: row.total,
     })),
-    ...flyerWorkbook.activeRows.map((row) => ({
+    ...flyerWorkbook.activeRows.map((row, index) => ({
+      source: "flyer",
+      sourceIndex: index,
       kind: "Panfletos e folders",
       description: row.description || "Panfleto/folder",
       detail: `${formatInteger(row.quantity)} unidades | ${row.productionType} | ${row.paper} | ${row.size} | ${row.printMode}${row.foldType !== "Sem dobra" ? ` | ${row.foldType}` : ""}`,
@@ -5058,7 +5072,9 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       discountDetail: row.discountDescription,
       total: row.total,
     })),
-    ...blockSulfiteWorkbook.activeRows.map((row) => ({
+    ...blockSulfiteWorkbook.activeRows.map((row, index) => ({
+      source: "blockSulfite",
+      sourceIndex: index,
       kind: "Blocos sulfite",
       description: row.description || "Bloco sulfite",
       detail: `${formatInteger(row.quantity)} blocos | ${row.format} | ${row.measure} | ${formatInteger(row.vias)} via${row.vias > 1 ? "s" : ""}`,
@@ -5066,7 +5082,9 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       discountDetail: row.discountDescription,
       total: row.total,
     })),
-    ...blockAutocopiativoWorkbook.activeRows.map((row) => ({
+    ...blockAutocopiativoWorkbook.activeRows.map((row, index) => ({
+      source: "blockAutocopiativo",
+      sourceIndex: index,
       kind: "Blocos autocopiativos",
       description: row.description || "Bloco autocopiativo",
       detail: `${formatInteger(row.quantity)} blocos | ${row.format} | ${row.measure} | ${formatInteger(row.vias)} via${row.vias > 1 ? "s" : ""}`,
@@ -5074,7 +5092,9 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       discountDetail: row.discountDescription,
       total: row.total,
     })),
-    ...m2Workbook.activeRows.map((row) => ({
+    ...m2Workbook.activeRows.map((row, index) => ({
+      source: "m2",
+      sourceIndex: index,
       kind: "Cálculo de m²",
       description: getM2RowDescription(row),
       detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.productLabel}${row.finishSummary ? ` | ${row.finishSummary}` : ""}`,
@@ -5082,7 +5102,9 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       discountDetail: row.discountDescription,
       total: row.total,
     })),
-    ...resinWorkbook.activeRows.map((row) => ({
+    ...resinWorkbook.activeRows.map((row, index) => ({
+      source: "resin",
+      sourceIndex: index,
       kind: "Resinados",
       description: row.description,
       detail: `${formatInteger(row.quantity)} unidades | ${formatResinMeasureCm(row.widthMm)} x ${formatResinMeasureCm(row.heightMm)} cm | ${row.materialLabel} | ${formatInteger(row.sheetsNeeded)} folha(s) A3 | ${formatInteger(row.piecesPerSheet)} por folha`,
@@ -5101,7 +5123,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
         .map(
           (entry, index) => `
             <div class="quote-line">
-              <div>
+              <div class="quote-line-main">
                 <strong>${escapeHtml(entry.description || `Item ${index + 1}`)}</strong>
                 <small>
                   ${escapeHtml(entry.kind)} | ${escapeHtml(entry.detail)}
@@ -5109,8 +5131,19 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
                 ${entry.extraDetail ? `<small class="quote-extra-detail">${escapeHtml(entry.extraDetail)}</small>` : ""}
                 ${entry.artDetail ? `<small class="quote-extra-detail">${escapeHtml(entry.artDetail)}</small>` : ""}
                 ${entry.discountDetail ? `<small class="quote-discount-detail">${escapeHtml(entry.discountDetail)}</small>` : ""}
+                <div class="quote-line-actions">
+                  <button
+                    type="button"
+                    class="button button-danger quote-delete-button"
+                    data-quote-delete="1"
+                    data-quote-source="${escapeHtml(entry.source)}"
+                    data-quote-index="${escapeHtml(String(entry.sourceIndex))}"
+                  >
+                    Excluir
+                  </button>
+                </div>
               </div>
-              <div>${formatCurrency(entry.total)}</div>
+              <div class="quote-line-total">${formatCurrency(entry.total)}</div>
             </div>
           `
         )
@@ -6404,6 +6437,89 @@ async function initApp() {
 
     quotePreview.innerHTML = createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, m2Workbook, resinWorkbook);
     return { workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, m2Workbook, resinWorkbook };
+  }
+
+  function resetAllBudgetItems() {
+    state.rows = Array.from({ length: 5 }, (_, index) => createDefaultRow(index));
+    state.colorPrintItems = Array.from({ length: 5 }, (_, index) => createDefaultColorPrintRow(index));
+    state.credentialItems = Array.from({ length: 5 }, (_, index) => createDefaultCredentialRow(index));
+    state.readyProductItems = Array.from({ length: 5 }, (_, index) => createDefaultReadyProductRow(index));
+    state.freeQuoteItems = Array.from({ length: 5 }, (_, index) => createDefaultFreeQuoteRow(index));
+    state.businessCardItems = Array.from({ length: 5 }, (_, index) => createDefaultBusinessCardRow(index));
+    state.flyerItems = Array.from({ length: 5 }, (_, index) => createDefaultFlyerRow(index));
+    state.blockItems.sulfite = Array.from({ length: 5 }, (_, index) => createDefaultBlockRow(index, "sulfite"));
+    state.blockItems.autocopiativo = Array.from({ length: 5 }, (_, index) => createDefaultBlockRow(index, "autocopiativo"));
+    state.m2Items = Array.from({ length: 5 }, (_, index) => createDefaultM2Row(index));
+    state.resinItems = Array.from({ length: 5 }, (_, index) => createDefaultResinRow(index));
+    selectedRowIds.clear();
+    persistLocalOnly();
+    renderRowsAndSummary();
+  }
+
+  function refillBudgetRows() {
+    ensureRowCount(state, 5);
+    ensureColorRowCount(state, 5);
+    ensureCredentialRowCount(state, 5);
+    ensureReadyProductRowCount(state, 5);
+    ensureBusinessCardRowCount(state, 5);
+    ensureFlyerRowCount(state, 5);
+    ensureBlockRowCount(state, "sulfite", 5);
+    ensureBlockRowCount(state, "autocopiativo", 5);
+    ensureM2RowCount(state, 5);
+    ensureResinRowCount(state, 5);
+  }
+
+  function deleteBudgetItemFromQuote(source, index) {
+    const removeFrom = (items, factory) => {
+      if (!Array.isArray(items) || index < 0 || index >= items.length) {
+        return;
+      }
+      items.splice(index, 1);
+      while (items.length < 5) {
+        items.push(factory(items.length));
+      }
+    };
+
+    switch (source) {
+      case "apostila":
+        removeFrom(state.rows, createDefaultRow);
+        break;
+      case "color":
+        removeFrom(state.colorPrintItems, createDefaultColorPrintRow);
+        break;
+      case "credential":
+        removeFrom(state.credentialItems, createDefaultCredentialRow);
+        break;
+      case "ready":
+        removeFrom(state.readyProductItems, createDefaultReadyProductRow);
+        break;
+      case "freeQuote":
+        removeFrom(state.freeQuoteItems, createDefaultFreeQuoteRow);
+        break;
+      case "businessCard":
+        removeFrom(state.businessCardItems, createDefaultBusinessCardRow);
+        break;
+      case "flyer":
+        removeFrom(state.flyerItems, createDefaultFlyerRow);
+        break;
+      case "blockSulfite":
+        removeFrom(state.blockItems.sulfite, (rowIndex) => createDefaultBlockRow(rowIndex, "sulfite"));
+        break;
+      case "blockAutocopiativo":
+        removeFrom(state.blockItems.autocopiativo, (rowIndex) => createDefaultBlockRow(rowIndex, "autocopiativo"));
+        break;
+      case "m2":
+        removeFrom(state.m2Items, createDefaultM2Row);
+        break;
+      case "resin":
+        removeFrom(state.resinItems, createDefaultResinRow);
+        break;
+      default:
+        return;
+    }
+
+    persistLocalOnly();
+    renderRowsAndSummary();
   }
 
   function closeM2FinishPopover() {
@@ -7991,6 +8107,46 @@ async function initApp() {
     window.print();
     setTimeout(restoreTitle, 1000);
   });
+
+  const quotePreviewElement = document.getElementById("quote-preview");
+  if (quotePreviewElement) {
+    quotePreviewElement.addEventListener("click", async (event) => {
+      const button = event.target instanceof HTMLElement ? event.target.closest("[data-quote-delete]") : null;
+      if (!button) {
+        return;
+      }
+      const source = button.getAttribute("data-quote-source") || "";
+      const index = Number(button.getAttribute("data-quote-index"));
+      const confirmed = await confirmAppAction({
+        kicker: "Excluir item",
+        title: "Remover do orçamento",
+        message: "Deseja excluir este item apenas do orçamento atual?",
+        confirmLabel: "Excluir",
+        danger: true,
+      });
+      if (!confirmed) {
+        return;
+      }
+      deleteBudgetItemFromQuote(source, index);
+    });
+  }
+
+  const clearQuoteButton = document.getElementById("clear-quote-button");
+  if (clearQuoteButton) {
+    clearQuoteButton.addEventListener("click", async () => {
+      const confirmed = await confirmAppAction({
+        kicker: "Limpar orçamento",
+        title: "Limpar orçamento inteiro",
+        message: "Deseja remover todos os itens do orçamento atual?",
+        confirmLabel: "Limpar",
+        danger: true,
+      });
+      if (!confirmed) {
+        return;
+      }
+      resetAllBudgetItems();
+    });
+  }
 
   const addFreeQuoteRowButton = document.getElementById("add-free-quote-row-button");
   if (addFreeQuoteRowButton) {

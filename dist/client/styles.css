@@ -1552,6 +1552,11 @@ textarea {
   border-bottom: 1px solid rgba(31, 42, 47, 0.08);
 }
 
+.quote-line-main {
+  display: grid;
+  gap: 6px;
+}
+
 .quote-line strong {
   display: block;
 }
@@ -1572,6 +1577,23 @@ textarea {
   margin-top: 6px;
   font-weight: 700;
   color: #9f4f1d !important;
+}
+
+.quote-line-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 4px;
+}
+
+.quote-delete-button {
+  padding: 8px 12px;
+  font-size: 0.8rem;
+}
+
+.quote-line-total {
+  align-self: start;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .quote-total-bar {
