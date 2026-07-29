@@ -1,0 +1,1185 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GrafiCalc | Orçamento Gráfico</title>
+  <link rel="stylesheet" href="./styles.css?v=9fc1099462ad">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div class="hero-logo" aria-label="GrafiCalc">
+        <span class="hero-logo-mark">Grafi</span><span class="hero-logo-accent">Calc</span>
+        <span class="hero-logo-subtitle">Orçamento gráfico sem complicação</span>
+      </div>
+      <p class="hero-copy">
+        Importe PDFs, ajuste as opções de capa e acabamento, e monte vários orçamentos no mesmo lugar.
+      </p>
+      <p class="helper-text status-note hero-status" id="sync-status">
+        Conectando a base compartilhada...
+      </p>
+    </header>
+
+    <nav class="tab-bar" aria-label="Abas principais">
+      <button class="tab-button is-active" data-tab-target="calculo">Cálculo de apostila</button>
+      <button class="tab-button" data-tab-target="impressos">Impressos coloridos</button>
+      <button class="tab-button" data-tab-target="credenciais">Credenciais</button>
+      <button class="tab-button" data-tab-target="produtos-prontos">Produtos prontos</button>
+      <button class="tab-button" data-tab-target="cartoes">Cartões de visitas</button>
+      <button class="tab-button" data-tab-target="panfletos">Panfletos e folders</button>
+      <button class="tab-button" data-tab-target="blocos-sulfite">Blocos sulfite</button>
+      <button class="tab-button" data-tab-target="blocos-autocopiativo">Blocos autocopiativos</button>
+      <button class="tab-button" data-tab-target="m2">Cálculo de m²</button>
+      <button class="tab-button" data-tab-target="resinados">Resinados</button>
+      <button class="tab-button" data-tab-target="orcamento-livre">Orçamento livre</button>
+      <button class="tab-button" data-tab-target="configuracao">Configuração</button>
+      <button class="tab-button" data-tab-target="clientes">Clientes</button>
+      <button class="tab-button" data-tab-target="historico">Histórico</button>
+      <button class="tab-button" data-tab-target="orcamento">Orçamento</button>
+    </nav>
+
+    <main class="tab-panels">
+      <section class="tab-panel is-active" data-tab-panel="calculo">
+        <div class="summary-grid">
+          <article class="summary-card">
+            <span class="summary-label">Linhas ativas</span>
+            <strong id="summary-active-lines">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Total de apostilas</span>
+            <strong id="summary-booklets">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Total geral</span>
+            <strong id="summary-total">R$ 0,00</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Valor médio</span>
+            <strong id="summary-average">R$ 0,00</strong>
+          </article>
+        </div>
+
+        <div class="workspace-grid">
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Importar PDFs</h2>
+                <p class="panel-copy">Ao importar, o app tenta ler a quantidade de páginas e preencher as linhas automaticamente.</p>
+              </div>
+            </div>
+
+            <label class="dropzone" for="pdf-input" id="pdf-dropzone">
+              <input id="pdf-input" type="file" accept=".pdf,application/pdf" multiple hidden>
+              <strong>Arraste os PDFs aqui</strong>
+              <span>ou clique para escolher arquivos</span>
+            </label>
+
+            <div class="toolbar">
+              <button id="import-button" class="button button-primary" type="button">Escolher PDFs</button>
+              <button id="add-row-button" class="button" type="button">Adicionar linha</button>
+              <button id="clear-all-button" class="button button-danger" type="button">Limpar linhas</button>
+            </div>
+
+            <p class="helper-text status-note" id="import-feedback">
+              O contador de páginas do PDF é automático. Se algum arquivo vier com a contagem incorreta, você pode ajustá-la manualmente.
+            </p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Preferências rápidas</h2>
+                <p class="panel-copy">Use isso para aplicar um mesmo padrão em várias linhas de uma vez.</p>
+              </div>
+            </div>
+
+            <div class="preset-grid">
+              <label>
+                <span>Modo de cálculo</span>
+                <select id="calc-mode-select">
+                  <option>Independente</option>
+                  <option>Somar quantidades</option>
+                </select>
+              </label>
+              <label>
+                <span>Tipo de impressão</span>
+                <select id="preset-print-type"></select>
+              </label>
+              <label>
+                <span>Tamanho</span>
+                <select id="preset-size"></select>
+              </label>
+              <label>
+                <span>Modo de impressão</span>
+                <select id="preset-print-mode"></select>
+              </label>
+              <label>
+                <span>Acabamento</span>
+                <select id="preset-finishing"></select>
+              </label>
+              <label>
+                <span>Capa</span>
+                <select id="preset-cover"></select>
+              </label>
+              <label>
+                <span>Papel da capa</span>
+                <select id="preset-cover-paper"></select>
+              </label>
+              <label>
+                <span>Contracapa</span>
+                <select id="preset-back-cover"></select>
+              </label>
+              <label>
+                <span>Papel da contracapa</span>
+                <select id="preset-back-cover-paper"></select>
+              </label>
+              <label>
+                <span>Espiral</span>
+                <select id="preset-spiral-option"></select>
+              </label>
+            </div>
+
+            <div class="toolbar">
+              <button id="apply-preset-active" class="button button-primary" type="button">Aplicar nas linhas ativas</button>
+              <button id="apply-preset-all" class="button" type="button">Aplicar em todas</button>
+            </div>
+          </article>
+        </div>
+
+        <article class="panel panel-table">
+          <div class="panel-heading">
+            <div>
+              <h2>Orçamento de apostilas</h2>
+              <p class="panel-copy">Cada linha representa uma apostila diferente. Os totais são recalculados na hora.</p>
+              <p class="helper-text">Se informar páginas coloridas, elas são calculadas pela mesma tabela de capa em Sulfite 75g.</p>
+            </div>
+          </div>
+
+          <div class="group-toolbar">
+            <label class="group-toolbar-field">
+              <span>Grupo de acabamento</span>
+              <input id="group-name-input" type="text" placeholder="Ex.: Grupo A">
+            </label>
+            <button id="apply-group-selected" class="button button-primary" type="button">Aplicar grupo nos selecionados</button>
+            <button id="clear-group-selected" class="button" type="button">Tirar grupo dos selecionados</button>
+          </div>
+
+          <p class="helper-text">
+            Se várias linhas tiverem o mesmo grupo de acabamento, o app soma as páginas desses arquivos e calcula um único acabamento para o grupo. O valor do acabamento entra na primeira linha do grupo.
+          </p>
+
+          <div class="table-shell">
+            <table class="budget-table free-quote-table">
+              <thead>
+                <tr>
+                  <th>Sel.</th>
+                  <th>Item</th>
+                  <th>Descrição</th>
+                  <th>Tipo</th>
+                  <th>Tam.</th>
+                  <th>Impressão</th>
+                  <th>Acabamento</th>
+                  <th>Grupo de acab.</th>
+                  <th>Quantidade</th>
+                  <th>Páginas</th>
+                  <th>Pág. coloridas</th>
+                  <th>Capa</th>
+                  <th>Papel da capa</th>
+                  <th>Contracapa</th>
+                  <th>Papel da contracapa</th>
+                  <th>Espiral</th>
+                  <th>Total miolo</th>
+                  <th>Total capa</th>
+                  <th>Total contra</th>
+                  <th>Acabamento</th>
+                  <th>Criação de arte</th>
+                  <th>Tipo desc.</th>
+                  <th>Desconto</th>
+                  <th>Total item</th>
+                  <th>Valor un.</th>
+                </tr>
+              </thead>
+              <tbody id="rows-table-body"></tbody>
+            </table>
+          </div>
+
+          <div class="warning-list" id="warning-list"></div>
+        </article>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="impressos">
+        <div class="summary-grid">
+          <article class="summary-card">
+            <span class="summary-label">Itens ativos</span>
+            <strong id="color-summary-active">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Unidades</span>
+            <strong id="color-summary-quantity">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Total geral</span>
+            <strong id="color-summary-total">R$ 0,00</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Valor médio</span>
+            <strong id="color-summary-average">R$ 0,00</strong>
+          </article>
+        </div>
+
+        <article class="panel panel-table">
+          <div class="panel-heading">
+            <div>
+              <h2>Orçamento de impressos coloridos</h2>
+              <p class="panel-copy">Informe o tamanho em centímetros e escolha entre A4, A3 ou tamanho personalizado. Se marcar sangra, o sistema soma 2 mm na largura e 2 mm na altura antes de calcular o encaixe na folha escolhida.</p>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <button id="add-color-row-button" class="button button-primary" type="button">Adicionar linha</button>
+            <button id="clear-color-rows-button" class="button button-danger" type="button">Limpar linhas</button>
+          </div>
+
+          <p class="helper-text status-note" id="color-feedback">
+            O corte é sugerido automaticamente pela tabela, mas você pode substituir o valor em cada linha, se necessário.
+          </p>
+
+          <div class="table-shell">
+            <table class="budget-table color-budget-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Descrição</th>
+                  <th>Largura (cm)</th>
+                  <th>Altura (cm)</th>
+                  <th>Sangra</th>
+                  <th>Impressão</th>
+                  <th>Tamanho</th>
+                  <th>Papel</th>
+                  <th>Quantidade</th>
+                  <th>Por folha</th>
+                  <th>Folhas</th>
+                  <th>Impressões por folha</th>
+                  <th>Impressões totais</th>
+                  <th>Corte sugerido</th>
+                  <th>Corte final</th>
+                  <th>Furo</th>
+                  <th>Dobra</th>
+                  <th>Plastificação</th>
+                  <th>Adicionais</th>
+                  <th>Aproveitamento plast.</th>
+                  <th>Criação de arte</th>
+                  <th>Tipo desc.</th>
+                  <th>Desconto</th>
+                  <th>Total item</th>
+                  <th>Valor un.</th>
+                </tr>
+              </thead>
+              <tbody id="color-rows-table-body"></tbody>
+            </table>
+          </div>
+
+          <div class="warning-list" id="color-warning-list"></div>
+        </article>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="m2">
+        <div class="summary-grid">
+          <article class="summary-card">
+            <span class="summary-label">Linhas ativas</span>
+            <strong id="m2-summary-active">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Peças</span>
+            <strong id="m2-summary-quantity">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Total geral</span>
+            <strong id="m2-summary-total">R$ 0,00</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Valor médio</span>
+            <strong id="m2-summary-average">R$ 0,00</strong>
+          </article>
+        </div>
+
+        <article class="panel panel-table m2-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>Orçamento por m²</h2>
+              <p class="panel-copy">Selecione o produto, escolha cm ou m, e deixe o app aplicar a faixa de preço correta. O extra fixo e a arte/edição são somados apenas uma vez ao total do item.</p>
+            </div>
+          </div>
+
+          <div class="toolbar m2-toolbar">
+            <button id="add-m2-row-button" class="button button-primary" type="button">Adicionar linha</button>
+            <button id="clear-m2-rows-button" class="button button-danger" type="button">Limpar linhas</button>
+            <label class="toolbar-field">
+              <span>Modo de cálculo</span>
+              <select id="m2-calc-mode-select">
+                <option value="Independente">Independente</option>
+                <option value="Somar materiais iguais">Somar materiais iguais</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="m2-quick-notes">
+            <span class="m2-note-chip">Aceita medidas em cm e m</span>
+            <span class="m2-note-chip">Aplica faixa automaticamente</span>
+            <span class="m2-note-chip">Acabamentos separados do extra fixo</span>
+            <span class="m2-note-chip">Soma apenas materiais iguais quando ativado</span>
+          </div>
+
+          <div class="table-shell">
+            <table class="budget-table m2-budget-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Produto</th>
+                  <th>Acabamentos</th>
+                  <th>Descrição</th>
+                  <th>Unidade</th>
+                  <th>Largura</th>
+                  <th>Altura</th>
+                  <th>Quantidade</th>
+                  <th>Área total (m²)</th>
+                  <th>Faixa</th>
+                  <th>Valor do m²</th>
+                  <th>Acab. selec. total</th>
+                  <th>Extra fixo</th>
+                  <th>Criação de arte</th>
+                  <th>Tipo desc.</th>
+                  <th>Desconto</th>
+                  <th>Total item</th>
+                </tr>
+              </thead>
+              <tbody id="m2-rows-table-body"></tbody>
+            </table>
+          </div>
+
+          <div class="warning-list" id="m2-warning-list"></div>
+        </article>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="credenciais">
+        <div class="summary-grid">
+          <article class="summary-card">
+            <span class="summary-label">Linhas ativas</span>
+            <strong id="credential-summary-active">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Credenciais</span>
+            <strong id="credential-summary-quantity">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Total geral</span>
+            <strong id="credential-summary-total">R$ 0,00</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Valor médio</span>
+            <strong id="credential-summary-average">R$ 0,00</strong>
+          </article>
+        </div>
+
+        <article class="panel panel-table">
+          <div class="panel-heading">
+            <div>
+              <h2>Cálculo de credenciais</h2>
+              <p class="panel-copy">Informe altura, largura e quantidade para calcular o material base das credenciais. Couche e offset usam a tabela da aba de impressos coloridos. PS e laminação usam a base do cálculo de m².</p>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <button id="add-credential-row-button" class="button button-primary" type="button">Adicionar linha</button>
+            <button id="clear-credential-rows-button" class="button button-danger" type="button">Limpar linhas</button>
+          </div>
+
+          <p class="helper-text status-note" id="credential-feedback">
+            Use esta aba para calcular várias credenciais no mesmo orçamento, reaproveitando os preços que já estão configurados no sistema.
+          </p>
+
+          <div class="table-shell">
+            <table class="budget-table credential-budget-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Descrição</th>
+                  <th>Material base</th>
+                  <th>Impressão</th>
+                  <th>Laminação</th>
+                  <th>Cordão</th>
+                  <th>Largura (cm)</th>
+                  <th>Altura (cm)</th>
+                  <th>Quantidade</th>
+                  <th>Área total (m²)</th>
+                  <th>Por A4</th>
+                  <th>Folhas A4</th>
+                  <th>Valor base</th>
+                  <th>Laminação total</th>
+                  <th>Cordão total</th>
+                  <th>Criação de arte</th>
+                  <th>Tipo desc.</th>
+                  <th>Desconto</th>
+                  <th>Total item</th>
+                  <th>Valor un.</th>
+                </tr>
+              </thead>
+              <tbody id="credential-rows-table-body"></tbody>
+            </table>
+          </div>
+
+          <div class="warning-list" id="credential-warning-list"></div>
+        </article>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="produtos-prontos">
+        <div class="summary-grid">
+          <article class="summary-card">
+            <span class="summary-label">Linhas ativas</span>
+            <strong id="ready-summary-active">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Unidades</span>
+            <strong id="ready-summary-quantity">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Total geral</span>
+            <strong id="ready-summary-total">R$ 0,00</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Valor médio</span>
+            <strong id="ready-summary-average">R$ 0,00</strong>
+          </article>
+        </div>
+
+        <article class="panel panel-table">
+          <div class="panel-heading">
+            <div>
+              <h2>Produtos prontos</h2>
+              <p class="panel-copy">Use esta aba para orçar cordões, carimbos e outros produtos vendidos por unidade, separados da credencial.</p>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <button id="add-ready-row-button" class="button button-primary" type="button">Adicionar linha</button>
+            <button id="clear-ready-rows-button" class="button button-danger" type="button">Limpar linhas</button>
+          </div>
+
+          <p class="helper-text status-note" id="ready-feedback">
+            Os cordões seguem a base configurada no sistema e os carimbos entram pela tabela fixa cadastrada.
+          </p>
+
+          <div class="table-shell">
+            <table class="budget-table ready-products-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Produto</th>
+                  <th>Descrição</th>
+                  <th>Quantidade</th>
+                  <th>Valor un.</th>
+                  <th>Criação de arte</th>
+                  <th>Tipo desc.</th>
+                  <th>Desconto</th>
+                  <th>Total item</th>
+                </tr>
+              </thead>
+              <tbody id="ready-rows-table-body"></tbody>
+            </table>
+          </div>
+
+          <div class="warning-list" id="ready-warning-list"></div>
+        </article>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="cartoes">
+        <div class="summary-grid">
+          <article class="summary-card">
+            <span class="summary-label">Linhas ativas</span>
+            <strong id="business-summary-active">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Cartões</span>
+            <strong id="business-summary-quantity">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Total geral</span>
+            <strong id="business-summary-total">R$ 0,00</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Valor médio</span>
+            <strong id="business-summary-average">R$ 0,00</strong>
+          </article>
+        </div>
+
+        <article class="panel panel-table">
+          <div class="panel-heading">
+            <div>
+              <h2>Cartões de visitas</h2>
+              <p class="panel-copy">Escolha produção laser ou offset, papel/acabamento, impressão e uma quantidade da tabela para fechar o valor.</p>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <button id="add-business-card-row-button" class="button button-primary" type="button">Adicionar linha</button>
+            <button id="clear-business-card-rows-button" class="button button-danger" type="button">Limpar linhas</button>
+          </div>
+
+          <p class="helper-text status-note" id="business-card-feedback">
+            Use esta aba para orçar vários modelos de cartões de visita no mesmo orçamento.
+          </p>
+
+          <div class="table-shell">
+            <table class="budget-table business-card-budget-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Descrição</th>
+                  <th>Produção</th>
+                  <th>Papel / acabamento</th>
+                  <th>Impressão</th>
+                  <th>Quantidade</th>
+                  <th>Pacote usado</th>
+                  <th>Valor base</th>
+                  <th>Acab. adicional</th>
+                  <th>Valor acab.</th>
+                  <th>Criação de arte</th>
+                  <th>Tipo desc.</th>
+                  <th>Desconto</th>
+                  <th>Total item</th>
+                  <th>Valor un.</th>
+                </tr>
+              </thead>
+              <tbody id="business-card-rows-table-body"></tbody>
+            </table>
+          </div>
+
+          <div class="warning-list" id="business-card-warning-list"></div>
+        </article>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="panfletos">
+        <div class="summary-grid">
+          <article class="summary-card">
+            <span class="summary-label">Linhas ativas</span>
+            <strong id="flyer-summary-active">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Unidades</span>
+            <strong id="flyer-summary-quantity">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Total geral</span>
+            <strong id="flyer-summary-total">R$ 0,00</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Valor médio</span>
+            <strong id="flyer-summary-average">R$ 0,00</strong>
+          </article>
+        </div>
+
+        <article class="panel panel-table">
+          <div class="panel-heading">
+            <div>
+              <h2>Panfletos e folders</h2>
+              <p class="panel-copy">Escolha produção laser ou offset, papel, tamanho, impressão e uma quantidade cadastrada na tabela.</p>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <button id="add-flyer-row-button" class="button button-primary" type="button">Adicionar linha</button>
+            <button id="clear-flyer-rows-button" class="button button-danger" type="button">Limpar linhas</button>
+          </div>
+
+          <p class="helper-text status-note" id="flyer-feedback">
+            Use esta aba para orçar vários panfletos ou folders no mesmo orçamento.
+          </p>
+
+          <div class="table-shell">
+            <table class="budget-table flyer-budget-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Descrição</th>
+                  <th>Produção</th>
+                  <th>Papel</th>
+                  <th>Tamanho</th>
+                  <th>Impressão</th>
+                  <th>Quantidade</th>
+                  <th>Dobra</th>
+                  <th>Valor base</th>
+                  <th>Dobra total</th>
+                  <th>Criação de arte</th>
+                  <th>Tipo desc.</th>
+                  <th>Desconto</th>
+                  <th>Total item</th>
+                  <th>Valor un.</th>
+                </tr>
+              </thead>
+              <tbody id="flyer-rows-table-body"></tbody>
+            </table>
+          </div>
+
+          <div class="warning-list" id="flyer-warning-list"></div>
+        </article>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="blocos-sulfite">
+        <div class="summary-grid">
+          <article class="summary-card">
+            <span class="summary-label">Linhas ativas</span>
+            <strong id="block-sulfite-summary-active">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Blocos</span>
+            <strong id="block-sulfite-summary-quantity">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Total geral</span>
+            <strong id="block-sulfite-summary-total">R$ 0,00</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Valor médio</span>
+            <strong id="block-sulfite-summary-average">R$ 0,00</strong>
+          </article>
+        </div>
+
+        <article class="panel panel-table">
+          <div class="panel-heading">
+            <div>
+              <h2>Blocos em papel sulfite 75g</h2>
+              <p class="panel-copy">Selecione formato, vias e quantidade para puxar o preço cadastrado na tabela de blocos.</p>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <button id="add-block-sulfite-row-button" class="button button-primary" type="button">Adicionar linha</button>
+            <button id="clear-block-sulfite-rows-button" class="button button-danger" type="button">Limpar linhas</button>
+          </div>
+
+          <p class="helper-text status-note" id="block-sulfite-feedback">
+            Use esta aba para orçar vários blocos em sulfite no mesmo orçamento.
+          </p>
+
+          <div class="table-shell">
+            <table class="budget-table block-budget-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Descrição</th>
+                  <th>Formato</th>
+                  <th>Medida</th>
+                  <th>Vias</th>
+                  <th>Quantidade</th>
+                  <th>Valor base</th>
+                  <th>Criação de arte</th>
+                  <th>Tipo desc.</th>
+                  <th>Desconto</th>
+                  <th>Total item</th>
+                  <th>Valor un.</th>
+                </tr>
+              </thead>
+              <tbody id="block-sulfite-rows-table-body"></tbody>
+            </table>
+          </div>
+
+          <div class="warning-list" id="block-sulfite-warning-list"></div>
+        </article>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="blocos-autocopiativo">
+        <div class="summary-grid">
+          <article class="summary-card">
+            <span class="summary-label">Linhas ativas</span>
+            <strong id="block-autocopiativo-summary-active">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Blocos</span>
+            <strong id="block-autocopiativo-summary-quantity">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Total geral</span>
+            <strong id="block-autocopiativo-summary-total">R$ 0,00</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Valor médio</span>
+            <strong id="block-autocopiativo-summary-average">R$ 0,00</strong>
+          </article>
+        </div>
+
+        <article class="panel panel-table">
+          <div class="panel-heading">
+            <div>
+              <h2>Blocos em papel autocopiativo</h2>
+              <p class="panel-copy">Selecione formato, vias e quantidade para puxar o preço cadastrado na tabela de blocos autocopiativos.</p>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <button id="add-block-autocopiativo-row-button" class="button button-primary" type="button">Adicionar linha</button>
+            <button id="clear-block-autocopiativo-rows-button" class="button button-danger" type="button">Limpar linhas</button>
+          </div>
+
+          <p class="helper-text status-note" id="block-autocopiativo-feedback">
+            Use esta aba para orçar vários blocos autocopiativos no mesmo orçamento.
+          </p>
+
+          <div class="table-shell">
+            <table class="budget-table block-budget-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Descrição</th>
+                  <th>Formato</th>
+                  <th>Medida</th>
+                  <th>Vias</th>
+                  <th>Quantidade</th>
+                  <th>Valor base</th>
+                  <th>Criação de arte</th>
+                  <th>Tipo desc.</th>
+                  <th>Desconto</th>
+                  <th>Total item</th>
+                  <th>Valor un.</th>
+                </tr>
+              </thead>
+              <tbody id="block-autocopiativo-rows-table-body"></tbody>
+            </table>
+          </div>
+
+          <div class="warning-list" id="block-autocopiativo-warning-list"></div>
+        </article>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="resinados">
+        <div class="summary-grid">
+          <article class="summary-card">
+            <span class="summary-label">Linhas ativas</span>
+            <strong id="resin-summary-active">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Unidades</span>
+            <strong id="resin-summary-quantity">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Total geral</span>
+            <strong id="resin-summary-total">R$ 0,00</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Valor unitário</span>
+            <strong id="resin-summary-average">R$ 0,00</strong>
+          </article>
+        </div>
+
+        <article class="panel panel-table">
+          <div class="panel-heading">
+            <div>
+              <h2>Orçamento de resinados</h2>
+              <p class="panel-copy">Adicione várias medidas na mesma aba. O sistema usa sempre a folha A3, soma 3 mm na largura e 3 mm na altura para a resina e escolhe automaticamente a melhor orientação.</p>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <button id="add-resin-row-button" class="button button-primary" type="button">Adicionar linha</button>
+            <button id="clear-resin-rows-button" class="button button-danger" type="button">Limpar linhas</button>
+          </div>
+
+          <p class="helper-text status-note" id="resin-feedback">
+            Preencha as linhas abaixo para calcular várias medidas de resinado no mesmo orçamento.
+          </p>
+
+          <div class="table-shell">
+            <table class="budget-table resin-budget-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Descrição</th>
+                  <th>Tipo de adesivo</th>
+                  <th>Largura (cm)</th>
+                  <th>Altura (cm)</th>
+                  <th>Quantidade</th>
+                  <th>Medida com resina</th>
+                  <th>Orientação</th>
+                  <th>Por A3</th>
+                  <th>Folhas A3</th>
+                  <th>Produção total</th>
+                  <th>Custo por folha</th>
+                  <th>Criação de arte</th>
+                  <th>Tipo desc.</th>
+                  <th>Desconto</th>
+                  <th>Total item</th>
+                  <th>Valor un.</th>
+                </tr>
+              </thead>
+              <tbody id="resin-rows-table-body"></tbody>
+            </table>
+          </div>
+
+          <div class="warning-list" id="resin-warning-list"></div>
+        </article>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="orcamento-livre">
+        <div class="summary-grid">
+          <article class="summary-card">
+            <span class="summary-label">Linhas ativas</span>
+            <strong id="free-quote-summary-active">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Itens</span>
+            <strong id="free-quote-summary-total">R$ 0,00</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Valor médio</span>
+            <strong id="free-quote-summary-average">R$ 0,00</strong>
+          </article>
+        </div>
+
+        <article class="panel panel-table">
+          <div class="panel-heading">
+            <div>
+              <h2>Orçamento livre</h2>
+              <p class="panel-copy">Use esta aba para digitar serviços avulsos com descrição, quantidade e valor livre. Tudo entra no orçamento final junto com as demais abas.</p>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <button id="add-free-quote-row-button" class="button button-primary" type="button">Adicionar linha</button>
+            <button id="clear-free-quote-rows-button" class="button button-danger" type="button">Limpar linhas</button>
+          </div>
+
+          <p class="helper-text status-note" id="free-quote-feedback">
+            O orçamento livre permite lançar serviços personalizados que não dependem de tabela fixa.
+          </p>
+
+          <div class="table-shell">
+            <table class="budget-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Serviço</th>
+                  <th>Quantidade</th>
+                  <th>Valor un.</th>
+                  <th>Total base</th>
+                  <th>Criação de arte</th>
+                  <th>Tipo desc.</th>
+                  <th>Desconto</th>
+                  <th>Total item</th>
+                  <th>Valor un. final</th>
+                </tr>
+              </thead>
+              <tbody id="free-quote-rows-table-body"></tbody>
+            </table>
+          </div>
+
+          <div class="warning-list" id="free-quote-warning-list"></div>
+        </article>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="configuracao">
+        <div class="workspace-grid config-top-grid">
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Central de configuração</h2>
+                <p class="panel-copy">Organize preços, acabamentos e produtos extras de cada aba do app em um só lugar.</p>
+              </div>
+            </div>
+
+            <div class="toolbar">
+              <button id="save-config-button" class="button button-primary button-spotlight" type="button">Salvar alterações</button>
+              <button id="lock-config-button" class="button" type="button" hidden>Bloquear configuração</button>
+              <button id="export-config-button" class="button" type="button">Exportar configuração</button>
+              <button id="import-config-button" class="button" type="button">Importar configuração</button>
+              <button id="reset-config-button" class="button button-danger" type="button">Restaurar padrão</button>
+              <input id="config-file-input" type="file" accept=".json,application/json" hidden>
+            </div>
+
+            <p class="helper-text config-status status-note" id="config-status">
+              Essa área é protegida por senha. Depois de desbloquear, use "Salvar alterações" para confirmar visualmente cada ajuste desta aba.
+            </p>
+
+            <p class="helper-text">
+              As alterações desta aba ficam salvas na base compartilhada e aparecem nos demais computadores.
+            </p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Ajustes extras</h2>
+                <p class="panel-copy">Desconto da espiral sem capa plástica e observações de uso.</p>
+              </div>
+            </div>
+
+            <div class="preset-grid compact-grid">
+              <label>
+                <span>Desconto sem capas plásticas</span>
+                <input id="spiral-discount-input" type="number" min="0" step="0.01">
+              </label>
+            </div>
+            <p class="helper-text">
+              A espiral só calcula até 500 folhas por apostila, seguindo a mesma regra da planilha.
+            </p>
+          </article>
+        </div>
+
+        <div class="config-sections" id="config-sections"></div>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="clientes">
+        <div class="summary-grid">
+          <article class="summary-card">
+            <span class="summary-label">Clientes salvos</span>
+            <strong id="clients-count">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Último cliente</span>
+            <strong id="clients-latest">Nenhum cliente salvo</strong>
+          </article>
+        </div>
+
+        <div class="workspace-grid">
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Cadastro de contatos</h2>
+                <p class="panel-copy">Cadastre, altere, salve e exclua contatos para reutilizar em qualquer orçamento.</p>
+              </div>
+            </div>
+
+            <div class="quote-form-grid">
+              <label>
+                <span>Nome / Razão social</span>
+                <input id="client-record-name" type="text">
+              </label>
+              <label>
+                <span>Contato</span>
+                <input id="client-record-contact" type="text">
+              </label>
+              <label>
+                <span>CNPJ</span>
+                <input id="client-record-cnpj" type="text">
+              </label>
+              <label class="full-width">
+                <span>Observações internas</span>
+                <textarea id="client-record-notes" rows="4"></textarea>
+              </label>
+            </div>
+
+            <div class="toolbar">
+              <button id="save-client-button" class="button button-primary" type="button">Salvar contato</button>
+              <button id="new-client-button" class="button" type="button">Novo contato</button>
+              <button id="load-current-client-button" class="button" type="button">Usar dados do orçamento atual</button>
+            </div>
+
+            <p class="helper-text status-note" id="clients-feedback">
+              Os contatos salvos aqui ficam compartilhados entre os computadores. O preenchimento do formulário não é compartilhado até você salvar.
+            </p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Base compartilhada</h2>
+                <p class="panel-copy">A lista abaixo funciona como um cadastro rápido de clientes para toda a equipe.</p>
+              </div>
+            </div>
+
+            <div id="clients-list" class="stack-list"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="historico">
+        <div class="summary-grid">
+          <article class="summary-card">
+            <span class="summary-label">Orçamentos salvos</span>
+            <strong id="history-count">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Total acumulado</span>
+            <strong id="history-total">R$ 0,00</strong>
+          </article>
+        </div>
+
+        <div class="workspace-grid">
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Salvar fechamento</h2>
+                <p class="panel-copy">Guarde os principais dados do fechamento para consulta posterior.</p>
+              </div>
+            </div>
+
+            <div class="toolbar">
+              <button id="save-history-button" class="button button-primary" type="button">Salvar orçamento atual</button>
+            </div>
+
+            <p class="helper-text">Cada registro salva o total, o cliente e um resumo curto do orçamento.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Histórico compartilhado</h2>
+                <p class="panel-copy">Use para consultar orçamentos recentes ou reaproveitar dados do cliente em qualquer computador.</p>
+              </div>
+            </div>
+
+            <div id="history-list" class="stack-list"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="orcamento">
+        <div class="workspace-grid quote-grid">
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Dados do cliente</h2>
+                <p class="panel-copy">Essas informações entram no resumo para envio.</p>
+              </div>
+            </div>
+
+            <div class="quote-form-grid">
+              <label>
+                <span>Nome / Razão social</span>
+                <input id="client-name" type="text">
+              </label>
+              <label>
+                <span>Contato</span>
+                <input id="client-contact" type="text">
+              </label>
+              <label>
+                <span>CNPJ</span>
+                <input id="client-cnpj" type="text">
+              </label>
+              <label>
+                <span>Forma de pagamento</span>
+                <input id="payment-terms" type="text">
+              </label>
+              <label>
+                <span>Prazo de produção</span>
+                <input id="production-deadline" type="text">
+              </label>
+              <label>
+                <span>Tipo de desconto geral</span>
+                <select id="quote-discount-type">
+                  <option value="R$">R$</option>
+                  <option value="%">%</option>
+                </select>
+              </label>
+              <label>
+                <span>Desconto geral</span>
+                <input id="quote-discount-value" type="number" min="0" step="0.01">
+              </label>
+              <label class="full-width">
+                <span>Observações para o cliente</span>
+                <textarea id="quote-notes" rows="4"></textarea>
+              </label>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Dados da empresa</h2>
+                <p class="panel-copy">Você pode trocar a logo, o nome e o endereço quando quiser.</p>
+              </div>
+            </div>
+
+            <div class="quote-form-grid">
+              <label class="full-width">
+                <span>Logo</span>
+                <input id="company-logo-input" type="file" accept="image/*">
+              </label>
+              <label class="full-width">
+                <span>Empresa</span>
+                <input id="company-name" type="text">
+              </label>
+              <label>
+                <span>CNPJ</span>
+                <input id="company-cnpj" type="text">
+              </label>
+              <label>
+                <span>Contato</span>
+                <input id="company-contact" type="text">
+              </label>
+              <label class="full-width">
+                <span>Endereço</span>
+                <textarea id="company-address" rows="3"></textarea>
+              </label>
+            </div>
+          </article>
+        </div>
+
+        <article class="panel quote-preview-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>Prévia do orçamento</h2>
+              <p class="panel-copy">Pronto para copiar, imprimir ou transformar em PDF.</p>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <button id="copy-quote-button" class="button" type="button">Copiar resumo</button>
+            <button id="clear-quote-button" class="button button-danger" type="button">Limpar orçamento</button>
+            <button id="print-quote-button" class="button button-primary button-spotlight" type="button">Imprimir / Salvar em PDF</button>
+          </div>
+
+          <div class="quote-preview" id="quote-preview"></div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <template id="logo-placeholder-template">
+    <div class="logo-placeholder">
+      <span>Logo da empresa</span>
+    </div>
+  </template>
+
+  <div class="app-modal" id="confirm-modal" hidden>
+    <div class="app-modal-backdrop" data-modal-close></div>
+    <div class="app-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title" aria-describedby="confirm-modal-message">
+      <div class="app-modal-icon">!</div>
+      <div class="app-modal-copy">
+        <span class="app-modal-kicker" id="confirm-modal-kicker">Confirmação</span>
+        <h3 id="confirm-modal-title">Confirmar exclusão</h3>
+        <p id="confirm-modal-message">Deseja realmente continuar?</p>
+      </div>
+      <div class="app-modal-actions">
+        <button class="button" id="confirm-modal-cancel" type="button">Cancelar</button>
+        <button class="button button-danger" id="confirm-modal-confirm" type="button">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./blocos-data.js?v=45a769731c54"></script>
+  <script src="./app.mjs?v=11888fd03486"></script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
