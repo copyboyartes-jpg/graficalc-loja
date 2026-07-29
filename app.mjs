@@ -2042,25 +2042,6 @@ function getBestFitOnSheet(sheetWidthMm, sheetHeightMm, itemWidthMm, itemHeightM
   return { itemsPerSheet: normalTotal, cols: normalCols, rows: normalRows, rotated: false };
 }
 
-function getBestFitOnSheet(widthMm, heightMm, sheetWidth, sheetHeight) {
-  if (widthMm <= 0 || heightMm <= 0) {
-    return { itemsPerSheet: 0, cols: 0, rows: 0, rotated: false };
-  }
-
-  const normalCols = Math.floor(sheetWidth / widthMm);
-  const normalRows = Math.floor(sheetHeight / heightMm);
-  const normalTotal = normalCols * normalRows;
-  const rotatedCols = Math.floor(sheetWidth / heightMm);
-  const rotatedRows = Math.floor(sheetHeight / widthMm);
-  const rotatedTotal = rotatedCols * rotatedRows;
-
-  if (rotatedTotal > normalTotal) {
-    return { itemsPerSheet: rotatedTotal, cols: rotatedCols, rows: rotatedRows, rotated: true };
-  }
-
-  return { itemsPerSheet: normalTotal, cols: normalCols, rows: normalRows, rotated: false };
-}
-
 function calculateHundredExtra(quantity, minimumValue, eachHundredValue) {
   const totalQuantity = toWholeNumber(quantity);
   if (totalQuantity <= 0) return 0;
@@ -2086,7 +2067,7 @@ function calculatePolasealFit(widthMm, heightMm) {
   const pieceHeight = heightMm + 10;
   const fits = POLASEAL_SIZES.map((sheet) => ({
     ...sheet,
-    ...getBestFitOnSheet(pieceWidth, pieceHeight, sheet.width, sheet.height),
+    ...getBestFitOnSheet(sheet.width, sheet.height, pieceWidth, pieceHeight),
   }));
   const a4 = fits.find((fit) => fit.id === "a4");
   const oficio = fits.find((fit) => fit.id === "oficio");
