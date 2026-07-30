@@ -4054,6 +4054,14 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
     ),
   ];
 
+  const freeQuoteCards = [
+    createConfigCardMarkup(
+      "Orçamento livre",
+      "Esta aba não usa tabela fixa de preços.",
+      `<p class="helper-text">Os serviços, quantidades e valores são digitados diretamente nas linhas de orçamento livre. Quando o campo estiver zerado ou sem descrição, a linha não aparece no orçamento final.</p>`
+    ),
+  ];
+
   const safeSection = activeSection === "impressos" || activeSection === "credenciais" || activeSection === "produtos-prontos" || activeSection === "cartoes" || activeSection === "panfletos" || activeSection === "blocos-sulfite" || activeSection === "blocos-autocopiativo" || activeSection === "m2" || activeSection === "resinados" || activeSection === "orcamento-livre" ? activeSection : "calculo";
   const configGroups = {
     calculo: createConfigGroupMarkup(
