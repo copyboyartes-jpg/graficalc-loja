@@ -19,7 +19,6 @@ const OPTIONS = {
   sizes: ["A4", "A5"],
   colorPrintSizes: ["A4", "A3", "Tamanho personalizado"],
   printModes: ["Só frente", "Frente e verso"],
-  bleedModes: ["Sem sangra", "Com sangra"],
   finishing: ["Sem acabamento", "Encadernação espiral", "Livreto"],
   coverTypes: ["Sem capa", "Colorida so frente", "Colorida frente e verso"],
   backCoverTypes: ["Sem contracapa", "Colorida so frente", "Colorida frente e verso"],
@@ -988,7 +987,7 @@ function createDefaultColorPrintRow(index) {
     widthMm: 0,
     heightMm: 0,
     size: "A4",
-    bleedMode: "Sem sangra",
+    bleedMm: 0,
     printMode: "Só frente",
     paperType: "Sulfite 75g",
     quantity: 0,
@@ -1487,6 +1486,11 @@ function mergeState(candidate) {
       ...row,
       widthMm: toDecimalNumber(row?.widthMm),
       heightMm: toDecimalNumber(row?.heightMm),
+      bleedMm: typeof row?.bleedMm !== "undefined"
+        ? toDecimalNumber(row?.bleedMm)
+        : row?.bleedMode === "Com sangra"
+          ? 2
+          : 0,
       quantity: toWholeNumber(row?.quantity),
       cutPriceOverride: row?.cutPriceOverride === "" || row?.cutPriceOverride === null || typeof row?.cutPriceOverride === "undefined"
         ? ""
@@ -3237,10 +3241,10 @@ function calculateColorPrintWorkbook(state, config) {
     const heightCm = toDecimalNumber(row.heightMm);
     const widthMm = widthCm * 10;
     const heightMm = heightCm * 10;
+    const bleedMm = Math.max(0, toDecimalNumber(row.bleedMm));
     const quantity = toWholeNumber(row.quantity);
-    const hasBleed = row.bleedMode === "Com sangra";
-    const effectiveWidth = widthMm + (hasBleed ? 2 : 0);
-    const effectiveHeight = heightMm + (hasBleed ? 2 : 0);
+    const effectiveWidth = widthMm + (bleedMm * 2);
+    const effectiveHeight = heightMm + (bleedMm * 2);
     const active = isColorPrintRowActive(row);
     const sheet = getColorPrintSheetDefinition(row.size, config);
     const pricingMap = sheet.pricingMap || config.colorPrintPricing;
@@ -3263,6 +3267,7 @@ function calculateColorPrintWorkbook(state, config) {
         ...row,
         widthMm: widthCm,
         heightMm: heightCm,
+        bleedMm,
         effectiveWidth,
         effectiveHeight,
         active,
@@ -3292,6 +3297,7 @@ function calculateColorPrintWorkbook(state, config) {
         ...row,
         widthMm: widthCm,
         heightMm: heightCm,
+        bleedMm,
         effectiveWidth,
         effectiveHeight,
         active,
@@ -3338,6 +3344,7 @@ function calculateColorPrintWorkbook(state, config) {
       ...row,
       widthMm: widthCm,
       heightMm: heightCm,
+      bleedMm,
       effectiveWidth,
       effectiveHeight,
       active,
@@ -6378,7 +6385,7 @@ async function initApp() {
             <td><input class="cell-input description" name="description" value="${escapeHtml(row.description)}"></td>
             <td><input class="cell-input" name="widthMm" type="number" min="0" step="0.1" value="${escapeHtml(row.widthMm)}"></td>
             <td><input class="cell-input" name="heightMm" type="number" min="0" step="0.1" value="${escapeHtml(row.heightMm)}"></td>
-            <td><select class="cell-select" name="bleedMode">${buildOptions(OPTIONS.bleedModes, row.bleedMode)}</select></td>
+            <td><input class="cell-input" name="bleedMm" type="number" min="0" step="0.1" value="${escapeHtml(row.bleedMm ?? 0)}"></td>
             <td><select class="cell-select" name="printMode">${buildOptions(OPTIONS.printModes, row.printMode)}</select></td>
             <td><select class="cell-select" name="size">${buildOptions(OPTIONS.colorPrintSizes, row.size || "A4")}</select></td>
             <td><select class="cell-select" name="paperType">${buildOptions(OPTIONS.colorPaperTypes, row.paperType)}</select></td>
@@ -7644,7 +7651,7 @@ async function initApp() {
 
     if (field === "quantity") {
       row[field] = toWholeNumber(target.value);
-    } else if (field === "widthMm" || field === "heightMm") {
+    } else if (field === "widthMm" || field === "heightMm" || field === "bleedMm") {
       row[field] = toDecimalNumber(target.value);
     } else if (field === "cutPriceOverride") {
       row[field] = target.value === "" ? "" : toMoneyNumber(target.value);
