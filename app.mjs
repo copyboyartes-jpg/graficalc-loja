@@ -1186,6 +1186,33 @@ function deepClone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function repairBrokenText(value) {
+  if (typeof value !== "string" || !value) {
+    return value;
+  }
+
+  const replacements = [
+    ["Ilh?s", "Ilhós"],
+    ["Ilh�s", "Ilhós"],
+    ["Lat?o", "Latão"],
+    ["Lat�o", "Latão"],
+    ["Lamina??o", "Laminação"],
+    ["Lamina��o", "Laminação"],
+    ["plastifica??o", "plastificação"],
+    ["plastifica��o", "plastificação"],
+    ["Configura??o", "Configuração"],
+    ["Configura��o", "Configuração"],
+    ["cora??o", "coração"],
+    ["cora��o", "coração"],
+  ];
+
+  let normalized = value;
+  for (const [broken, fixed] of replacements) {
+    normalized = normalized.replaceAll(broken, fixed);
+  }
+  return normalized;
+}
+
 function normalizeCatalogSections(list) {
   if (!Array.isArray(list)) {
     return [];
@@ -1204,9 +1231,9 @@ function normalizeCatalogSections(list) {
         }
         normalized.push({
           id: product.id || `produto-${Date.now()}`,
-          label: product.label || "Novo produto",
+          label: repairBrokenText(product.label || "Novo produto"),
           tab,
-          note: product.note || "",
+          note: repairBrokenText(product.note || ""),
         });
       }
       continue;
@@ -1214,10 +1241,10 @@ function normalizeCatalogSections(list) {
     if (item.tab === "calculo" || item.tab === "impressos" || item.tab === "credenciais" || item.tab === "produtos-prontos" || item.tab === "cartoes" || item.tab === "panfletos" || item.tab === "m2") {
       normalized.push({
         id: item.id || `produto-${Date.now()}`,
-        label: item.label || item.name || "Novo produto",
+        label: repairBrokenText(item.label || item.name || "Novo produto"),
         tab: item.tab,
         pricingKey: item.tab === "m2" ? (item.pricingKey || "banner") : "",
-        note: item.note || "",
+        note: repairBrokenText(item.note || ""),
       });
     }
   }
@@ -1246,7 +1273,7 @@ function normalizeM2Finishes(candidateFinishes, defaultFinishes) {
     .filter((item) => item && typeof item === "object")
     .map((item, index) => ({
       id: item.id || `acabamento-${Date.now()}-${index}`,
-      label: item.label || "Novo acabamento",
+      label: repairBrokenText(item.label || "Novo acabamento"),
       type: item.type || "area",
       price: Number.isFinite(Number(item.price)) ? Number(item.price) : 0,
       spacingCm: item.spacingCm === "" || item.spacingCm == null ? "" : Number(item.spacingCm),
