@@ -1731,7 +1731,7 @@ function loadConfigSection() {
 
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.configSection);
-    return raw === "impressos" || raw === "credenciais" || raw === "produtos-prontos" || raw === "cartoes" || raw === "panfletos" || raw === "m2" || raw === "resinados" ? raw : "calculo";
+    return raw === "impressos" || raw === "credenciais" || raw === "produtos-prontos" || raw === "cartoes" || raw === "panfletos" || raw === "blocos-sulfite" || raw === "blocos-autocopiativo" || raw === "m2" || raw === "resinados" || raw === "orcamento-livre" ? raw : "calculo";
   } catch {
     return "calculo";
   }
@@ -1741,7 +1741,7 @@ function saveConfigSection(section) {
   if (typeof localStorage === "undefined") {
     return;
   }
-  const safeSection = section === "impressos" || section === "credenciais" || section === "produtos-prontos" || section === "cartoes" || section === "panfletos" || section === "m2" || section === "resinados" || section === "orcamento-livre" ? section : "calculo";
+  const safeSection = section === "impressos" || section === "credenciais" || section === "produtos-prontos" || section === "cartoes" || section === "panfletos" || section === "blocos-sulfite" || section === "blocos-autocopiativo" || section === "m2" || section === "resinados" || section === "orcamento-livre" ? section : "calculo";
   localStorage.setItem(STORAGE_KEYS.configSection, safeSection);
 }
 
@@ -4054,7 +4054,7 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
     ),
   ];
 
-  const safeSection = activeSection === "impressos" || activeSection === "credenciais" || activeSection === "produtos-prontos" || activeSection === "cartoes" || activeSection === "panfletos" || activeSection === "m2" || activeSection === "resinados" || activeSection === "orcamento-livre" ? activeSection : "calculo";
+  const safeSection = activeSection === "impressos" || activeSection === "credenciais" || activeSection === "produtos-prontos" || activeSection === "cartoes" || activeSection === "panfletos" || activeSection === "blocos-sulfite" || activeSection === "blocos-autocopiativo" || activeSection === "m2" || activeSection === "resinados" || activeSection === "orcamento-livre" ? activeSection : "calculo";
   const configGroups = {
     calculo: createConfigGroupMarkup(
       "calculo",
@@ -5498,7 +5498,7 @@ async function initApp() {
   const config = loadFromStorage(STORAGE_KEYS.config, mergeConfig);
   let configViewMode = loadConfigViewMode();
   let activeConfigSection = loadConfigSection();
-  let lastConfigSourceTab = activeConfigSection === "impressos" || activeConfigSection === "credenciais" || activeConfigSection === "produtos-prontos" || activeConfigSection === "cartoes" || activeConfigSection === "panfletos" || activeConfigSection === "m2" || activeConfigSection === "resinados" || activeConfigSection === "orcamento-livre" ? activeConfigSection : "calculo";
+  let lastConfigSourceTab = activeConfigSection === "impressos" || activeConfigSection === "credenciais" || activeConfigSection === "produtos-prontos" || activeConfigSection === "cartoes" || activeConfigSection === "panfletos" || activeConfigSection === "blocos-sulfite" || activeConfigSection === "blocos-autocopiativo" || activeConfigSection === "m2" || activeConfigSection === "resinados" || activeConfigSection === "orcamento-livre" ? activeConfigSection : "calculo";
   let isConfigUnlocked = loadSessionFlag(SESSION_KEYS.configUnlocked);
   let sharedSyncTimer = null;
   let sharedSyncInFlight = false;
@@ -5962,7 +5962,7 @@ async function initApp() {
 
   function selectTab(tabName) {
     if (tabName === "configuracao") {
-      activeConfigSection = lastConfigSourceTab === "impressos" || lastConfigSourceTab === "credenciais" || lastConfigSourceTab === "produtos-prontos" || lastConfigSourceTab === "cartoes" || lastConfigSourceTab === "panfletos" || lastConfigSourceTab === "m2" || lastConfigSourceTab === "resinados" || lastConfigSourceTab === "orcamento-livre" ? lastConfigSourceTab : "calculo";
+      activeConfigSection = lastConfigSourceTab === "impressos" || lastConfigSourceTab === "credenciais" || lastConfigSourceTab === "produtos-prontos" || lastConfigSourceTab === "cartoes" || lastConfigSourceTab === "panfletos" || lastConfigSourceTab === "blocos-sulfite" || lastConfigSourceTab === "blocos-autocopiativo" || lastConfigSourceTab === "m2" || lastConfigSourceTab === "resinados" || lastConfigSourceTab === "orcamento-livre" ? lastConfigSourceTab : "calculo";
       saveConfigSection(activeConfigSection);
       renderConfig();
       if (!isConfigUnlocked) {
@@ -8027,7 +8027,7 @@ async function initApp() {
 
     const sectionButton = event.target.closest("[data-config-section]");
     if (sectionButton) {
-      activeConfigSection = sectionButton.dataset.configSection === "impressos" || sectionButton.dataset.configSection === "credenciais" || sectionButton.dataset.configSection === "produtos-prontos" || sectionButton.dataset.configSection === "cartoes" || sectionButton.dataset.configSection === "panfletos" || sectionButton.dataset.configSection === "m2" || sectionButton.dataset.configSection === "resinados"
+      activeConfigSection = sectionButton.dataset.configSection === "impressos" || sectionButton.dataset.configSection === "credenciais" || sectionButton.dataset.configSection === "produtos-prontos" || sectionButton.dataset.configSection === "cartoes" || sectionButton.dataset.configSection === "panfletos" || sectionButton.dataset.configSection === "blocos-sulfite" || sectionButton.dataset.configSection === "blocos-autocopiativo" || sectionButton.dataset.configSection === "m2" || sectionButton.dataset.configSection === "resinados" || sectionButton.dataset.configSection === "orcamento-livre"
         ? sectionButton.dataset.configSection
         : "calculo";
       saveConfigSection(activeConfigSection);
@@ -8579,9 +8579,16 @@ async function initApp() {
     }
   });
 
-  await bootstrapSharedState();
-  startSharedRefresh();
   renderAll();
+  bootstrapSharedState()
+    .catch(() => {
+      sharedBootstrapComplete = true;
+      setSyncStatus("Não foi possível conectar a base compartilhada agora. O app segue disponível nesta máquina.", "error");
+    })
+    .finally(() => {
+      renderAll();
+    });
+  startSharedRefresh();
 }
 
 if (typeof window !== "undefined" && typeof document !== "undefined") {
