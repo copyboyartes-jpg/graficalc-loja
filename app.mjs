@@ -201,12 +201,7 @@ const COLOR_EXTRA_OPTIONS = {
   folds: ["Sem dobra", "Dobra"],
   lamination: [
     "Sem plastificação",
-    "Plastificação inteira",
-    "Plastificação com corte",
-    "02 por polaseal",
-    "04 por polaseal",
-    "06 por polaseal",
-    "08 por polaseal",
+    "Com plastificação",
   ],
 };
 const A3_WIDTH_MM = 420;
@@ -1498,7 +1493,7 @@ function mergeState(candidate) {
         : toMoneyNumber(row?.cutPriceOverride),
       holeOption: COLOR_EXTRA_OPTIONS.holes.includes(row?.holeOption) ? row.holeOption : "Sem furo",
       foldOption: COLOR_EXTRA_OPTIONS.folds.includes(row?.foldOption) ? row.foldOption : "Sem dobra",
-      laminationOption: COLOR_EXTRA_OPTIONS.lamination.includes(row?.laminationOption) ? row.laminationOption : "Sem plastificação",
+      laminationOption: normalizeColorLaminationOption(row?.laminationOption),
       artCreationFee: toMoneyNumber(row?.artCreationFee),
       discountType: normalizeDiscountType(row?.discountType),
       discountValue: toMoneyNumber(row?.discountValue),
@@ -2114,6 +2109,23 @@ function calculatePolasealFit(widthMm, heightMm) {
   };
 }
 
+function normalizeColorLaminationOption(value) {
+  if (value === "Sem plastificação" || value === "Com plastificação") {
+    return value;
+  }
+  if (
+    value === "Plastificação inteira" ||
+    value === "Plastificação com corte" ||
+    value === "02 por polaseal" ||
+    value === "04 por polaseal" ||
+    value === "06 por polaseal" ||
+    value === "08 por polaseal"
+  ) {
+    return "Com plastificação";
+  }
+  return "Sem plastificação";
+}
+
 function calculateColorExtras(row, widthMm, heightMm, quantity, config) {
   const extras = config?.colorPrintExtras || createDefaultConfig().colorPrintExtras;
   const holeMinimum = Number(extras.holes?.[0]?.value || 10);
@@ -2124,18 +2136,21 @@ function calculateColorExtras(row, widthMm, heightMm, quantity, config) {
   const foldTotal = row.foldOption === "Dobra" ? calculateHundredExtra(quantity, foldMinimum, foldEachHundred) : 0;
   let laminationTotal = 0;
   const laminationFit = calculatePolasealFit(widthMm, heightMm);
+  const normalizedLaminationOption = normalizeColorLaminationOption(row.laminationOption);
 
-  if (row.laminationOption === "Plastificação inteira") {
-    const wholeA4 = extras.laminationWhole?.a4 || [];
-    const sheet = laminationFit.best?.id === "a3" ? "a3" : "a4";
-    const chosenTier = lookupTier(sheet === "a3" ? extras.laminationWhole?.a3 || [] : wholeA4, quantity);
-    laminationTotal = quantity * chosenTier;
-  } else if (row.laminationOption === "Plastificação com corte") {
-    laminationTotal = quantity * 23;
-  } else {
-    const selected = (extras.laminationCombo || []).find((item) => Number(item.quantity || 0) > 0 && row.laminationOption === item.label);
-    if (selected) {
-      laminationTotal = Math.ceil(quantity / Number(selected.quantity || 1)) * Number(selected.total || 0);
+  if (normalizedLaminationOption === "Com plastificação") {
+    if (row.size === "A3") {
+      const chosenTier = lookupTier(extras.laminationWhole?.a3 || [], quantity);
+      laminationTotal = quantity * chosenTier;
+    } else if (row.size === "A4") {
+      const chosenTier = lookupTier(extras.laminationWhole?.a4 || [], quantity);
+      laminationTotal = quantity * chosenTier;
+    } else {
+      const itemsPerSheet = Number(laminationFit.best?.itemsPerSheet || 0);
+      const selected = (extras.laminationCombo || []).find((item) => Number(item.quantity || 0) === itemsPerSheet);
+      if (selected && itemsPerSheet > 0) {
+        laminationTotal = Math.ceil(quantity / itemsPerSheet) * Number(selected.total || 0);
+      }
     }
   }
 
@@ -2143,7 +2158,7 @@ function calculateColorExtras(row, widthMm, heightMm, quantity, config) {
   const labels = [];
   if (holeTotal > 0) labels.push(`${row.holeOption}: ${formatCurrency(holeTotal)}`);
   if (foldTotal > 0) labels.push(`Dobra: ${formatCurrency(foldTotal)}`);
-  if (laminationTotal > 0) labels.push(`${row.laminationOption}: ${formatCurrency(laminationTotal)}`);
+  if (laminationTotal > 0) labels.push(`${normalizedLaminationOption}: ${formatCurrency(laminationTotal)}`);
 
   return {
     holeTotal,
