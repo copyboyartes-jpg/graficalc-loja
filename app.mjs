@@ -7079,12 +7079,29 @@ async function initApp() {
   }
 
   function renderAll() {
-    renderPresetControls();
-    renderClientFields();
-    renderConfig();
-    renderClientsTab();
-    renderHistoryTab();
-    return renderRowsAndSummary();
+    const sections = [
+      renderPresetControls,
+      renderClientFields,
+      renderConfig,
+      renderClientsTab,
+      renderHistoryTab,
+    ];
+
+    for (const renderSection of sections) {
+      try {
+        renderSection();
+      } catch (error) {
+        console.warn("Falha ao atualizar uma area do GrafiCalc.", error);
+      }
+    }
+
+    try {
+      return renderRowsAndSummary();
+    } catch (error) {
+      console.error("Falha ao atualizar as linhas de orcamento.", error);
+      setSyncStatus("Algumas linhas nao puderam ser exibidas. Atualize a pagina; se continuar, chame o Codi.", "error");
+      return null;
+    }
   }
 
   function updatePreset(name, value) {

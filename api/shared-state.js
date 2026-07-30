@@ -1,4 +1,5 @@
 const SHARED_STATE_KEY = "graficalc-global";
+const FALLBACK_SUPABASE_URL = "https://abiwcbjqlffgnrfenvwf.supabase.co";
 
 function jsonResponse(body, status = 200) {
   return {
@@ -11,15 +12,69 @@ function jsonResponse(body, status = 200) {
   };
 }
 
-function getKvConfig() {
-  const url = process.env.SUPABASE_URL;
-  const token = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
-
-  if (!url || !token) {
-    throw new Error("Base Supabase nao configurada.");
+function looksLikeSupabaseUrl(value) {
+  if (!value) {
+    return false;
   }
 
-  return { url: url.replace(/\/$/, ""), token };
+  try {
+    const parsed = new URL(String(value).trim());
+    return parsed.protocol === "https:" && parsed.hostname.endsWith(".supabase.co");
+  } catch (error) {
+    return false;
+  }
+}
+
+function looksLikeSupabaseToken(value) {
+  const token = String(value || "").trim();
+  return token.startsWith("sb_publishable_") || token.startsWith("sb_secret_") || token.startsWith("eyJ");
+}
+
+function normalizeSupabaseUrl() {
+  const candidates = [
+    process.env.SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_REST_URL,
+  ];
+
+  const configuredUrl = candidates.find(looksLikeSupabaseUrl);
+  return (configuredUrl || FALLBACK_SUPABASE_URL).replace(/\/$/, "");
+}
+
+function getSupabaseToken() {
+  const directCandidates = [
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    process.env.SUPABASE_SECRET_KEY,
+    process.env.SUPABASE_ANON_KEY,
+    process.env.SUPABASE_PUBLISHABLE_KEY,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  ];
+
+  if (looksLikeSupabaseToken(process.env.SUPABASE_URL)) {
+    directCandidates.push(process.env.SUPABASE_URL);
+  }
+
+  for (const [key, value] of Object.entries(process.env)) {
+    if (looksLikeSupabaseToken(value)) {
+      directCandidates.push(value);
+    }
+    if (looksLikeSupabaseToken(key)) {
+      directCandidates.push(key);
+    }
+  }
+
+  return directCandidates.map((value) => String(value || "").trim()).find(Boolean);
+}
+
+function getKvConfig() {
+  const url = normalizeSupabaseUrl();
+  const token = getSupabaseToken();
+
+  if (!token) {
+    throw new Error("Chave do Supabase nao configurada no Vercel.");
+  }
+
+  return { url, token };
 }
 
 async function supabaseRequest(path, options = {}) {
