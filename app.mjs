@@ -7,6 +7,7 @@
 
 const SESSION_KEYS = {
   configUnlocked: "graficalc-config-unlocked-v1",
+  renderRecovery: "graficalc-render-recovery-v1",
 };
 
 const CONFIG_ACCESS_PASSWORD = "copyboy2026";
@@ -6671,6 +6672,22 @@ async function initApp() {
     renderRowsAndSummary();
   }
 
+  function resetLocalCalculationAreas() {
+    state.rows = Array.from({ length: 5 }, (_, index) => createDefaultRow(index));
+    state.colorPrintItems = Array.from({ length: 5 }, (_, index) => createDefaultColorPrintRow(index));
+    state.credentialItems = Array.from({ length: 5 }, (_, index) => createDefaultCredentialRow(index));
+    state.readyProductItems = Array.from({ length: 5 }, (_, index) => createDefaultReadyProductRow(index));
+    state.freeQuoteItems = Array.from({ length: 5 }, (_, index) => createDefaultFreeQuoteRow(index));
+    state.businessCardItems = Array.from({ length: 5 }, (_, index) => createDefaultBusinessCardRow(index));
+    state.flyerItems = Array.from({ length: 5 }, (_, index) => createDefaultFlyerRow(index));
+    state.blockItems.sulfite = Array.from({ length: 5 }, (_, index) => createDefaultBlockRow(index, "sulfite"));
+    state.blockItems.autocopiativo = Array.from({ length: 5 }, (_, index) => createDefaultBlockRow(index, "autocopiativo"));
+    state.m2Items = Array.from({ length: 5 }, (_, index) => createDefaultM2Row(index));
+    state.resinItems = Array.from({ length: 5 }, (_, index) => createDefaultResinRow(index));
+    selectedRowIds.clear();
+    persistLocalOnly();
+  }
+
   function refillBudgetRows() {
     ensureRowCount(state, 5);
     ensureColorRowCount(state, 5);
@@ -7104,9 +7121,22 @@ async function initApp() {
     }
 
     try {
-      return renderRowsAndSummary();
+      const rendered = renderRowsAndSummary();
+      saveSessionFlag(SESSION_KEYS.renderRecovery, false);
+      return rendered;
     } catch (error) {
       console.error("Falha ao atualizar as linhas de orcamento.", error);
+      if (!loadSessionFlag(SESSION_KEYS.renderRecovery)) {
+        saveSessionFlag(SESSION_KEYS.renderRecovery, true);
+        try {
+          resetLocalCalculationAreas();
+          const recovered = renderRowsAndSummary();
+          setSyncStatus("Encontramos dados antigos nesta máquina e restauramos as linhas locais automaticamente.", "warning");
+          return recovered;
+        } catch (recoveryError) {
+          console.error("Falha ao recuperar as linhas locais desta máquina.", recoveryError);
+        }
+      }
       setSyncStatus("Algumas linhas nao puderam ser exibidas. Atualize a pagina; se continuar, chame o Codi.", "error");
       return null;
     }

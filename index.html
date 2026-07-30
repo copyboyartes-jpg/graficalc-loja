@@ -1154,6 +1154,20 @@
   </div>
 
   <script src="./blocos-data.js?v=45a769731c54"></script>
+  <script>
+    (function repairLegacyBudgetRows() {
+      try {
+        var repairKey = "graficalc-local-rows-repair-20260730";
+        if (localStorage.getItem(repairKey) === "done") {
+          return;
+        }
+        localStorage.removeItem("copyboy-apostilas-state-v1");
+        localStorage.setItem(repairKey, "done");
+      } catch (error) {
+        console.warn("Nao foi possivel limpar o orcamento local antigo.", error);
+      }
+    })();
+  </script>
   <script src="./app.mjs?v=fix-calculos-config-20260729"></script>
 </body>
 </html>
