@@ -6651,7 +6651,29 @@ async function initApp() {
       ? resinWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
       : `<div class="warning-item is-success">Sem alertas no momento. Você pode montar várias medidas de resinados no mesmo orçamento por aqui.</div>`;
 
-    quotePreview.innerHTML = createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, m2Workbook, resinWorkbook);
+    try {
+      quotePreview.innerHTML = createQuoteHtml(
+        state,
+        workbook,
+        colorWorkbook,
+        credentialWorkbook,
+        readyWorkbook,
+        freeQuoteWorkbook,
+        businessCardWorkbook,
+        flyerWorkbook,
+        blockSulfiteWorkbook,
+        blockAutocopiativoWorkbook,
+        m2Workbook,
+        resinWorkbook
+      );
+    } catch (error) {
+      console.error("Falha ao montar a previa do orcamento.", error);
+      quotePreview.innerHTML = `
+        <div class="quote-empty-state">
+          Nao foi possivel atualizar a previa do orcamento agora. Os calculos seguem disponiveis.
+        </div>
+      `;
+    }
     return { workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, m2Workbook, resinWorkbook };
   }
 
