@@ -7198,14 +7198,15 @@ async function initApp() {
         credentialWorkbook,
         readyWorkbook,
         freeQuoteWorkbook,
-      businessCardWorkbook,
-      flyerWorkbook,
-      blockSulfiteWorkbook,
-      blockAutocopiativoWorkbook,
-      linearMeterWorkbook,
-      m2Workbook,
-      resinWorkbook
-    );
+<<<<<<< HEAD
+        businessCardWorkbook,
+        flyerWorkbook,
+        blockSulfiteWorkbook,
+        blockAutocopiativoWorkbook,
+        linearMeterWorkbook,
+        m2Workbook,
+        resinWorkbook
+      );
     } catch (error) {
       console.error("Falha ao montar a previa do orcamento.", error);
       quotePreview.innerHTML = `
@@ -7214,7 +7215,9 @@ async function initApp() {
         </div>
       `;
     }
+<<<<<<< HEAD
     return { workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, linearMeterWorkbook, m2Workbook, resinWorkbook };
+>>>>>>> 389edec (Blindar previa do orcamento na renderizacao)
   }
 
   function resetAllBudgetItems() {
