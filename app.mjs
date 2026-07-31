@@ -7312,21 +7312,35 @@ async function initApp() {
     const startIndex = firstFreeIndex === -1 ? state.rows.length : firstFreeIndex;
     ensureRowCount(state, startIndex + files.length);
 
-    let imported = 0;
+  let imported = 0;
+    let failedFiles = 0;
     for (let index = 0; index < files.length; index += 1) {
       const file = files[index];
-      const pages = await countPdfPages(file);
       const row = state.rows[startIndex + index];
       applyPresetToRow(row, state.presets);
       row.description = file.name.replace(/\.pdf$/i, "");
       row.quantity = 1;
-      row.pages = pages || 0;
       row.colorPages = 0;
+      row.pages = 0;
+
+      try {
+        const pages = await countPdfPages(file);
+        row.pages = pages || 0;
+      } catch (error) {
+        failedFiles += 1;
+        console.warn(`Nao foi possivel ler a quantidade de paginas do arquivo "${file.name}".`, error);
+      }
+
       imported += 1;
     }
 
     persist();
     renderRowsAndSummary();
+    if (failedFiles > 0) {
+      setMainFeedback(`${imported} PDF(s) importado(s). ${failedFiles} arquivo(s) vieram sem a contagem automática de páginas, mas o nome foi mantido para você ajustar na linha.`, "warning");
+      return;
+    }
+
       setMainFeedback(`${imported} PDF(s) importado(s) com sucesso. Se a contagem de páginas de algum arquivo vier diferente, você pode corrigir direto na linha.`, "success");
   }
 
