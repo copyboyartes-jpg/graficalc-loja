@@ -3697,9 +3697,81 @@ function countPdfPagesFromText(text) {
   return pageMatches ? pageMatches.length : 0;
 }
 
+const PDFJS_CDN_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+const PDFJS_WORKER_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+let pdfJsLoaderPromise = null;
+
+function getPdfJsLibrary() {
+  return window.pdfjsLib ?? window["pdfjs-dist/build/pdf"];
+}
+
+function configurePdfJsWorker(pdfjsLib) {
+  if (!pdfjsLib?.GlobalWorkerOptions) {
+    return pdfjsLib;
+  }
+
+  if (pdfjsLib.GlobalWorkerOptions.workerSrc !== PDFJS_WORKER_URL) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
+  }
+
+  return pdfjsLib;
+}
+
+function ensurePdfJsLoaded() {
+  const existingLibrary = configurePdfJsWorker(getPdfJsLibrary());
+  if (existingLibrary) {
+    return Promise.resolve(existingLibrary);
+  }
+
+  if (pdfJsLoaderPromise) {
+    return pdfJsLoaderPromise;
+  }
+
+  pdfJsLoaderPromise = new Promise((resolve, reject) => {
+    const existingScript = document.querySelector('script[data-pdfjs-loader="true"]');
+    if (existingScript) {
+      existingScript.addEventListener("load", () => resolve(configurePdfJsWorker(getPdfJsLibrary())), { once: true });
+      existingScript.addEventListener("error", () => reject(new Error("Nao foi possivel carregar o leitor de PDF.")), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = PDFJS_CDN_URL;
+    script.async = true;
+    script.dataset.pdfjsLoader = "true";
+    script.addEventListener("load", () => {
+      const loadedLibrary = configurePdfJsWorker(getPdfJsLibrary());
+      if (loadedLibrary) {
+        resolve(loadedLibrary);
+        return;
+      }
+      reject(new Error("O leitor de PDF carregou sem disponibilizar a biblioteca."));
+    }, { once: true });
+    script.addEventListener("error", () => reject(new Error("Nao foi possivel carregar o leitor de PDF.")), { once: true });
+    document.head.appendChild(script);
+  });
+
+  return pdfJsLoaderPromise;
+}
+
 async function countPdfPages(file) {
   const buffer = await file.arrayBuffer();
-  const decoder = new TextDecoder("windows-1252");
+  try {
+    const pdfjsLib = await ensurePdfJsLoaded();
+    const documentTask = pdfjsLib.getDocument({ data: buffer });
+    const pdfDocument = await documentTask.promise;
+    const totalPages = Number(pdfDocument?.numPages ?? 0);
+    if (typeof pdfDocument?.destroy === "function") {
+      pdfDocument.destroy();
+    }
+    if (Number.isFinite(totalPages) && totalPages > 0) {
+      return totalPages;
+    }
+  } catch (error) {
+    console.warn(`Nao foi possivel contar as paginas do PDF "${file?.name ?? "sem nome"}" com o leitor principal. Vou tentar a leitura de apoio.`, error);
+  }
+
+  const decoder = new TextDecoder("latin1");
   const text = decoder.decode(buffer);
   return countPdfPagesFromText(text);
 }
