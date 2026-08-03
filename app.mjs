@@ -1213,6 +1213,7 @@ function createDefaultState() {
     quoteHistory: [],
     paymentTerms: "",
     productionDeadline: "",
+    quoteTotalVisibility: "show",
     quoteNotes: "",
     quoteDiscountType: "R$",
     quoteDiscountValue: 0,
@@ -1505,6 +1506,7 @@ function mergeState(candidate) {
     : state.quoteHistory;
   state.paymentTerms = typeof candidate.paymentTerms === "string" ? candidate.paymentTerms : state.paymentTerms;
   state.productionDeadline = typeof candidate.productionDeadline === "string" ? candidate.productionDeadline : state.productionDeadline;
+  state.quoteTotalVisibility = candidate.quoteTotalVisibility === "hide" ? "hide" : "show";
   state.quoteNotes = typeof candidate.quoteNotes === "string" ? candidate.quoteNotes : state.quoteNotes;
   state.quoteDiscountType = normalizeDiscountType(candidate.quoteDiscountType);
   state.quoteDiscountValue = toMoneyNumber(candidate.quoteDiscountValue);
@@ -5582,6 +5584,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
 
       ${notesMarkup}
 
+      ${state.quoteTotalVisibility !== "hide" ? `
       <div class="quote-total-bar">
         <div>
           <strong>Total geral</strong>
@@ -5589,7 +5592,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
           ${quoteDiscount.hasDiscount ? `<p class="quote-muted">Subtotal: ${formatCurrency(combinedSubtotal)}</p><p class="quote-discount-detail">Desconto geral: ${formatDiscountValue(quoteDiscount.type, quoteDiscount.value)} (-${formatCurrency(quoteDiscount.amount)})</p>` : ""}
         </div>
         <strong>${formatCurrency(combinedTotal)}</strong>
-      </div>
+      </div>` : ""}
     </div>
   `;
 }
@@ -5658,12 +5661,14 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
 
   const combinedSubtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + freeQuoteWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + flyerWorkbook.totals.totalGeneral + blockSulfiteWorkbook.totals.totalGeneral + blockAutocopiativoWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
   const quoteDiscount = calculateDiscount(combinedSubtotal, state.quoteDiscountType, state.quoteDiscountValue);
-  if (quoteDiscount.hasDiscount) {
-    lines.push("", `Subtotal: ${formatCurrency(combinedSubtotal)}`);
-    lines.push(`Desconto geral: ${formatDiscountValue(quoteDiscount.type, quoteDiscount.value)} (-${formatCurrency(quoteDiscount.amount)})`);
-    lines.push(`Total geral: ${formatCurrency(quoteDiscount.total)}`);
-  } else {
-    lines.push("", `Total geral: ${formatCurrency(combinedSubtotal)}`);
+  if (state.quoteTotalVisibility !== "hide") {
+    if (quoteDiscount.hasDiscount) {
+      lines.push("", `Subtotal: ${formatCurrency(combinedSubtotal)}`);
+      lines.push(`Desconto geral: ${formatDiscountValue(quoteDiscount.type, quoteDiscount.value)} (-${formatCurrency(quoteDiscount.amount)})`);
+      lines.push(`Total geral: ${formatCurrency(quoteDiscount.total)}`);
+    } else {
+      lines.push("", `Total geral: ${formatCurrency(combinedSubtotal)}`);
+    }
   }
 
   if (state.quoteNotes?.trim()) {
@@ -6185,6 +6190,7 @@ async function initApp() {
     document.getElementById("client-cnpj").value = state.client.cnpj;
     document.getElementById("payment-terms").value = state.paymentTerms;
     document.getElementById("production-deadline").value = state.productionDeadline;
+    document.getElementById("quote-total-visibility").value = state.quoteTotalVisibility === "hide" ? "hide" : "show";
     document.getElementById("quote-discount-type").value = normalizeDiscountType(state.quoteDiscountType);
     document.getElementById("quote-discount-value").value = state.quoteDiscountValue || 0;
     document.getElementById("quote-notes").value = state.quoteNotes;
@@ -8515,6 +8521,7 @@ async function initApp() {
     ["client-cnpj", "client", "cnpj"],
     ["payment-terms", null, "paymentTerms"],
     ["production-deadline", null, "productionDeadline"],
+    ["quote-total-visibility", null, "quoteTotalVisibility"],
     ["quote-discount-type", null, "quoteDiscountType"],
     ["quote-discount-value", null, "quoteDiscountValue"],
     ["quote-notes", null, "quoteNotes"],
