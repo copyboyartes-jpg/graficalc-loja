@@ -450,6 +450,49 @@ const READY_PRODUCT_CATALOG = [
     unitPrice: 190,
   },
   {
+    id: "Wind banner promocional 2m",
+    label: "Wind banner promocional 2m",
+    category: "Windbanner promocional",
+    unitPrice: 150,
+    quoteDescription: "tecido promocional, mais fino, base de concreto, haste em alumínio",
+  },
+  {
+    id: "Windbanner promocional 1,20m - somente tecido",
+    label: "Windbanner promocional 1,20m - somente tecido",
+    category: "Windbanner promocional",
+    pricingMode: "tieredUnit",
+    minQuantity: 5,
+    quoteDescription: "tecido promocional, mais fino",
+    tiers: [
+      { min: 5, value: 60, label: "De 5 a 10" },
+      { min: 11, value: 55, label: "Acima de 10" },
+    ],
+  },
+  {
+    id: "Windbanner promocional 1,20m - tecido e haste",
+    label: "Windbanner promocional 1,20m - tecido e haste",
+    category: "Windbanner promocional",
+    pricingMode: "tieredUnit",
+    minQuantity: 5,
+    quoteDescription: "tecido promocional, mais fino, haste em alumínio",
+    tiers: [
+      { min: 5, value: 80, label: "De 5 a 10" },
+      { min: 11, value: 75, label: "Acima de 10" },
+    ],
+  },
+  {
+    id: "Windbanner promocional 1,20m - tecido, haste e base",
+    label: "Windbanner promocional 1,20m - tecido, haste e base",
+    category: "Windbanner promocional",
+    pricingMode: "tieredUnit",
+    minQuantity: 5,
+    quoteDescription: "tecido promocional, mais fino, base de concreto, haste em alumínio",
+    tiers: [
+      { min: 5, value: 100, label: "De 5 a 10" },
+      { min: 11, value: 95, label: "Acima de 10" },
+    ],
+  },
+  {
     id: "Base de concreto grande para windbanner",
     label: "Base de concreto grande para windbanner",
     category: "Windbanner",
@@ -2676,6 +2719,7 @@ function calculateReadyProductWorkbook(state, config) {
     const active = isReadyProductRowActive(row);
     const product = getReadyProductSelection(config, row.productType, quantity);
     const description = (row.description || "").trim();
+    const minimumQuantity = toWholeNumber(product.minQuantity);
     const subtotal = product.totalPrice === null || product.totalPrice === undefined
       ? quantity * product.unitPrice
       : product.totalPrice;
@@ -2688,20 +2732,26 @@ function calculateReadyProductWorkbook(state, config) {
       product.billedQuantity > quantity
         ? `Produto pronto ${index + 1}: cordão estampado vendido de 10 em 10. ${quantity} un foi calculado como ${product.billedQuantity} un.`
         : "";
+    const minimumWarning =
+      active && minimumQuantity > 0 && quantity > 0 && quantity < minimumQuantity
+        ? `Produto pronto ${index + 1}: ${product.label} tem pedido mínimo de ${minimumQuantity} unidades.`
+        : "";
 
     return {
       ...row,
       active,
-      valid: active ? quantity > 0 : false,
+      valid: active ? quantity > 0 && (!minimumQuantity || quantity >= minimumQuantity) : false,
       quantity,
       billedQuantity: product.billedQuantity || quantity,
       productType: product.label,
       productLabel: product.label,
-      description: description || product.label,
+      description: description || product.quoteDescription || product.label,
       artCreationFee,
       unitPrice: product.totalPrice === null || product.totalPrice === undefined || quantity <= 0 ? product.unitPrice : subtotal / quantity,
       ...rowDiscount,
-      warning: active && quantity <= 0 ? `Produto pronto ${index + 1}: informe uma quantidade maior que zero.` : packageWarning,
+      warning: active && quantity <= 0
+        ? `Produto pronto ${index + 1}: informe uma quantidade maior que zero.`
+        : minimumWarning || packageWarning,
     };
   });
 
