@@ -2094,6 +2094,20 @@ function getColorPrintSheetDefinition(size, config) {
   };
 }
 
+function isPredefinedColorPrintSize(size) {
+  return size === "A4" || size === "A3";
+}
+
+function getColorPrintDisplaySize(row) {
+  const hasCustomMeasures = toDecimalNumber(row.widthMm) > 0 && toDecimalNumber(row.heightMm) > 0;
+
+  if (isPredefinedColorPrintSize(row.size) && !hasCustomMeasures) {
+    return row.size || "A4";
+  }
+
+  return `${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.size || "A4"}`;
+}
+
 function getBestFitOnSheet(sheetWidthMm, sheetHeightMm, itemWidthMm, itemHeightMm) {
   if (sheetWidthMm <= 0 || sheetHeightMm <= 0 || itemWidthMm <= 0 || itemHeightMm <= 0) {
     return { itemsPerSheet: 0, cols: 0, rows: 0, rotated: false };
@@ -3295,12 +3309,13 @@ function calculateColorPrintWorkbook(state, config) {
     const heightMm = heightCm * 10;
     const bleedMm = Math.max(0, toDecimalNumber(row.bleedMm));
     const quantity = toWholeNumber(row.quantity);
-    const effectiveWidth = widthMm + (bleedMm * 2);
-    const effectiveHeight = heightMm + (bleedMm * 2);
     const active = isColorPrintRowActive(row);
     const sheet = getColorPrintSheetDefinition(row.size, config);
     const pricingMap = sheet.pricingMap || config.colorPrintPricing;
     const sizeLabel = sheet.label || row.size || "A4";
+    const predefinedSize = isPredefinedColorPrintSize(sheet.key);
+    const effectiveWidth = predefinedSize ? sheet.widthMm : widthMm + (bleedMm * 2);
+    const effectiveHeight = predefinedSize ? sheet.heightMm : heightMm + (bleedMm * 2);
 
     if (sheet.key === "custom" && (sheet.widthMm <= 0 || sheet.heightMm <= 0)) {
       if (active) {
@@ -3308,13 +3323,13 @@ function calculateColorPrintWorkbook(state, config) {
       }
     }
 
-    if ((effectiveWidth > sheet.widthMm && effectiveWidth > sheet.heightMm) || (effectiveHeight > sheet.heightMm && effectiveHeight > sheet.widthMm)) {
+    if (!predefinedSize && ((effectiveWidth > sheet.widthMm && effectiveWidth > sheet.heightMm) || (effectiveHeight > sheet.heightMm && effectiveHeight > sheet.widthMm))) {
       if (active) {
         warnings.push(`Impresso ${index + 1}: o tamanho informado não cabe em uma folha ${sizeLabel}.`);
       }
     }
 
-    if (effectiveWidth <= 0 || effectiveHeight <= 0 || quantity <= 0 || (sheet.key === "custom" && (sheet.widthMm <= 0 || sheet.heightMm <= 0))) {
+    if ((!predefinedSize && (effectiveWidth <= 0 || effectiveHeight <= 0)) || quantity <= 0 || (sheet.key === "custom" && (sheet.widthMm <= 0 || sheet.heightMm <= 0))) {
       return {
         ...row,
         widthMm: widthCm,
@@ -3340,7 +3355,9 @@ function calculateColorPrintWorkbook(state, config) {
       };
     }
 
-    const fit = getBestFitOnSheet(sheet.widthMm, sheet.heightMm, effectiveWidth, effectiveHeight);
+    const fit = predefinedSize
+      ? { itemsPerSheet: 1, cols: 1, rows: 1, rotated: false }
+      : getBestFitOnSheet(sheet.widthMm, sheet.heightMm, effectiveWidth, effectiveHeight);
     if (fit.itemsPerSheet <= 0) {
       if (active) {
         warnings.push(`Impresso ${index + 1}: o tamanho informado não cabe em uma folha ${sizeLabel}.`);
@@ -3371,15 +3388,15 @@ function calculateColorPrintWorkbook(state, config) {
     }
 
     const sides = row.printMode === "Frente e verso" ? 2 : 1;
-    const a4Sheets = Math.ceil(quantity / fit.itemsPerSheet);
-    const a4Impressions = a4Sheets * sides;
+    const a4Sheets = predefinedSize ? quantity : Math.ceil(quantity / fit.itemsPerSheet);
+    const a4Impressions = predefinedSize ? quantity * sides : a4Sheets * sides;
     const pricingKey = getColorPaperPricingKey(row.paperType);
     const printUnit = lookupTier(pricingMap[pricingKey], a4Impressions);
     const printTotal = a4Impressions * printUnit;
-    const estimatedCuts = estimateCuts(fit.cols, fit.rows);
+    const estimatedCuts = predefinedSize ? 0 : estimateCuts(fit.cols, fit.rows);
     let suggestedCutPrice = 0;
 
-    if (fit.itemsPerSheet > 1 && estimatedCuts > 0) {
+    if (!predefinedSize && fit.itemsPerSheet > 1 && estimatedCuts > 0) {
       if (a4Sheets <= 5) {
         suggestedCutPrice = lookupSmallJobCutValue(config.cutPricing, fit.itemsPerSheet);
       } else {
@@ -5401,7 +5418,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       sourceIndex: index,
       kind: "Impresso colorido",
       description: row.description,
-      detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.size || "A4"} | ${row.paperType} | ${row.printMode}`,
+      detail: `${formatInteger(row.quantity)} unidades | ${getColorPrintDisplaySize(row)} | ${row.paperType} | ${row.printMode}`,
       extraDetail: row.colorExtrasSummary || "",
       artDetail: formatArtCreationDetail(row),
       discountDetail: row.discountDescription,
@@ -5622,7 +5639,7 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
       };
     }),
     ...colorWorkbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || `Impresso ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.size || "A4"} | ${row.paperType} | ${row.printMode}${row.colorExtrasSummary ? ` | ${row.colorExtrasSummary}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
+      text: `- ${row.description || `Impresso ${index + 1}`} | ${row.quantity} unidades | ${getColorPrintDisplaySize(row)} | ${row.paperType} | ${row.printMode}${row.colorExtrasSummary ? ` | ${row.colorExtrasSummary}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...credentialWorkbook.activeRows.map((row, index) => ({
       text: `- ${row.description || `Credencial ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthCm)} x ${formatMeasure(row.heightCm)} cm | ${row.materialLabel} | ${row.printMode}${row.lamination === "Com laminação" ? " | Com laminação" : ""}${row.lanyardType !== "none" ? ` | ${row.lanyardLabel}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
