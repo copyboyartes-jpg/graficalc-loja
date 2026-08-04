@@ -29,6 +29,7 @@
       <button class="tab-button" data-tab-target="blocos-autocopiativo">Blocos autocopiativos</button>
       <button class="tab-button" data-tab-target="m2">Cálculo de m²</button>
       <button class="tab-button" data-tab-target="resinados">Resinados</button>
+      <button class="tab-button" data-tab-target="metro-linear">Metro linear</button>
       <button class="tab-button" data-tab-target="orcamento-livre">Orçamento livre</button>
       <button class="tab-button" data-tab-target="configuracao">Configuração</button>
       <button class="tab-button" data-tab-target="clientes">Clientes</button>
@@ -229,7 +230,7 @@
           <div class="panel-heading">
             <div>
               <h2>Orçamento de impressos coloridos</h2>
-              <p class="panel-copy">Se escolher A4 ou A3, o sistema calcula direto pela quantidade de impressões solicitadas. Se escolher tamanho personalizado, informe as medidas em centímetros. A sangria é informada em milímetros e o sistema soma esse valor nos quatro lados antes de calcular o encaixe.</p>
+              <p class="panel-copy">Se escolher A4 ou A3, o sistema calcula direto pela quantidade de impressões solicitadas e pode deixar largura, altura e sangria em branco. Essas três informações só entram no cálculo quando o tamanho for personalizado. A sangria é informada em milímetros e o sistema soma esse valor nos quatro lados antes de calcular o encaixe.</p>
             </div>
           </div>
 
@@ -813,6 +814,69 @@
           </div>
 
           <div class="warning-list" id="resin-warning-list"></div>
+        </article>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="metro-linear">
+        <div class="summary-grid">
+          <article class="summary-card">
+            <span class="summary-label">Linhas ativas</span>
+            <strong id="linear-meter-summary-active">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Metros lineares</span>
+            <strong id="linear-meter-summary-quantity">0 m</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Total geral</span>
+            <strong id="linear-meter-summary-total">R$ 0,00</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Valor médio</span>
+            <strong id="linear-meter-summary-average">R$ 0,00</strong>
+          </article>
+        </div>
+
+        <article class="panel panel-table">
+          <div class="panel-heading">
+            <div>
+              <h2>Metro linear</h2>
+              <p class="panel-copy">Use esta aba para DTF têxtil, DTF UV, canvas e papéis vendidos por metro linear.</p>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <button id="add-linear-meter-row-button" class="button button-primary" type="button">Adicionar linha</button>
+            <button id="clear-linear-meter-rows-button" class="button button-danger" type="button">Limpar linhas</button>
+          </div>
+
+          <p class="helper-text status-note" id="linear-meter-feedback">
+            Use esta aba para calcular materiais vendidos por metro linear.
+          </p>
+
+          <div class="table-shell">
+            <table class="budget-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Material</th>
+                  <th>Prazo / tabela</th>
+                  <th>Descrição</th>
+                  <th>Largura fixa</th>
+                  <th>Metro linear</th>
+                  <th>Valor base</th>
+                  <th>Criação de arte</th>
+                  <th>Tipo desc.</th>
+                  <th>Desconto</th>
+                  <th>Total item</th>
+                  <th>Valor por metro</th>
+                </tr>
+              </thead>
+              <tbody id="linear-meter-rows-table-body"></tbody>
+            </table>
+          </div>
+
+          <div class="warning-list" id="linear-meter-warning-list"></div>
         </article>
       </section>
 
