@@ -1452,35 +1452,50 @@ function mergeConfig(candidate) {
     return defaults;
   }
 
+  const sanitizeValue = (value) => {
+    if (typeof value === "string") {
+      return repairBrokenText(value);
+    }
+    if (Array.isArray(value)) {
+      return value.map((entry) => sanitizeValue(entry));
+    }
+    if (value && typeof value === "object") {
+      return Object.fromEntries(
+        Object.entries(value).map(([key, entry]) => [key, sanitizeValue(entry)])
+      );
+    }
+    return value;
+  };
+
   const merged = deepClone(defaults);
   if (candidate.printPricing) {
     merged.printPricing = {
-      blackWhite: Array.isArray(candidate.printPricing.blackWhite) ? candidate.printPricing.blackWhite : merged.printPricing.blackWhite,
-      inkjet: Array.isArray(candidate.printPricing.inkjet) ? candidate.printPricing.inkjet : merged.printPricing.inkjet,
-      laser: Array.isArray(candidate.printPricing.laser) ? candidate.printPricing.laser : merged.printPricing.laser,
+      blackWhite: Array.isArray(candidate.printPricing.blackWhite) ? sanitizeValue(candidate.printPricing.blackWhite) : merged.printPricing.blackWhite,
+      inkjet: Array.isArray(candidate.printPricing.inkjet) ? sanitizeValue(candidate.printPricing.inkjet) : merged.printPricing.inkjet,
+      laser: Array.isArray(candidate.printPricing.laser) ? sanitizeValue(candidate.printPricing.laser) : merged.printPricing.laser,
     };
   }
 
   if (candidate.coverPricing && typeof candidate.coverPricing === "object") {
     for (const paper of OPTIONS.coverPapers) {
       if (Array.isArray(candidate.coverPricing[paper])) {
-        merged.coverPricing[paper] = candidate.coverPricing[paper];
+        merged.coverPricing[paper] = sanitizeValue(candidate.coverPricing[paper]);
       }
     }
   }
 
   if (Array.isArray(candidate.spiralPricing)) {
-    merged.spiralPricing = candidate.spiralPricing;
+    merged.spiralPricing = sanitizeValue(candidate.spiralPricing);
   }
 
   if (Array.isArray(candidate.bookletPricing)) {
-    merged.bookletPricing = candidate.bookletPricing;
+    merged.bookletPricing = sanitizeValue(candidate.bookletPricing);
   }
 
   if (candidate.colorPrintPricing && typeof candidate.colorPrintPricing === "object") {
     for (const key of Object.keys(merged.colorPrintPricing)) {
       if (Array.isArray(candidate.colorPrintPricing[key])) {
-        merged.colorPrintPricing[key] = candidate.colorPrintPricing[key];
+        merged.colorPrintPricing[key] = sanitizeValue(candidate.colorPrintPricing[key]);
       }
     }
   }
@@ -1488,7 +1503,7 @@ function mergeConfig(candidate) {
   if (candidate.colorPrintPricingA3 && typeof candidate.colorPrintPricingA3 === "object") {
     for (const key of Object.keys(merged.colorPrintPricingA3)) {
       if (Array.isArray(candidate.colorPrintPricingA3[key])) {
-        merged.colorPrintPricingA3[key] = candidate.colorPrintPricingA3[key];
+        merged.colorPrintPricingA3[key] = sanitizeValue(candidate.colorPrintPricingA3[key]);
       }
     }
   }
@@ -1505,15 +1520,15 @@ function mergeConfig(candidate) {
   if (candidate.colorPrintExtras && typeof candidate.colorPrintExtras === "object") {
     merged.colorPrintExtras = {
       ...merged.colorPrintExtras,
-      ...candidate.colorPrintExtras,
-      holes: Array.isArray(candidate.colorPrintExtras.holes) ? candidate.colorPrintExtras.holes : merged.colorPrintExtras.holes,
-      folds: Array.isArray(candidate.colorPrintExtras.folds) ? candidate.colorPrintExtras.folds : merged.colorPrintExtras.folds,
+      ...sanitizeValue(candidate.colorPrintExtras),
+      holes: Array.isArray(candidate.colorPrintExtras.holes) ? sanitizeValue(candidate.colorPrintExtras.holes) : merged.colorPrintExtras.holes,
+      folds: Array.isArray(candidate.colorPrintExtras.folds) ? sanitizeValue(candidate.colorPrintExtras.folds) : merged.colorPrintExtras.folds,
       laminationWhole: {
         ...merged.colorPrintExtras.laminationWhole,
-        ...(candidate.colorPrintExtras.laminationWhole || {}),
+        ...sanitizeValue(candidate.colorPrintExtras.laminationWhole || {}),
       },
       laminationCombo: Array.isArray(candidate.colorPrintExtras.laminationCombo)
-        ? candidate.colorPrintExtras.laminationCombo
+        ? sanitizeValue(candidate.colorPrintExtras.laminationCombo)
         : merged.colorPrintExtras.laminationCombo,
     };
   }
@@ -1521,19 +1536,19 @@ function mergeConfig(candidate) {
   if (candidate.credentialLanyardPricing && typeof candidate.credentialLanyardPricing === "object") {
     merged.credentialLanyardPricing = {
       ...merged.credentialLanyardPricing,
-      ...candidate.credentialLanyardPricing,
+      ...sanitizeValue(candidate.credentialLanyardPricing),
       printed: Array.isArray(candidate.credentialLanyardPricing.printed)
-        ? candidate.credentialLanyardPricing.printed
+        ? sanitizeValue(candidate.credentialLanyardPricing.printed)
         : merged.credentialLanyardPricing.printed,
       printedPackages: Array.isArray(candidate.credentialLanyardPricing.printedPackages)
-        ? candidate.credentialLanyardPricing.printedPackages
+        ? sanitizeValue(candidate.credentialLanyardPricing.printedPackages)
         : merged.credentialLanyardPricing.printedPackages,
     };
   }
 
   if (candidate.cutPricing && typeof candidate.cutPricing === "object") {
     if (Array.isArray(candidate.cutPricing.upToFiveSheets)) {
-      merged.cutPricing.upToFiveSheets = candidate.cutPricing.upToFiveSheets;
+      merged.cutPricing.upToFiveSheets = sanitizeValue(candidate.cutPricing.upToFiveSheets);
     }
     if (Number.isFinite(Number(candidate.cutPricing.aboveFiveSheetsPerCut))) {
       merged.cutPricing.aboveFiveSheetsPerCut = Number(candidate.cutPricing.aboveFiveSheetsPerCut);
@@ -1542,16 +1557,16 @@ function mergeConfig(candidate) {
 
   if (candidate.resinPricing && typeof candidate.resinPricing === "object") {
     merged.resinPricing = {
-      ...merged.resinPricing,
-      ...candidate.resinPricing,
+      ...sanitizeValue(merged.resinPricing),
+      ...sanitizeValue(candidate.resinPricing),
       pricingByMaterial: {
         standard: {
           ...merged.resinPricing.pricingByMaterial.standard,
-          ...(candidate.resinPricing.pricingByMaterial?.standard || {}),
+          ...sanitizeValue(candidate.resinPricing.pricingByMaterial?.standard || {}),
         },
         special: {
           ...merged.resinPricing.pricingByMaterial.special,
-          ...(candidate.resinPricing.pricingByMaterial?.special || {}),
+          ...sanitizeValue(candidate.resinPricing.pricingByMaterial?.special || {}),
         },
       },
     };
@@ -1566,12 +1581,12 @@ function mergeConfig(candidate) {
   if (candidate.m2Pricing && typeof candidate.m2Pricing === "object") {
     for (const key of Object.keys(merged.m2Pricing)) {
       if (Array.isArray(candidate.m2Pricing[key])) {
-        merged.m2Pricing[key] = candidate.m2Pricing[key];
+        merged.m2Pricing[key] = sanitizeValue(candidate.m2Pricing[key]);
       }
     }
     for (const key of Object.keys(candidate.m2Pricing)) {
       if (!(key in merged.m2Pricing) && Array.isArray(candidate.m2Pricing[key])) {
-        merged.m2Pricing[key] = candidate.m2Pricing[key];
+        merged.m2Pricing[key] = sanitizeValue(candidate.m2Pricing[key]);
       }
     }
   }
@@ -7198,7 +7213,6 @@ async function initApp() {
         credentialWorkbook,
         readyWorkbook,
         freeQuoteWorkbook,
-<<<<<<< HEAD
         businessCardWorkbook,
         flyerWorkbook,
         blockSulfiteWorkbook,
@@ -7215,9 +7229,7 @@ async function initApp() {
         </div>
       `;
     }
-<<<<<<< HEAD
     return { workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, linearMeterWorkbook, m2Workbook, resinWorkbook };
->>>>>>> 389edec (Blindar previa do orcamento na renderizacao)
   }
 
   function resetAllBudgetItems() {
