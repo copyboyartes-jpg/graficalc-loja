@@ -5298,6 +5298,29 @@ function createM2FinishPickerMarkup(row, config) {
   `;
 }
 
+function getColorFinishSelectionCount(row) {
+  let count = 0;
+  if (row.cutPriceOverride !== "" && row.cutPriceOverride !== null && typeof row.cutPriceOverride !== "undefined") count += 1;
+  if (row.holeOption && row.holeOption !== "Sem furo") count += 1;
+  if (row.foldOption === "Dobra") count += 1;
+  if (normalizeColorLaminationOption(row.laminationOption) !== "Sem plastificação") count += 1;
+  return count;
+}
+
+function createColorFinishPickerMarkup(row) {
+  const selectedCount = getColorFinishSelectionCount(row);
+  const buttonLabel = selectedCount ? `Acabamentos (${selectedCount})` : "Sem acabamento";
+
+  return `
+    <div class="finish-picker">
+      <button class="button finish-picker-button" type="button" data-color-finish-toggle>
+        <span>${escapeHtml(buttonLabel)}</span>
+        <span class="finish-picker-chevron">▾</span>
+      </button>
+    </div>
+  `;
+}
+
 function createCatalogTabCardMarkup(tab, title, sections, config, viewMode = "basic") {
   const products = Array.isArray(sections) ? sections.filter((item) => item?.tab === tab) : [];
   const isAdvanced = viewMode === "advanced";
@@ -6209,7 +6232,12 @@ async function initApp() {
       return false;
     }
 
-    if (target.closest("#credential-lanyard-popover") || target.closest("#business-card-quantity-popover") || target.closest("#m2-finish-popover")) {
+    if (
+      target.closest("#credential-lanyard-popover")
+      || target.closest("#business-card-quantity-popover")
+      || target.closest("#m2-finish-popover")
+      || target.closest("#color-finish-popover")
+    ) {
       return false;
     }
 
@@ -6867,13 +6895,8 @@ async function initApp() {
             <td><span class="readonly-value subtle">${formatInteger(row.a4Sheets)}</span></td>
             <td><span class="readonly-value subtle">${formatInteger(row.a4Impressions)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.printTotal)}</span></td>
-            <td><span class="readonly-value subtle">${formatCurrency(row.suggestedCutPrice)}</span></td>
-            <td><input class="cell-input" name="cutPriceOverride" type="number" min="0" step="0.01" value="${escapeHtml(row.cutPriceOverride)}" placeholder="${row.suggestedCutPrice > 0 ? row.suggestedCutPrice.toFixed(2) : "0.00"}"></td>
-            <td><select class="cell-select" name="holeOption">${buildOptions(COLOR_EXTRA_OPTIONS.holes, row.holeOption || "Sem furo")}</select></td>
-            <td><select class="cell-select" name="foldOption">${buildOptions(COLOR_EXTRA_OPTIONS.folds, row.foldOption || "Sem dobra")}</select></td>
-            <td><select class="cell-select" name="laminationOption">${buildOptions(COLOR_EXTRA_OPTIONS.lamination, row.laminationOption || "Sem plastificação")}</select></td>
-            <td><span class="readonly-value subtle">${formatCurrency(row.colorExtrasTotal || 0)}</span></td>
-            <td><span class="readonly-value subtle">${escapeHtml(row.laminationFitDescription || "-")}</span></td>
+            <td>${createColorFinishPickerMarkup(row)}</td>
+            <td><span class="readonly-value subtle">${formatCurrency((row.finalCutPrice || 0) + (row.colorExtrasTotal || 0))}</span></td>
             <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
             <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
             <td><input class="cell-input" name="discountValue" type="number" min="0" step="0.01" value="${escapeHtml(row.discountValue ?? 0)}" placeholder="0,00"></td>
@@ -7344,6 +7367,13 @@ async function initApp() {
     }
   }
 
+  function closeColorFinishPopover() {
+    const existing = document.getElementById("color-finish-popover");
+    if (existing) {
+      existing.remove();
+    }
+  }
+
   function closeCredentialLanyardPopover() {
     const existing = document.getElementById("credential-lanyard-popover");
     if (existing) {
@@ -7413,6 +7443,186 @@ async function initApp() {
     popover.addEventListener("click", (event) => {
       if (event.target.closest("[data-business-card-quantity-close]")) {
         closeBusinessCardQuantityPopover();
+      }
+    });
+  }
+
+  function openColorFinishPopover(rowIndex, anchor) {
+    const row = state.colorPrintItems[rowIndex];
+    if (!row || !anchor) {
+      return;
+    }
+
+    closeColorFinishPopover();
+
+    const selectedCount = getColorFinishSelectionCount(row);
+    const activeTotal = (row.finalCutPrice || 0) + (row.colorExtrasTotal || 0);
+    const popover = document.createElement("div");
+    popover.id = "color-finish-popover";
+    popover.className = "finish-popover";
+    popover.innerHTML = `
+      <div class="finish-popover-header">
+        <div class="finish-popover-title">
+          <strong>Acabamentos</strong>
+          <span>Ajuste corte, furo, dobra e plastificação desta linha.</span>
+        </div>
+        <button type="button" class="button finish-popover-close" data-color-finish-close>Fechar</button>
+      </div>
+      <label class="finish-picker-option is-none finish-popover-empty">
+        <input type="radio" name="color-finish-none" value="none"${selectedCount === 0 ? " checked" : ""} data-color-finish-none>
+        <div class="finish-picker-option-body">
+          <div class="finish-option-copy">
+            <span class="finish-option-label">Sem acabamento</span>
+            <small>Use esta opção quando o item não tiver corte adicional, furo, dobra ou plastificação.</small>
+          </div>
+        </div>
+      </label>
+      <div class="finish-popover-list">
+        <label class="finish-picker-option">
+          <input type="checkbox" value="cut"${row.cutPriceOverride !== "" ? " checked" : ""} data-color-finish-card>
+          <div class="finish-picker-option-body">
+            <div class="finish-option-copy">
+              <span class="finish-option-label">Corte</span>
+              <small>Valor sugerido pela tabela: ${escapeHtml(formatCurrency(row.suggestedCutPrice || 0))}</small>
+            </div>
+            <div class="finish-eyelet-settings">
+              <span>Valor final</span>
+              <input type="number" min="0" step="0.01" value="${row.cutPriceOverride === "" ? "" : escapeHtml(row.cutPriceOverride)}" placeholder="${row.suggestedCutPrice > 0 ? row.suggestedCutPrice.toFixed(2) : "0.00"}" data-color-finish-field="cutPriceOverride">
+              <span>R$</span>
+            </div>
+          </div>
+        </label>
+        <label class="finish-picker-option">
+          <input type="checkbox" value="hole"${row.holeOption && row.holeOption !== "Sem furo" ? " checked" : ""} data-color-finish-card>
+          <div class="finish-picker-option-body">
+            <div class="finish-option-copy">
+              <span class="finish-option-label">Furo</span>
+              <small>Aplicado pela quantidade desta linha.</small>
+            </div>
+            <div class="finish-eyelet-settings">
+              <span>Tipo</span>
+              <select class="cell-select" data-color-finish-field="holeOption">
+                ${buildOptions(COLOR_EXTRA_OPTIONS.holes, row.holeOption || "Sem furo")}
+              </select>
+            </div>
+          </div>
+        </label>
+        <label class="finish-picker-option">
+          <input type="checkbox" value="fold"${row.foldOption === "Dobra" ? " checked" : ""} data-color-finish-card>
+          <div class="finish-picker-option-body">
+            <div class="finish-option-copy">
+              <span class="finish-option-label">Dobra</span>
+              <small>Aplicado pela quantidade desta linha.</small>
+            </div>
+            <div class="finish-eyelet-settings">
+              <span>Tipo</span>
+              <select class="cell-select" data-color-finish-field="foldOption">
+                ${buildOptions(COLOR_EXTRA_OPTIONS.folds, row.foldOption || "Sem dobra")}
+              </select>
+            </div>
+          </div>
+        </label>
+        <label class="finish-picker-option">
+          <input type="checkbox" value="lamination"${normalizeColorLaminationOption(row.laminationOption) !== "Sem plastificação" ? " checked" : ""} data-color-finish-card>
+          <div class="finish-picker-option-body">
+            <div class="finish-option-copy">
+              <span class="finish-option-label">Plastificação</span>
+              <small>${escapeHtml(row.laminationFitDescription || "O app calcula automaticamente o melhor aproveitamento do polaseal.")}</small>
+            </div>
+            <div class="finish-eyelet-settings">
+              <span>Tipo</span>
+              <select class="cell-select" data-color-finish-field="laminationOption">
+                ${buildOptions(COLOR_EXTRA_OPTIONS.lamination, row.laminationOption || "Sem plastificação")}
+              </select>
+            </div>
+          </div>
+        </label>
+      </div>
+      <div class="finish-popover-footer">
+        <span class="finish-popover-summary">${escapeHtml(selectedCount ? `${selectedCount} acabamento(s) ativo(s) | ${formatCurrency(activeTotal)}` : "Nenhum acabamento selecionado")}</span>
+        <button type="button" class="button finish-popover-clear" data-color-finish-clear>Limpar seleção</button>
+      </div>
+    `;
+
+    document.body.appendChild(popover);
+    const rect = anchor.getBoundingClientRect();
+    popover.style.position = "fixed";
+    popover.style.visibility = "hidden";
+    popover.style.top = "12px";
+    popover.style.left = "12px";
+    const popoverRect = popover.getBoundingClientRect();
+    const spacing = 12;
+    const fitsBelow = rect.bottom + spacing + popoverRect.height <= window.innerHeight - spacing;
+    const top = fitsBelow
+      ? rect.bottom + spacing
+      : Math.max(spacing, rect.top - popoverRect.height - spacing);
+    const left = Math.min(
+      Math.max(spacing, rect.left),
+      Math.max(spacing, window.innerWidth - popoverRect.width - spacing)
+    );
+    popover.style.top = `${top}px`;
+    popover.style.left = `${left}px`;
+    popover.style.visibility = "visible";
+
+    const updateRowFromPopover = () => {
+      const cutInput = popover.querySelector('[data-color-finish-field="cutPriceOverride"]');
+      const holeSelect = popover.querySelector('[data-color-finish-field="holeOption"]');
+      const foldSelect = popover.querySelector('[data-color-finish-field="foldOption"]');
+      const laminationSelect = popover.querySelector('[data-color-finish-field="laminationOption"]');
+
+      if (cutInput instanceof HTMLInputElement) {
+        row.cutPriceOverride = cutInput.value === "" ? "" : toMoneyNumber(cutInput.value);
+      }
+      if (holeSelect instanceof HTMLSelectElement) {
+        row.holeOption = holeSelect.value || "Sem furo";
+      }
+      if (foldSelect instanceof HTMLSelectElement) {
+        row.foldOption = foldSelect.value || "Sem dobra";
+      }
+      if (laminationSelect instanceof HTMLSelectElement) {
+        row.laminationOption = normalizeColorLaminationOption(laminationSelect.value);
+      }
+
+      normalizeColorPrintRowBySize(row);
+      persist();
+      renderRowsAndSummary();
+    };
+
+    popover.addEventListener("change", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      if (target.closest("[data-color-finish-none]")) {
+        row.cutPriceOverride = "";
+        row.holeOption = "Sem furo";
+        row.foldOption = "Sem dobra";
+        row.laminationOption = "Sem plastificação";
+        normalizeColorPrintRowBySize(row);
+        persist();
+        renderRowsAndSummary();
+        closeColorFinishPopover();
+        return;
+      }
+
+      updateRowFromPopover();
+    });
+
+    popover.addEventListener("click", (event) => {
+      if (event.target.closest("[data-color-finish-close]")) {
+        closeColorFinishPopover();
+        return;
+      }
+      if (event.target.closest("[data-color-finish-clear]")) {
+        row.cutPriceOverride = "";
+        row.holeOption = "Sem furo";
+        row.foldOption = "Sem dobra";
+        row.laminationOption = "Sem plastificação";
+        normalizeColorPrintRowBySize(row);
+        persist();
+        renderRowsAndSummary();
+        closeColorFinishPopover();
       }
     });
   }
@@ -8501,6 +8711,18 @@ async function initApp() {
     renderRowsAndSummary();
   });
 
+  colorRowsTableBody.addEventListener("click", (event) => {
+    const toggle = event.target.closest("[data-color-finish-toggle]");
+    if (toggle) {
+      event.preventDefault();
+      const rowElement = toggle.closest("tr[data-color-row-index]");
+      if (!rowElement) {
+        return;
+      }
+      openColorFinishPopover(Number(rowElement.dataset.colorRowIndex), toggle);
+    }
+  });
+
   m2RowsTableBody.addEventListener("click", (event) => {
     const toggle = event.target.closest("[data-finish-picker-toggle]");
     if (toggle) {
@@ -8518,6 +8740,8 @@ async function initApp() {
     if (
       event.target.closest("[data-finish-picker-toggle]")
       || event.target.closest("#m2-finish-popover")
+      || event.target.closest("[data-color-finish-toggle]")
+      || event.target.closest("#color-finish-popover")
       || event.target.closest("[data-credential-lanyard-toggle]")
       || event.target.closest("#credential-lanyard-popover")
       || event.target.closest("[data-business-card-quantity-toggle]")
@@ -8526,6 +8750,7 @@ async function initApp() {
       return;
     }
     closeM2FinishPopover();
+    closeColorFinishPopover();
     closeCredentialLanyardPopover();
     closeBusinessCardQuantityPopover();
   });
