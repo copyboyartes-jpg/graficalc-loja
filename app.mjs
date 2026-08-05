@@ -16,7 +16,7 @@ const SHARED_SYNC_INTERVAL_MS = 20000;
 
 const OPTIONS = {
   printTypes: ["Preto e branco", "Colorido jato de tinta", "Colorido laser"],
-  sizes: ["A4", "A5"],
+  sizes: ["A4", "A5", "A6"],
   colorPrintSizes: ["A4", "A3", "Tamanho personalizado"],
   printModes: ["Só frente", "Frente e verso"],
   finishing: ["Sem acabamento", "Encadernação espiral", "Livreto"],
@@ -2157,6 +2157,16 @@ function getRegularPrintTotal(rowImpressions, effectiveQuantity, tiers) {
   return rowImpressions * lookupTier(tiers, effectiveQuantity);
 }
 
+function getApostilaPagesPerSheet(size) {
+  if (size === "A6") {
+    return 4;
+  }
+  if (size === "A5") {
+    return 2;
+  }
+  return 1;
+}
+
 function getPrintTotalByType(printType, rowImpressions, effectiveQuantity, config, printMode) {
   if (printType === "Preto e branco") {
     return getBlackWhiteTotal(rowImpressions, effectiveQuantity, config, printMode);
@@ -2178,7 +2188,8 @@ function getCoverImpressions(row, kind) {
   }
 
   const sides = type === "Colorida frente e verso" ? 2 : 1;
-  const baseCopies = row.size === "A5" && row.finishing !== "Livreto" ? Math.ceil(copies / 2) : copies;
+  const pagesPerSheet = getApostilaPagesPerSheet(row.size);
+  const baseCopies = pagesPerSheet > 1 && row.finishing !== "Livreto" ? Math.ceil(copies / pagesPerSheet) : copies;
   return baseCopies * sides;
 }
 
@@ -2196,7 +2207,7 @@ function getInnerImpressions(row) {
   if (copies <= 0 || pages <= 0) {
     return 0;
   }
-  const pagesPerA4 = row.size === "A5" ? Math.ceil(pages / 2) : pages;
+  const pagesPerA4 = Math.ceil(pages / getApostilaPagesPerSheet(row.size));
   return copies * pagesPerA4;
 }
 
@@ -2451,7 +2462,7 @@ function getPagesPerA4(pageCount, size) {
   if (pageCount <= 0) {
     return 0;
   }
-  return size === "A5" ? Math.ceil(pageCount / 2) : pageCount;
+  return Math.ceil(pageCount / getApostilaPagesPerSheet(size));
 }
 
 function getInnerImpressionBreakdown(row) {
