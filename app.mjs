@@ -9243,11 +9243,12 @@ async function initApp() {
     const freeQuoteWorkbook = calculateFreeQuoteWorkbook(state);
     const businessCardWorkbook = calculateBusinessCardWorkbook(state);
     const flyerWorkbook = calculateFlyerWorkbook(state);
+    const linearMeterWorkbook = calculateLinearMeterWorkbook(state);
     const m2Workbook = calculateM2WorkbookFromConfig(state, config);
     const resinWorkbook = calculateResinWorkbook(state, config);
     const blockSulfiteWorkbook = calculateBlockWorkbook(state, "sulfite");
     const blockAutocopiativoWorkbook = calculateBlockWorkbook(state, "autocopiativo");
-    const text = createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, m2Workbook, resinWorkbook);
+    const text = createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, linearMeterWorkbook, m2Workbook, resinWorkbook);
     try {
       await navigator.clipboard.writeText(text);
       setMainFeedback("Resumo do orçamento copiado com sucesso.", "success");
@@ -9392,13 +9393,14 @@ async function initApp() {
     const freeQuoteWorkbook = calculateFreeQuoteWorkbook(state);
     const businessCardWorkbook = calculateBusinessCardWorkbook(state);
     const flyerWorkbook = calculateFlyerWorkbook(state);
+    const linearMeterWorkbook = calculateLinearMeterWorkbook(state);
     const m2Workbook = calculateM2WorkbookFromConfig(state, config);
     const resinWorkbook = calculateResinWorkbook(state, config);
     const title = state.client.name.trim() || `Orçamento ${new Date().toLocaleDateString("pt-BR")}`;
     const blockSulfiteWorkbook = calculateBlockWorkbook(state, "sulfite");
     const blockAutocopiativoWorkbook = calculateBlockWorkbook(state, "autocopiativo");
-    const summary = createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, m2Workbook, resinWorkbook).split("\n").slice(0, 10).join(" • ");
-    const subtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + freeQuoteWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + flyerWorkbook.totals.totalGeneral + blockSulfiteWorkbook.totals.totalGeneral + blockAutocopiativoWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
+    const summary = createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, linearMeterWorkbook, m2Workbook, resinWorkbook).split("\n").slice(0, 10).join(" • ");
+    const subtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + freeQuoteWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + flyerWorkbook.totals.totalGeneral + blockSulfiteWorkbook.totals.totalGeneral + blockAutocopiativoWorkbook.totals.totalGeneral + linearMeterWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
     const quoteDiscount = calculateDiscount(subtotal, state.quoteDiscountType, state.quoteDiscountValue);
 
     state.quoteHistory.unshift({
