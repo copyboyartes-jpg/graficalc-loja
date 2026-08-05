@@ -2870,7 +2870,9 @@ function calculateCredentialWorkbook(state, config) {
     const baseSubtotal = areaM2 * pricePerM2;
     let baseTotal = Math.max(minimumValue, baseSubtotal);
 
-    if (printMode === "Frente e verso") {
+    if (material.pricingKey === "ps2mm" && printMode === "Frente e verso") {
+      baseTotal += areaM2 * 70;
+    } else if (printMode === "Frente e verso") {
       const flatCutPricing = config.m2Pricing?.flatCut || [];
       const flatCutBand = getM2PricingBand(flatCutPricing, areaM2);
       const flatCutPricePerM2 = toMoneyNumber(flatCutBand?.value);
@@ -2878,7 +2880,8 @@ function calculateCredentialWorkbook(state, config) {
       baseTotal += flatCutSubtotal;
     }
 
-    const laminationTotal = laminationSelected ? areaM2 * laminationPricePerM2 : 0;
+    const laminationArea = printMode === "Frente e verso" ? areaM2 * 2 : areaM2;
+    const laminationTotal = laminationSelected ? laminationArea * laminationPricePerM2 : 0;
     const rowDiscount = applyRowDiscount(row, baseTotal + laminationTotal + lanyardTotal + artCreationFee, quantity);
 
     return {
@@ -4504,12 +4507,12 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
     ),
     createConfigCardMarkup(
       "PS da credencial",
-      "Essas faixas controlam o cálculo das credenciais em PS 1mm e PS 2mm.",
+      "Essas faixas controlam o cálculo das credenciais em PS 1mm e PS 2mm. No PS 2mm frente e verso, o app soma mais R$ 70,00 por m² ao valor da faixa.",
       createCredentialPsPricingMarkup(config.m2Pricing)
     ),
     createConfigCardMarkup(
       "Laminação da credencial",
-      "Ajuste aqui o valor da laminação aplicado nas credenciais.",
+      "Ajuste aqui o valor da laminação aplicado nas credenciais. Quando a credencial for frente e verso, a laminação conta os dois lados.",
       createCredentialLaminationConfigMarkup(config.m2Finishes)
     ),
     createConfigCardMarkup(
