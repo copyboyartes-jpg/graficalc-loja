@@ -2838,9 +2838,10 @@ function calculateCredentialWorkbook(state, config) {
 
       const sheetsNeeded = Math.ceil(quantity / fit.itemsPerSheet);
       const impressionsNeeded = sheetsNeeded * sides;
+      const pricingBandQuantity = quantity * sides;
       const pricingKey = getColorPaperPricingKey(material.paperType);
       const pricing = config.colorPrintPricing?.[pricingKey] || [];
-      const sheetPrice = lookupTier(pricing, impressionsNeeded);
+      const sheetPrice = lookupTier(pricing, pricingBandQuantity);
       const baseTotal = impressionsNeeded * sheetPrice;
       const laminationTotal = laminationSelected ? areaM2 * laminationPricePerM2 : 0;
       const rowDiscount = applyRowDiscount(row, baseTotal + laminationTotal + lanyardTotal + artCreationFee, quantity);
@@ -2858,7 +2859,7 @@ function calculateCredentialWorkbook(state, config) {
         lanyardTotal,
         artCreationFee,
         ...rowDiscount,
-        tierLabel: `${fit.itemsPerSheet} por A4`,
+        tierLabel: `${fit.itemsPerSheet} por A4 | faixa ${quantity * sides} impressões`,
       };
     }
 
