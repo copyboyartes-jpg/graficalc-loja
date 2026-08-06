@@ -8544,18 +8544,19 @@ async function initApp() {
     updateCredentialRowField(target);
   });
 
-  readyRowsTableBody.addEventListener("change", (event) => {
-    const target = event.target;
+  function updateReadyProductRowField(target) {
     const rowElement = target.closest("tr[data-ready-row-index]");
     if (!rowElement) {
-      return;
+      return false;
     }
     const row = state.readyProductItems[Number(rowElement.dataset.readyRowIndex)];
     const field = target.name;
     if (!field || !row) {
-      return;
+      return false;
     }
-    if (field === "artCreationFee" || field === "discountValue") {
+    if (field === "quantity") {
+      row[field] = toWholeNumber(target.value);
+    } else if (field === "artCreationFee" || field === "discountValue") {
       row[field] = toMoneyNumber(target.value);
     } else if (field === "discountType") {
       row[field] = normalizeDiscountType(target.value);
@@ -8564,6 +8565,23 @@ async function initApp() {
     }
     persistLocalOnly();
     renderRowsAndSummary();
+    return true;
+  }
+
+  readyRowsTableBody.addEventListener("input", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) {
+      return;
+    }
+    if (!["description", "quantity", "artCreationFee", "discountValue"].includes(target.name)) {
+      return;
+    }
+    updateReadyProductRowField(target);
+  });
+
+  readyRowsTableBody.addEventListener("change", (event) => {
+    const target = event.target;
+    updateReadyProductRowField(target);
   });
 
   freeQuoteRowsTableBody.addEventListener("change", (event) => {
