@@ -9577,6 +9577,7 @@ async function initApp() {
       }
       persistLocalOnly();
       renderAll();
+      selectTab("orcamento");
       setMainFeedback("Orçamento completo carregado a partir do histórico.", "success");
     } else if (button.dataset.historyAction === "load-client") {
       state.client.name = item.clientName || state.client.name;
