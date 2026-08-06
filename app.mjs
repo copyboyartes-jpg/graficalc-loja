@@ -1366,6 +1366,22 @@ function createQuoteHistorySnapshot(state) {
   });
 }
 
+function getQuoteHistorySnapshot(item) {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+  if (item.snapshot && typeof item.snapshot === "object") {
+    return item.snapshot;
+  }
+  if (item.fullState && typeof item.fullState === "object") {
+    return item.fullState;
+  }
+  if (item.state && typeof item.state === "object") {
+    return item.state;
+  }
+  return null;
+}
+
 function applyQuoteHistorySnapshot(state, snapshot) {
   if (!snapshot || typeof snapshot !== "object") {
     return false;
@@ -1690,7 +1706,7 @@ function mergeState(candidate) {
           total: Number.isFinite(Number(item.total)) ? Number(item.total) : 0,
           summary: typeof item.summary === "string" ? item.summary : "",
           createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString(),
-          snapshot: item.snapshot && typeof item.snapshot === "object" ? deepClone(item.snapshot) : null,
+          snapshot: getQuoteHistorySnapshot(item) ? deepClone(getQuoteHistorySnapshot(item)) : null,
         }))
     : state.quoteHistory;
   state.paymentTerms = typeof candidate.paymentTerms === "string" ? candidate.paymentTerms : state.paymentTerms;
@@ -6820,22 +6836,26 @@ async function initApp() {
     historyList.innerHTML = state.quoteHistory.length
       ? state.quoteHistory
           .map(
-            (item) => `
+            (item) => {
+              const hasFullSnapshot = Boolean(getQuoteHistorySnapshot(item));
+              return `
               <article class="list-card" data-quote-id="${escapeHtml(item.id)}">
                 <div>
                   <h3>${escapeHtml(item.title || "Orçamento salvo")}</h3>
                   <p>${escapeHtml(item.clientName || "Cliente não informado")}</p>
                   <p class="list-meta">${escapeHtml(formatDateTime(item.createdAt) || "data indisponível")}</p>
                   ${item.summary ? `<p class="list-notes">${escapeHtml(item.summary)}</p>` : ""}
+                  ${hasFullSnapshot ? "" : `<p class="list-meta">Este registro tem somente o resumo salvo.</p>`}
                 </div>
                 <div class="list-actions">
-                  <button class="button button-primary" type="button" data-history-action="load-full" data-quote-id="${escapeHtml(item.id)}">Abrir completo</button>
+                  <button class="button button-primary" type="button" data-history-action="load-full" data-quote-id="${escapeHtml(item.id)}" ${hasFullSnapshot ? "" : "disabled"}>${hasFullSnapshot ? "Abrir completo" : "Somente resumo"}</button>
                   <button class="button button-primary" type="button" data-history-action="load-client" data-quote-id="${escapeHtml(item.id)}">Usar cliente</button>
                   <button class="button" type="button" data-history-action="copy" data-quote-id="${escapeHtml(item.id)}">Copiar resumo</button>
                   <button class="button button-danger" type="button" data-history-action="delete" data-quote-id="${escapeHtml(item.id)}">Excluir</button>
                 </div>
               </article>
-            `
+            `;
+            }
           )
           .join("")
       : `<div class="empty-state"><strong>Nenhum orçamento salvo ainda</strong><span>Salve um fechamento para manter um histórico rápido de clientes, valores e resumos recentes.</span></div>`;
@@ -9550,8 +9570,9 @@ async function initApp() {
     }
 
     if (button.dataset.historyAction === "load-full") {
-      if (!applyQuoteHistorySnapshot(state, item.snapshot)) {
-        setMainFeedback("Este orçamento antigo não tem todos os dados para reabrir por completo.", "warning");
+      const snapshot = getQuoteHistorySnapshot(item);
+      if (!applyQuoteHistorySnapshot(state, snapshot)) {
+        setMainFeedback("Este item do histórico tem apenas o resumo salvo e não pode ser reaberto por completo.", "warning");
         return;
       }
       persistLocalOnly();
