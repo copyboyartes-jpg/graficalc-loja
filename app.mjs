@@ -7033,7 +7033,7 @@ async function initApp() {
             <td><span class="readonly-value subtle">${formatInteger(row.a4Impressions)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.printTotal)}</span></td>
             <td>${createColorFinishPickerMarkup(row)}</td>
-            <td><span class="readonly-value subtle">${formatCurrency((row.finalCutPrice || 0) + (row.colorExtrasTotal || 0))}</span></td>
+            <td><span class="readonly-value subtle">${formatCurrency(row.colorExtrasTotal || 0)}</span></td>
             <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
             <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
             <td><input class="cell-input" name="discountValue" type="number" min="0" step="0.01" value="${escapeHtml(row.discountValue ?? 0)}" placeholder="0,00"></td>
@@ -8581,7 +8581,7 @@ async function initApp() {
     if (!["widthCm", "heightCm", "quantity", "artCreationFee", "discountValue", "description"].includes(target.name)) {
       return;
     }
-    updateCredentialRowField(target, { rerender: false });
+    updateCredentialRowField(target);
   });
 
   credentialRowsTableBody.addEventListener("change", (event) => {
@@ -8624,7 +8624,7 @@ async function initApp() {
     if (!["description", "quantity", "artCreationFee", "discountValue"].includes(target.name)) {
       return;
     }
-    updateReadyProductRowField(target, { rerender: false });
+    updateReadyProductRowField(target);
   });
 
   readyRowsTableBody.addEventListener("change", (event) => {
