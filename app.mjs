@@ -8555,15 +8555,34 @@ async function initApp() {
     if (!field || !row) {
       return false;
     }
-    if (field === "quantity") {
-      row[field] = toWholeNumber(target.value);
-    } else if (field === "widthCm" || field === "heightCm") {
-      row[field] = toDecimalNumber(target.value);
-    } else if (field === "artCreationFee" || field === "discountValue") {
-      row[field] = toMoneyNumber(target.value);
+
+    const widthInput = rowElement.querySelector('input[name="widthCm"]');
+    const heightInput = rowElement.querySelector('input[name="heightCm"]');
+    const quantityInput = rowElement.querySelector('input[name="quantity"]');
+    const artCreationInput = rowElement.querySelector('input[name="artCreationFee"]');
+    const discountValueInput = rowElement.querySelector('input[name="discountValue"]');
+
+    if (widthInput) {
+      row.widthCm = toDecimalNumber(widthInput.value);
+    }
+    if (heightInput) {
+      row.heightCm = toDecimalNumber(heightInput.value);
+    }
+    if (quantityInput) {
+      row.quantity = toWholeNumber(quantityInput.value);
+    }
+    if (artCreationInput) {
+      row.artCreationFee = toMoneyNumber(artCreationInput.value);
+    }
+    if (discountValueInput) {
+      row.discountValue = toMoneyNumber(discountValueInput.value);
+    }
+
+    if (field === "description") {
+      row.description = target.value;
     } else if (field === "discountType") {
-      row[field] = normalizeDiscountType(target.value);
-    } else {
+      row.discountType = normalizeDiscountType(target.value);
+    } else if (!["widthCm", "heightCm", "quantity", "artCreationFee", "discountValue"].includes(field)) {
       row[field] = target.value;
     }
     persistLocalOnly();
