@@ -8502,16 +8502,15 @@ async function initApp() {
     renderRowsAndSummary();
   });
 
-  credentialRowsTableBody.addEventListener("change", (event) => {
-    const target = event.target;
+  function updateCredentialRowField(target) {
     const rowElement = target.closest("tr[data-credential-row-index]");
     if (!rowElement) {
-      return;
+      return false;
     }
     const row = state.credentialItems[Number(rowElement.dataset.credentialRowIndex)];
     const field = target.name;
     if (!field || !row) {
-      return;
+      return false;
     }
     if (field === "quantity") {
       row[field] = toWholeNumber(target.value);
@@ -8526,6 +8525,23 @@ async function initApp() {
     }
     persistLocalOnly();
     renderRowsAndSummary();
+    return true;
+  }
+
+  credentialRowsTableBody.addEventListener("input", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) {
+      return;
+    }
+    if (!["widthCm", "heightCm", "quantity", "artCreationFee", "discountValue", "description"].includes(target.name)) {
+      return;
+    }
+    updateCredentialRowField(target);
+  });
+
+  credentialRowsTableBody.addEventListener("change", (event) => {
+    const target = event.target;
+    updateCredentialRowField(target);
   });
 
   readyRowsTableBody.addEventListener("change", (event) => {
