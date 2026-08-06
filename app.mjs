@@ -1339,6 +1339,64 @@ function deepClone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function createQuoteHistorySnapshot(state) {
+  return deepClone({
+    calcMode: state.calcMode,
+    m2CalcMode: state.m2CalcMode,
+    presets: state.presets,
+    rows: state.rows,
+    colorPrintItems: state.colorPrintItems,
+    credentialItems: state.credentialItems,
+    readyProductItems: state.readyProductItems,
+    freeQuoteItems: state.freeQuoteItems,
+    m2Items: state.m2Items,
+    resinItems: state.resinItems,
+    linearMeterItems: state.linearMeterItems,
+    businessCardItems: state.businessCardItems,
+    flyerItems: state.flyerItems,
+    blockItems: state.blockItems,
+    client: state.client,
+    company: state.company,
+    paymentTerms: state.paymentTerms,
+    productionDeadline: state.productionDeadline,
+    quoteTotalVisibility: state.quoteTotalVisibility,
+    quoteNotes: state.quoteNotes,
+    quoteDiscountType: state.quoteDiscountType,
+    quoteDiscountValue: state.quoteDiscountValue,
+  });
+}
+
+function applyQuoteHistorySnapshot(state, snapshot) {
+  if (!snapshot || typeof snapshot !== "object") {
+    return false;
+  }
+
+  const restored = mergeState(snapshot);
+  state.calcMode = restored.calcMode;
+  state.m2CalcMode = restored.m2CalcMode;
+  state.presets = deepClone(restored.presets);
+  state.rows = deepClone(restored.rows);
+  state.colorPrintItems = deepClone(restored.colorPrintItems);
+  state.credentialItems = deepClone(restored.credentialItems);
+  state.readyProductItems = deepClone(restored.readyProductItems);
+  state.freeQuoteItems = deepClone(restored.freeQuoteItems);
+  state.m2Items = deepClone(restored.m2Items);
+  state.resinItems = deepClone(restored.resinItems);
+  state.linearMeterItems = deepClone(restored.linearMeterItems);
+  state.businessCardItems = deepClone(restored.businessCardItems);
+  state.flyerItems = deepClone(restored.flyerItems);
+  state.blockItems = deepClone(restored.blockItems);
+  state.client = deepClone(restored.client);
+  state.company = deepClone(restored.company);
+  state.paymentTerms = restored.paymentTerms;
+  state.productionDeadline = restored.productionDeadline;
+  state.quoteTotalVisibility = restored.quoteTotalVisibility;
+  state.quoteNotes = restored.quoteNotes;
+  state.quoteDiscountType = restored.quoteDiscountType;
+  state.quoteDiscountValue = restored.quoteDiscountValue;
+  return true;
+}
+
 function repairBrokenText(value) {
   if (typeof value !== "string" || !value) {
     return value;
@@ -1632,6 +1690,7 @@ function mergeState(candidate) {
           total: Number.isFinite(Number(item.total)) ? Number(item.total) : 0,
           summary: typeof item.summary === "string" ? item.summary : "",
           createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString(),
+          snapshot: item.snapshot && typeof item.snapshot === "object" ? deepClone(item.snapshot) : null,
         }))
     : state.quoteHistory;
   state.paymentTerms = typeof candidate.paymentTerms === "string" ? candidate.paymentTerms : state.paymentTerms;
@@ -6770,6 +6829,7 @@ async function initApp() {
                   ${item.summary ? `<p class="list-notes">${escapeHtml(item.summary)}</p>` : ""}
                 </div>
                 <div class="list-actions">
+                  <button class="button button-primary" type="button" data-history-action="load-full" data-quote-id="${escapeHtml(item.id)}">Abrir completo</button>
                   <button class="button button-primary" type="button" data-history-action="load-client" data-quote-id="${escapeHtml(item.id)}">Usar cliente</button>
                   <button class="button" type="button" data-history-action="copy" data-quote-id="${escapeHtml(item.id)}">Copiar resumo</button>
                   <button class="button button-danger" type="button" data-history-action="delete" data-quote-id="${escapeHtml(item.id)}">Excluir</button>
@@ -9425,6 +9485,7 @@ async function initApp() {
       total: quoteDiscount.total,
       summary,
       createdAt: new Date().toISOString(),
+      snapshot: createQuoteHistorySnapshot(state),
     });
 
     state.quoteHistory = state.quoteHistory.slice(0, 20);
@@ -9488,7 +9549,15 @@ async function initApp() {
       return;
     }
 
-    if (button.dataset.historyAction === "load-client") {
+    if (button.dataset.historyAction === "load-full") {
+      if (!applyQuoteHistorySnapshot(state, item.snapshot)) {
+        setMainFeedback("Este orçamento antigo não tem todos os dados para reabrir por completo.", "warning");
+        return;
+      }
+      persistLocalOnly();
+      renderAll();
+      setMainFeedback("Orçamento completo carregado a partir do histórico.", "success");
+    } else if (button.dataset.historyAction === "load-client") {
       state.client.name = item.clientName || state.client.name;
       persist();
       renderAll();
