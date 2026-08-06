@@ -2035,18 +2035,55 @@ function saveConfigSection(section) {
 }
 
 function toWholeNumber(value) {
-  const parsed = Number.parseInt(value, 10);
+  const normalized = normalizeNumericInput(value, { allowDecimal: false });
+  const parsed = Number.parseInt(normalized, 10);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 }
 
 function toMoneyNumber(value) {
-  const parsed = Number.parseFloat(value);
+  const normalized = normalizeNumericInput(value, { allowDecimal: true });
+  const parsed = Number.parseFloat(normalized);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 }
 
 function toDecimalNumber(value) {
-  const parsed = Number.parseFloat(value);
+  const normalized = normalizeNumericInput(value, { allowDecimal: true });
+  const parsed = Number.parseFloat(normalized);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+function normalizeNumericInput(value, options = {}) {
+  const { allowDecimal = true } = options;
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? String(value) : "";
+  }
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  const cleaned = value
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/[R$r$]/g, "")
+    .replace(/[^0-9,.-]/g, "");
+
+  if (!cleaned) {
+    return "";
+  }
+
+  if (!allowDecimal) {
+    const integerOnly = cleaned.replace(/[^\d-]/g, "");
+    return integerOnly;
+  }
+
+  const decimalSeparator = Math.max(cleaned.lastIndexOf(","), cleaned.lastIndexOf("."));
+  if (decimalSeparator === -1) {
+    return cleaned.replace(/[^\d-]/g, "");
+  }
+
+  const integerPart = cleaned.slice(0, decimalSeparator).replace(/[^\d-]/g, "");
+  const decimalPart = cleaned.slice(decimalSeparator + 1).replace(/[^\d]/g, "");
+  return decimalPart ? `${integerPart}.${decimalPart}` : integerPart;
 }
 
 function formatCurrency(value) {
@@ -2595,7 +2632,12 @@ function isColorPrintRowActive(row) {
 }
 
 function isCredentialRowActive(row) {
-  return Boolean(row.description?.trim() || Number(row.quantity) > 0 || Number(row.widthCm) > 0 || Number(row.heightCm) > 0);
+  return Boolean(
+    row.description?.trim()
+    || toWholeNumber(row.quantity) > 0
+    || toDecimalNumber(row.widthCm) > 0
+    || toDecimalNumber(row.heightCm) > 0
+  );
 }
 
 function isBusinessCardRowActive(row) {
@@ -2789,7 +2831,7 @@ function getCredentialLanyardSelection(config, lanyardType, quantity = 0) {
 }
 
 function isReadyProductRowActive(row) {
-  return Boolean(row.description?.trim() || Number(row.quantity) > 0);
+  return Boolean(row.description?.trim() || toWholeNumber(row.quantity) > 0);
 }
 
 function getReadyProductSelection(config, productType, quantity = 0) {
@@ -7020,18 +7062,18 @@ async function initApp() {
                 </button>
               </div>
             </td>
-            <td><input class="cell-input" name="widthCm" type="number" min="0" step="0.1" value="${escapeHtml(row.widthCm)}" placeholder="0,0"></td>
-            <td><input class="cell-input" name="heightCm" type="number" min="0" step="0.1" value="${escapeHtml(row.heightCm)}" placeholder="0,0"></td>
-            <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${escapeHtml(row.quantity)}" placeholder="0"></td>
+            <td><input class="cell-input" name="widthCm" type="text" inputmode="decimal" value="${escapeHtml(row.widthCm)}" placeholder="0,0"></td>
+            <td><input class="cell-input" name="heightCm" type="text" inputmode="decimal" value="${escapeHtml(row.heightCm)}" placeholder="0,0"></td>
+            <td><input class="cell-input" name="quantity" type="text" inputmode="numeric" value="${escapeHtml(row.quantity)}" placeholder="0"></td>
             <td><span class="readonly-value subtle">${formatAreaM2(row.areaM2)}</span></td>
             <td><span class="readonly-value subtle">${row.itemsPerSheet > 0 ? formatInteger(row.itemsPerSheet) : "-"}</span></td>
             <td><span class="readonly-value subtle">${row.sheetsNeeded > 0 ? formatInteger(row.sheetsNeeded) : "-"}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.baseTotal)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.laminationTotal)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.lanyardTotal)}</span></td>
-            <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
+            <td><input class="cell-input" name="artCreationFee" type="text" inputmode="decimal" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
             <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
-            <td><input class="cell-input" name="discountValue" type="number" min="0" step="0.01" value="${escapeHtml(row.discountValue ?? 0)}" placeholder="0,00"></td>
+            <td><input class="cell-input" name="discountValue" type="text" inputmode="decimal" value="${escapeHtml(row.discountValue ?? 0)}" placeholder="0,00"></td>
             <td><span class="readonly-value">${formatCurrency(row.total)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.unitValue)}</span></td>
           </tr>
@@ -7058,11 +7100,11 @@ async function initApp() {
             <td><strong>${String(index + 1).padStart(2, "0")}</strong></td>
             <td><select class="cell-select" name="productType">${buildReadyProductOptions(row.productType)}</select></td>
             <td><input class="cell-input description" name="description" value="${escapeHtml(row.description === row.productLabel ? "" : row.description)}" placeholder="${escapeHtml(row.productLabel)}"></td>
-            <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${escapeHtml(row.quantity)}" placeholder="0"></td>
+            <td><input class="cell-input" name="quantity" type="text" inputmode="numeric" value="${escapeHtml(row.quantity)}" placeholder="0"></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.unitPrice)}</span></td>
-            <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
+            <td><input class="cell-input" name="artCreationFee" type="text" inputmode="decimal" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
             <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
-            <td><input class="cell-input" name="discountValue" type="number" min="0" step="0.01" value="${escapeHtml(row.discountValue ?? 0)}" placeholder="0,00"></td>
+            <td><input class="cell-input" name="discountValue" type="text" inputmode="decimal" value="${escapeHtml(row.discountValue ?? 0)}" placeholder="0,00"></td>
             <td><span class="readonly-value">${formatCurrency(row.total)}</span></td>
           </tr>
         `
@@ -8502,7 +8544,8 @@ async function initApp() {
     renderRowsAndSummary();
   });
 
-  function updateCredentialRowField(target) {
+  function updateCredentialRowField(target, options = {}) {
+    const { rerender = true } = options;
     const rowElement = target.closest("tr[data-credential-row-index]");
     if (!rowElement) {
       return false;
@@ -8524,7 +8567,9 @@ async function initApp() {
       row[field] = target.value;
     }
     persistLocalOnly();
-    renderRowsAndSummary();
+    if (rerender) {
+      renderRowsAndSummary();
+    }
     return true;
   }
 
@@ -8536,7 +8581,7 @@ async function initApp() {
     if (!["widthCm", "heightCm", "quantity", "artCreationFee", "discountValue", "description"].includes(target.name)) {
       return;
     }
-    updateCredentialRowField(target);
+    updateCredentialRowField(target, { rerender: false });
   });
 
   credentialRowsTableBody.addEventListener("change", (event) => {
@@ -8544,7 +8589,8 @@ async function initApp() {
     updateCredentialRowField(target);
   });
 
-  function updateReadyProductRowField(target) {
+  function updateReadyProductRowField(target, options = {}) {
+    const { rerender = true } = options;
     const rowElement = target.closest("tr[data-ready-row-index]");
     if (!rowElement) {
       return false;
@@ -8564,7 +8610,9 @@ async function initApp() {
       row[field] = target.value;
     }
     persistLocalOnly();
-    renderRowsAndSummary();
+    if (rerender) {
+      renderRowsAndSummary();
+    }
     return true;
   }
 
@@ -8576,7 +8624,7 @@ async function initApp() {
     if (!["description", "quantity", "artCreationFee", "discountValue"].includes(target.name)) {
       return;
     }
-    updateReadyProductRowField(target);
+    updateReadyProductRowField(target, { rerender: false });
   });
 
   readyRowsTableBody.addEventListener("change", (event) => {
