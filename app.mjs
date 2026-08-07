@@ -6904,6 +6904,7 @@ async function initApp() {
   }
 
   function renderRowsAndSummary() {
+    syncCredentialRowsFromDom();
     const workbook = calculateWorkbook(state, config);
     const colorWorkbook = calculateColorPrintWorkbook(state, config);
     const credentialWorkbook = calculateCredentialWorkbook(state, config);
@@ -8544,8 +8545,113 @@ async function initApp() {
     renderRowsAndSummary();
   });
 
+  function getFormControlValue(rowElement, selector) {
+    const control = rowElement.querySelector(selector);
+    if (control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement) {
+      return control.value;
+    }
+    return null;
+  }
+
+  function normalizeOptionValue(value, options, fallback) {
+    return options.includes(value) ? value : fallback;
+  }
+
+  function syncCredentialRowFromElement(rowElement) {
+    const row = state.credentialItems[Number(rowElement.dataset.credentialRowIndex)];
+    if (!row) {
+      return false;
+    }
+
+    const before = JSON.stringify({
+      description: row.description,
+      materialType: row.materialType,
+      printMode: row.printMode,
+      lamination: row.lamination,
+      lanyardType: row.lanyardType,
+      widthCm: row.widthCm,
+      heightCm: row.heightCm,
+      quantity: row.quantity,
+      artCreationFee: row.artCreationFee,
+      discountType: row.discountType,
+      discountValue: row.discountValue,
+    });
+
+    const descriptionValue = getFormControlValue(rowElement, 'input[name="description"]');
+    const materialTypeValue = getFormControlValue(rowElement, 'select[name="materialType"]');
+    const printModeValue = getFormControlValue(rowElement, 'select[name="printMode"]');
+    const laminationValue = getFormControlValue(rowElement, 'select[name="lamination"]');
+    const widthValue = getFormControlValue(rowElement, 'input[name="widthCm"]');
+    const heightValue = getFormControlValue(rowElement, 'input[name="heightCm"]');
+    const quantityValue = getFormControlValue(rowElement, 'input[name="quantity"]');
+    const artCreationValue = getFormControlValue(rowElement, 'input[name="artCreationFee"]');
+    const discountTypeValue = getFormControlValue(rowElement, 'select[name="discountType"]');
+    const discountValue = getFormControlValue(rowElement, 'input[name="discountValue"]');
+
+    if (descriptionValue !== null) {
+      row.description = descriptionValue;
+    }
+    if (materialTypeValue !== null) {
+      row.materialType = normalizeOptionValue(materialTypeValue, OPTIONS.credentialMaterials, row.materialType || "Couche 250g");
+    }
+    if (printModeValue !== null) {
+      row.printMode = normalizeOptionValue(printModeValue, OPTIONS.printModes, row.printMode || "Só frente");
+    }
+    if (laminationValue !== null) {
+      row.lamination = normalizeOptionValue(laminationValue, OPTIONS.credentialLamination, row.lamination || "Sem laminação");
+    }
+    if (widthValue !== null) {
+      row.widthCm = toDecimalNumber(widthValue);
+    }
+    if (heightValue !== null) {
+      row.heightCm = toDecimalNumber(heightValue);
+    }
+    if (quantityValue !== null) {
+      row.quantity = toWholeNumber(quantityValue);
+    }
+    if (artCreationValue !== null) {
+      row.artCreationFee = toMoneyNumber(artCreationValue);
+    }
+    if (discountTypeValue !== null) {
+      row.discountType = normalizeDiscountType(discountTypeValue);
+    }
+    if (discountValue !== null) {
+      row.discountValue = toMoneyNumber(discountValue);
+    }
+
+    const after = JSON.stringify({
+      description: row.description,
+      materialType: row.materialType,
+      printMode: row.printMode,
+      lamination: row.lamination,
+      lanyardType: row.lanyardType,
+      widthCm: row.widthCm,
+      heightCm: row.heightCm,
+      quantity: row.quantity,
+      artCreationFee: row.artCreationFee,
+      discountType: row.discountType,
+      discountValue: row.discountValue,
+    });
+
+    return before !== after;
+  }
+
+  function syncCredentialRowsFromDom() {
+    if (!credentialRowsTableBody) {
+      return false;
+    }
+    let changed = false;
+    credentialRowsTableBody.querySelectorAll("tr[data-credential-row-index]").forEach((rowElement) => {
+      changed = syncCredentialRowFromElement(rowElement) || changed;
+    });
+    return changed;
+  }
+
   function updateCredentialRowField(target, options = {}) {
     const { rerender = true } = options;
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) {
+      return false;
+    }
     const rowElement = target.closest("tr[data-credential-row-index]");
     if (!rowElement) {
       return false;
@@ -8556,33 +8662,9 @@ async function initApp() {
       return false;
     }
 
-    const widthInput = rowElement.querySelector('input[name="widthCm"]');
-    const heightInput = rowElement.querySelector('input[name="heightCm"]');
-    const quantityInput = rowElement.querySelector('input[name="quantity"]');
-    const artCreationInput = rowElement.querySelector('input[name="artCreationFee"]');
-    const discountValueInput = rowElement.querySelector('input[name="discountValue"]');
+    syncCredentialRowFromElement(rowElement);
 
-    if (widthInput) {
-      row.widthCm = toDecimalNumber(widthInput.value);
-    }
-    if (heightInput) {
-      row.heightCm = toDecimalNumber(heightInput.value);
-    }
-    if (quantityInput) {
-      row.quantity = toWholeNumber(quantityInput.value);
-    }
-    if (artCreationInput) {
-      row.artCreationFee = toMoneyNumber(artCreationInput.value);
-    }
-    if (discountValueInput) {
-      row.discountValue = toMoneyNumber(discountValueInput.value);
-    }
-
-    if (field === "description") {
-      row.description = target.value;
-    } else if (field === "discountType") {
-      row.discountType = normalizeDiscountType(target.value);
-    } else if (!["widthCm", "heightCm", "quantity", "artCreationFee", "discountValue"].includes(field)) {
+    if (!["description", "materialType", "printMode", "lamination", "widthCm", "heightCm", "quantity", "artCreationFee", "discountType", "discountValue"].includes(field)) {
       row[field] = target.value;
     }
     persistLocalOnly();
@@ -8605,6 +8687,9 @@ async function initApp() {
 
   credentialRowsTableBody.addEventListener("change", (event) => {
     const target = event.target;
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) {
+      return;
+    }
     updateCredentialRowField(target);
   });
 
@@ -9728,7 +9813,15 @@ async function initApp() {
     }
   });
 
+  const refreshCredentialRowsFromBrowserRestore = () => {
+    if (syncCredentialRowsFromDom()) {
+      persistLocalOnly();
+      renderRowsAndSummary();
+    }
+  };
+
   renderAll();
+  window.setTimeout(refreshCredentialRowsFromBrowserRestore, 250);
   bootstrapSharedState()
     .catch(() => {
       sharedBootstrapComplete = true;
@@ -9736,6 +9829,7 @@ async function initApp() {
     })
     .finally(() => {
       renderAll();
+      window.setTimeout(refreshCredentialRowsFromBrowserRestore, 100);
     });
   startSharedRefresh();
 }
