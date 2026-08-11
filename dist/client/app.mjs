@@ -7560,8 +7560,7 @@ async function initApp() {
     renderRowsAndSummary();
   });
 
-  credentialRowsTableBody.addEventListener("change", (event) => {
-    const target = event.target;
+  const updateCredentialRowField = (target) => {
     const rowElement = target.closest("tr[data-credential-row-index]");
     if (!rowElement) {
       return;
@@ -7584,6 +7583,18 @@ async function initApp() {
     }
     persistLocalOnly();
     renderRowsAndSummary();
+  };
+  credentialRowsTableBody.addEventListener("input", (event) => {
+    const target = event.target;
+    if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement) {
+      updateCredentialRowField(target);
+    }
+  });
+  credentialRowsTableBody.addEventListener("change", (event) => {
+    const target = event.target;
+    if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement) {
+      updateCredentialRowField(target);
+    }
   });
 
   readyRowsTableBody.addEventListener("change", (event) => {
