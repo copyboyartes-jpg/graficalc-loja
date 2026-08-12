@@ -2884,6 +2884,18 @@ function getCredentialMinimumBand(pricing) {
   return pricing.find((tier) => String(tier.label || "").toLowerCase().includes("valor minimo")) || null;
 }
 
+const credentialDraftFieldValues = new Map();
+
+function setCredentialDraftFieldValue(index, field, value) {
+  const key = `${index}:${field}`;
+  credentialDraftFieldValues.set(key, value);
+}
+
+function getCredentialDraftFieldValue(index, field, fallbackValue = "") {
+  const key = `${index}:${field}`;
+  return credentialDraftFieldValues.has(key) ? credentialDraftFieldValues.get(key) : fallbackValue;
+}
+
 function getCredentialRowSnapshotFromDom(index, fallbackRow) {
   if (typeof document === "undefined") {
     return fallbackRow;
@@ -2910,12 +2922,15 @@ function getCredentialRowSnapshotFromDom(index, fallbackRow) {
     materialType: readValue('select[name="materialType"]', fallbackRow.materialType || "Couche 250g"),
     printMode: readValue('select[name="printMode"]', fallbackRow.printMode || "Só frente"),
     lamination: readValue('select[name="lamination"]', fallbackRow.lamination || "Sem laminação"),
-    widthCm: readValue('input[name="widthCm"]', fallbackRow.widthCm),
-    heightCm: readValue('input[name="heightCm"]', fallbackRow.heightCm),
-    quantity:
+    widthCm: getCredentialDraftFieldValue(index, "widthCm", readValue('input[name="widthCm"]', fallbackRow.widthCm)),
+    heightCm: getCredentialDraftFieldValue(index, "heightCm", readValue('input[name="heightCm"]', fallbackRow.heightCm)),
+    quantity: getCredentialDraftFieldValue(
+      index,
+      "quantity",
       quantityInputByPosition instanceof HTMLInputElement
         ? quantityInputByPosition.value
-        : readValue('input[name="quantity"]', fallbackRow.quantity),
+        : readValue('input[name="quantity"]', fallbackRow.quantity)
+    ),
     artCreationFee: readValue('input[name="artCreationFee"]', fallbackRow.artCreationFee),
     discountType: readValue('select[name="discountType"]', fallbackRow.discountType || "R$"),
     discountValue: readValue('input[name="discountValue"]', fallbackRow.discountValue),
@@ -6979,12 +6994,15 @@ async function initApp() {
         row.lamination = normalizeOptionValue(laminationSelect.value, OPTIONS.credentialLamination, row.lamination || "Sem laminação");
       }
       if (widthInput instanceof HTMLInputElement) {
+        setCredentialDraftFieldValue(rowIndex, "widthCm", widthInput.value);
         row.widthCm = toDecimalNumber(widthInput.value);
       }
       if (heightInput instanceof HTMLInputElement) {
+        setCredentialDraftFieldValue(rowIndex, "heightCm", heightInput.value);
         row.heightCm = toDecimalNumber(heightInput.value);
       }
       if (quantityInput instanceof HTMLInputElement) {
+        setCredentialDraftFieldValue(rowIndex, "quantity", quantityInput.value);
         row.quantity = toWholeNumber(quantityInput.value);
       }
       if (artCreationInput instanceof HTMLInputElement) {
@@ -8721,6 +8739,11 @@ async function initApp() {
     const { preserveFocus = false } = options;
     if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) {
       return;
+    }
+    const rowElement = target.closest("tr[data-credential-row-index]");
+    const rowIndex = Number(rowElement?.getAttribute("data-credential-row-index"));
+    if (Number.isInteger(rowIndex) && ["widthCm", "heightCm", "quantity"].includes(target.name)) {
+      setCredentialDraftFieldValue(rowIndex, target.name, target.value);
     }
     syncCredentialRowsFromDom();
     persistLocalOnly();
