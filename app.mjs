@@ -1070,12 +1070,9 @@ function createDefaultCredentialRow(index) {
     printMode: "Só frente",
     lamination: "Sem laminação",
     lanyardType: "none",
-    widthCmInput: "",
-    heightCmInput: "",
-    quantityInput: "",
-    widthCm: 0,
-    heightCm: 0,
-    quantity: 0,
+    widthCm: "",
+    heightCm: "",
+    quantity: "",
     artCreationFee: 0,
     discountType: "R$",
     discountValue: 0,
@@ -1762,12 +1759,9 @@ function mergeState(candidate) {
     state.credentialItems = candidate.credentialItems.map((row, index) => ({
       ...createDefaultCredentialRow(index),
       ...row,
-      widthCmInput: typeof row?.widthCmInput === "string" ? row.widthCmInput : String(row?.widthCm ?? ""),
-      heightCmInput: typeof row?.heightCmInput === "string" ? row.heightCmInput : String(row?.heightCm ?? ""),
-      quantityInput: typeof row?.quantityInput === "string" ? row.quantityInput : String(row?.quantity ?? ""),
-      widthCm: toDecimalNumber(row?.widthCm),
-      heightCm: toDecimalNumber(row?.heightCm),
-      quantity: toWholeNumber(row?.quantity),
+      widthCm: typeof row?.widthCm === "string" ? row.widthCm : String(row?.widthCm ?? ""),
+      heightCm: typeof row?.heightCm === "string" ? row.heightCm : String(row?.heightCm ?? ""),
+      quantity: typeof row?.quantity === "string" ? row.quantity : String(row?.quantity ?? ""),
       artCreationFee: toMoneyNumber(row?.artCreationFee),
       discountType: normalizeDiscountType(row?.discountType),
       discountValue: toMoneyNumber(row?.discountValue),
@@ -2896,9 +2890,12 @@ function calculateCredentialWorkbook(state, config) {
 
   const rows = state.credentialItems.map((sourceRow, index) => {
     const row = sourceRow;
-    const widthCm = toDecimalNumber(row.widthCm);
-    const heightCm = toDecimalNumber(row.heightCm);
-    const quantity = toWholeNumber(row.quantity);
+    const widthInput = typeof row.widthCm === "string" ? row.widthCm : String(row.widthCm ?? "");
+    const heightInput = typeof row.heightCm === "string" ? row.heightCm : String(row.heightCm ?? "");
+    const quantityInput = typeof row.quantity === "string" ? row.quantity : String(row.quantity ?? "");
+    const widthCm = toDecimalNumber(widthInput);
+    const heightCm = toDecimalNumber(heightInput);
+    const quantity = toWholeNumber(quantityInput);
     const active = isCredentialRowActive(row);
     const material = getCredentialMaterialConfig(row.materialType);
     const lanyard = getCredentialLanyardSelection(config, row.lanyardType, quantity);
@@ -2915,9 +2912,12 @@ function calculateCredentialWorkbook(state, config) {
       ...row,
       active,
       valid: false,
+      widthCm: widthInput,
+      heightCm: heightInput,
+      quantity: quantityInput,
       widthCm,
       heightCm,
-      quantity,
+      quantityValue: quantity,
       materialType: material.label,
       materialLabel: material.label,
       printMode,
@@ -2951,7 +2951,7 @@ function calculateCredentialWorkbook(state, config) {
     if (widthCm <= 0 || heightCm <= 0 || quantity <= 0) {
       return {
         ...baseRow,
-        warning: `Credencial ${index + 1}: preencha largura, altura e quantidade maiores que zero. Leitura interna: largura ${formatMeasure(widthCm)}, altura ${formatMeasure(heightCm)}, quantidade ${formatInteger(quantity)}.`,
+        warning: `Credencial ${index + 1}: preencha largura, altura e quantidade maiores que zero.`,
       };
     }
 
@@ -3040,7 +3040,7 @@ function calculateCredentialWorkbook(state, config) {
   });
 
   const activeRows = rows.filter((row) => row.active && row.valid);
-  const totalQuantity = activeRows.reduce((sum, row) => sum + row.quantity, 0);
+  const totalQuantity = activeRows.reduce((sum, row) => sum + row.quantityValue, 0);
   const totalGeneral = activeRows.reduce((sum, row) => sum + row.total, 0);
 
   return {
@@ -5889,7 +5889,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       sourceIndex: index,
       kind: "Credencial",
       description: row.description || "Credencial",
-      detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthCm)} x ${formatMeasure(row.heightCm)} cm | ${row.materialLabel} | ${row.printMode}${row.lamination === "Com laminação" ? " | Com laminação" : ""}${row.lanyardType !== "none" ? ` | ${row.lanyardLabel}` : ""}`,
+      detail: `${formatInteger(row.quantityValue)} unidades | ${formatMeasure(row.widthCm)} x ${formatMeasure(row.heightCm)} cm | ${row.materialLabel} | ${row.printMode}${row.lamination === "Com laminação" ? " | Com laminação" : ""}${row.lanyardType !== "none" ? ` | ${row.lanyardLabel}` : ""}`,
       extraDetail: row.itemsPerSheet > 0 ? `${formatInteger(row.itemsPerSheet)} por A4 | ${formatInteger(row.sheetsNeeded)} folha(s) A4` : `Área total: ${formatAreaM2(row.areaM2)} m²`,
       artDetail: formatArtCreationDetail(row),
       discountDetail: row.discountDescription,
@@ -6112,7 +6112,7 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
       text: `- ${row.description || `Impresso ${index + 1}`} | ${row.quantity} unidades | ${getColorPrintDisplaySize(row)} | ${row.paperType} | ${row.printMode}${row.colorExtrasSummary ? ` | ${row.colorExtrasSummary}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...credentialWorkbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || `Credencial ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthCm)} x ${formatMeasure(row.heightCm)} cm | ${row.materialLabel} | ${row.printMode}${row.lamination === "Com laminação" ? " | Com laminação" : ""}${row.lanyardType !== "none" ? ` | ${row.lanyardLabel}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
+      text: `- ${row.description || `Credencial ${index + 1}`} | ${row.quantityValue} unidades | ${formatMeasure(row.widthCm)} x ${formatMeasure(row.heightCm)} cm | ${row.materialLabel} | ${row.printMode}${row.lamination === "Com laminação" ? " | Com laminação" : ""}${row.lanyardType !== "none" ? ` | ${row.lanyardLabel}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...readyWorkbook.activeRows.map((row, index) => ({
       text: `- ${row.description || `Produto pronto ${index + 1}`} | ${row.quantity} unidades | ${row.productLabel}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
@@ -6911,7 +6911,6 @@ async function initApp() {
   }
 
   function renderRowsAndSummary() {
-    syncCredentialRowsFromDom();
     const workbook = calculateWorkbook(state, config);
     const colorWorkbook = calculateColorPrintWorkbook(state, config);
     const credentialWorkbook = calculateCredentialWorkbook(state, config);
@@ -7070,9 +7069,9 @@ async function initApp() {
                 </button>
               </div>
             </td>
-            <td><input class="cell-input" name="widthCm" type="text" inputmode="decimal" value="${escapeHtml(row.widthCmInput ?? row.widthCm)}" placeholder="0,0"></td>
-            <td><input class="cell-input" name="heightCm" type="text" inputmode="decimal" value="${escapeHtml(row.heightCmInput ?? row.heightCm)}" placeholder="0,0"></td>
-            <td><input class="cell-input" name="quantity" type="text" inputmode="numeric" value="${escapeHtml(row.quantityInput ?? row.quantity)}" placeholder="0"></td>
+            <td><input class="cell-input" name="widthCm" type="text" inputmode="decimal" value="${escapeHtml(row.widthCm)}" placeholder="0,0"></td>
+            <td><input class="cell-input" name="heightCm" type="text" inputmode="decimal" value="${escapeHtml(row.heightCm)}" placeholder="0,0"></td>
+            <td><input class="cell-input" name="quantity" type="text" inputmode="numeric" value="${escapeHtml(row.quantity)}" placeholder="0"></td>
             <td><span class="readonly-value subtle">${formatAreaM2(row.areaM2)}</span></td>
             <td><span class="readonly-value subtle">${row.itemsPerSheet > 0 ? formatInteger(row.itemsPerSheet) : "-"}</span></td>
             <td><span class="readonly-value subtle">${row.sheetsNeeded > 0 ? formatInteger(row.sheetsNeeded) : "-"}</span></td>
@@ -8579,12 +8578,10 @@ async function initApp() {
       row.printMode = normalizeOptionValue(target.value, OPTIONS.printModes, row.printMode || "Só frente");
     } else if (field === "lamination") {
       row.lamination = normalizeOptionValue(target.value, OPTIONS.credentialLamination, row.lamination || "Sem laminação");
-    } else if (field === "widthCm" || field === "heightCm") {
-      row[`${field}Input`] = target.value;
-      row[field] = toDecimalNumber(target.value);
     } else if (field === "quantity") {
-      row.quantityInput = target.value;
-      row[field] = toWholeNumber(target.value);
+      row[field] = target.value;
+    } else if (field === "widthCm" || field === "heightCm") {
+      row[field] = target.value;
     } else if (field === "artCreationFee" || field === "discountValue") {
       row[field] = toMoneyNumber(target.value);
     } else if (field === "discountType") {
@@ -8597,71 +8594,6 @@ async function initApp() {
       renderRowsAndSummary();
     }
     return true;
-  }
-
-  function syncCredentialRowFromDom(rowElement) {
-    if (!(rowElement instanceof HTMLTableRowElement)) {
-      return false;
-    }
-
-    const rowIndex = Number(rowElement.dataset.credentialRowIndex);
-    const row = state.credentialItems[rowIndex];
-    if (!row) {
-      return false;
-    }
-
-    const descriptionInput = rowElement.querySelector('input[name="description"]');
-    const materialSelect = rowElement.querySelector('select[name="materialType"]');
-    const printModeSelect = rowElement.querySelector('select[name="printMode"]');
-    const laminationSelect = rowElement.querySelector('select[name="lamination"]');
-    const widthInput = rowElement.querySelector('input[name="widthCm"]');
-    const heightInput = rowElement.querySelector('input[name="heightCm"]');
-    const quantityInput = rowElement.querySelector('input[name="quantity"]');
-    const artCreationFeeInput = rowElement.querySelector('input[name="artCreationFee"]');
-    const discountTypeSelect = rowElement.querySelector('select[name="discountType"]');
-    const discountValueInput = rowElement.querySelector('input[name="discountValue"]');
-
-    if (descriptionInput instanceof HTMLInputElement) {
-      row.description = descriptionInput.value;
-    }
-    if (materialSelect instanceof HTMLSelectElement) {
-      row.materialType = normalizeOptionValue(materialSelect.value, OPTIONS.credentialMaterials, row.materialType || "Couche 250g");
-    }
-    if (printModeSelect instanceof HTMLSelectElement) {
-      row.printMode = normalizeOptionValue(printModeSelect.value, OPTIONS.printModes, row.printMode || "Só frente");
-    }
-    if (laminationSelect instanceof HTMLSelectElement) {
-      row.lamination = normalizeOptionValue(laminationSelect.value, OPTIONS.credentialLamination, row.lamination || "Sem laminação");
-    }
-    if (widthInput instanceof HTMLInputElement) {
-      row.widthCmInput = widthInput.value;
-      row.widthCm = toDecimalNumber(widthInput.value);
-    }
-    if (heightInput instanceof HTMLInputElement) {
-      row.heightCmInput = heightInput.value;
-      row.heightCm = toDecimalNumber(heightInput.value);
-    }
-    if (quantityInput instanceof HTMLInputElement) {
-      row.quantityInput = quantityInput.value;
-      row.quantity = toWholeNumber(quantityInput.value);
-    }
-    if (artCreationFeeInput instanceof HTMLInputElement) {
-      row.artCreationFee = toMoneyNumber(artCreationFeeInput.value);
-    }
-    if (discountTypeSelect instanceof HTMLSelectElement) {
-      row.discountType = normalizeDiscountType(discountTypeSelect.value);
-    }
-    if (discountValueInput instanceof HTMLInputElement) {
-      row.discountValue = toMoneyNumber(discountValueInput.value);
-    }
-
-    return true;
-  }
-
-  function syncCredentialRowsFromDom() {
-    credentialRowsTableBody.querySelectorAll("tr[data-credential-row-index]").forEach((rowElement) => {
-      syncCredentialRowFromDom(rowElement);
-    });
   }
 
   function rerenderCredentialRowsPreservingFocus(target) {
@@ -8700,12 +8632,7 @@ async function initApp() {
     if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) {
       return;
     }
-    const rowElement = target.closest("tr[data-credential-row-index]");
-    if (rowElement instanceof HTMLTableRowElement) {
-      syncCredentialRowFromDom(rowElement);
-    } else {
-      updateCredentialRowField(target, { rerender: false });
-    }
+    updateCredentialRowField(target, { rerender: false });
     if (preserveFocus && target instanceof HTMLInputElement) {
       rerenderCredentialRowsPreservingFocus(target);
       return;
@@ -8722,22 +8649,6 @@ async function initApp() {
   });
 
   credentialRowsTableBody.addEventListener("change", (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) {
-      return;
-    }
-    refreshCredentialTableFromDom(target);
-  });
-
-  credentialRowsTableBody.addEventListener("keyup", (event) => {
-    const target = event.target;
-    if (!isCredentialEditableField(target)) {
-      return;
-    }
-    refreshCredentialTableFromDom(target, { preserveFocus: true });
-  });
-
-  credentialRowsTableBody.addEventListener("focusout", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) {
       return;
