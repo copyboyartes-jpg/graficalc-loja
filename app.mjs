@@ -2977,7 +2977,7 @@ function calculateCredentialWorkbook(state, config) {
     if (widthCm <= 0 || heightCm <= 0 || quantity <= 0) {
       return {
         ...baseRow,
-        warning: `Credencial ${index + 1}: preencha largura, altura e quantidade maiores que zero.`,
+        warning: `Credencial ${index + 1}: preencha largura, altura e quantidade maiores que zero. Leitura interna: largura ${formatMeasure(widthCm)}, altura ${formatMeasure(heightCm)}, quantidade ${formatInteger(quantity)}.`,
       };
     }
 
