@@ -6904,7 +6904,6 @@ async function initApp() {
   }
 
   function renderRowsAndSummary() {
-    syncCredentialRowsFromDom();
     const workbook = calculateWorkbook(state, config);
     const colorWorkbook = calculateColorPrintWorkbook(state, config);
     const credentialWorkbook = calculateCredentialWorkbook(state, config);
@@ -8545,106 +8544,8 @@ async function initApp() {
     renderRowsAndSummary();
   });
 
-  function getFormControlValue(rowElement, selector) {
-    const control = rowElement.querySelector(selector);
-    if (control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement) {
-      return control.value;
-    }
-    return null;
-  }
-
   function normalizeOptionValue(value, options, fallback) {
     return options.includes(value) ? value : fallback;
-  }
-
-  function syncCredentialRowFromElement(rowElement) {
-    const row = state.credentialItems[Number(rowElement.dataset.credentialRowIndex)];
-    if (!row) {
-      return false;
-    }
-
-    const before = JSON.stringify({
-      description: row.description,
-      materialType: row.materialType,
-      printMode: row.printMode,
-      lamination: row.lamination,
-      lanyardType: row.lanyardType,
-      widthCm: row.widthCm,
-      heightCm: row.heightCm,
-      quantity: row.quantity,
-      artCreationFee: row.artCreationFee,
-      discountType: row.discountType,
-      discountValue: row.discountValue,
-    });
-
-    const descriptionValue = getFormControlValue(rowElement, 'input[name="description"]');
-    const materialTypeValue = getFormControlValue(rowElement, 'select[name="materialType"]');
-    const printModeValue = getFormControlValue(rowElement, 'select[name="printMode"]');
-    const laminationValue = getFormControlValue(rowElement, 'select[name="lamination"]');
-    const widthValue = getFormControlValue(rowElement, 'input[name="widthCm"]');
-    const heightValue = getFormControlValue(rowElement, 'input[name="heightCm"]');
-    const quantityValue = getFormControlValue(rowElement, 'input[name="quantity"]');
-    const artCreationValue = getFormControlValue(rowElement, 'input[name="artCreationFee"]');
-    const discountTypeValue = getFormControlValue(rowElement, 'select[name="discountType"]');
-    const discountValue = getFormControlValue(rowElement, 'input[name="discountValue"]');
-
-    if (descriptionValue !== null) {
-      row.description = descriptionValue;
-    }
-    if (materialTypeValue !== null) {
-      row.materialType = normalizeOptionValue(materialTypeValue, OPTIONS.credentialMaterials, row.materialType || "Couche 250g");
-    }
-    if (printModeValue !== null) {
-      row.printMode = normalizeOptionValue(printModeValue, OPTIONS.printModes, row.printMode || "Só frente");
-    }
-    if (laminationValue !== null) {
-      row.lamination = normalizeOptionValue(laminationValue, OPTIONS.credentialLamination, row.lamination || "Sem laminação");
-    }
-    if (widthValue !== null) {
-      row.widthCm = toDecimalNumber(widthValue);
-    }
-    if (heightValue !== null) {
-      row.heightCm = toDecimalNumber(heightValue);
-    }
-    if (quantityValue !== null) {
-      row.quantity = toWholeNumber(quantityValue);
-    }
-    if (artCreationValue !== null) {
-      row.artCreationFee = toMoneyNumber(artCreationValue);
-    }
-    if (discountTypeValue !== null) {
-      row.discountType = normalizeDiscountType(discountTypeValue);
-    }
-    if (discountValue !== null) {
-      row.discountValue = toMoneyNumber(discountValue);
-    }
-
-    const after = JSON.stringify({
-      description: row.description,
-      materialType: row.materialType,
-      printMode: row.printMode,
-      lamination: row.lamination,
-      lanyardType: row.lanyardType,
-      widthCm: row.widthCm,
-      heightCm: row.heightCm,
-      quantity: row.quantity,
-      artCreationFee: row.artCreationFee,
-      discountType: row.discountType,
-      discountValue: row.discountValue,
-    });
-
-    return before !== after;
-  }
-
-  function syncCredentialRowsFromDom() {
-    if (!credentialRowsTableBody) {
-      return false;
-    }
-    let changed = false;
-    credentialRowsTableBody.querySelectorAll("tr[data-credential-row-index]").forEach((rowElement) => {
-      changed = syncCredentialRowFromElement(rowElement) || changed;
-    });
-    return changed;
   }
 
   function updateCredentialRowField(target, options = {}) {
@@ -8662,9 +8563,23 @@ async function initApp() {
       return false;
     }
 
-    syncCredentialRowFromElement(rowElement);
-
-    if (!["description", "materialType", "printMode", "lamination", "widthCm", "heightCm", "quantity", "artCreationFee", "discountType", "discountValue"].includes(field)) {
+    if (field === "description") {
+      row.description = target.value;
+    } else if (field === "materialType") {
+      row.materialType = normalizeOptionValue(target.value, OPTIONS.credentialMaterials, row.materialType || "Couche 250g");
+    } else if (field === "printMode") {
+      row.printMode = normalizeOptionValue(target.value, OPTIONS.printModes, row.printMode || "Só frente");
+    } else if (field === "lamination") {
+      row.lamination = normalizeOptionValue(target.value, OPTIONS.credentialLamination, row.lamination || "Sem laminação");
+    } else if (field === "widthCm" || field === "heightCm") {
+      row[field] = toDecimalNumber(target.value);
+    } else if (field === "quantity") {
+      row[field] = toWholeNumber(target.value);
+    } else if (field === "artCreationFee" || field === "discountValue") {
+      row[field] = toMoneyNumber(target.value);
+    } else if (field === "discountType") {
+      row[field] = normalizeDiscountType(target.value);
+    } else {
       row[field] = target.value;
     }
     persistLocalOnly();
@@ -9814,10 +9729,7 @@ async function initApp() {
   });
 
   const refreshCredentialRowsFromBrowserRestore = () => {
-    if (syncCredentialRowsFromDom()) {
-      persistLocalOnly();
-      renderRowsAndSummary();
-    }
+    renderRowsAndSummary();
   };
 
   renderAll();
