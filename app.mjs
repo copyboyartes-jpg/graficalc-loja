@@ -7087,6 +7087,33 @@ async function initApp() {
         `
       )
       .join("");
+    credentialRowsTableBody
+      .querySelectorAll("input, select, textarea")
+      .forEach((field) => {
+        if (!(field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement)) {
+          return;
+        }
+        if (field.dataset.credentialBound === "true") {
+          return;
+        }
+        field.dataset.credentialBound = "true";
+        field.addEventListener("input", () => {
+          if (isCredentialEditableField(field)) {
+            refreshCredentialTableFromDom(field, { preserveFocus: true });
+          }
+        });
+        field.addEventListener("change", () => {
+          refreshCredentialTableFromDom(field);
+        });
+        field.addEventListener("blur", () => {
+          refreshCredentialTableFromDom(field);
+        });
+        field.addEventListener("keyup", () => {
+          if (isCredentialEditableField(field)) {
+            refreshCredentialTableFromDom(field, { preserveFocus: true });
+          }
+        });
+      });
 
     warningList.innerHTML = workbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("");
     colorWarningList.innerHTML = colorWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("");
