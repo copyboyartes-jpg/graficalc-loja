@@ -1070,6 +1070,9 @@ function createDefaultCredentialRow(index) {
     printMode: "Só frente",
     lamination: "Sem laminação",
     lanyardType: "none",
+    widthCmInput: "",
+    heightCmInput: "",
+    quantityInput: "",
     widthCm: 0,
     heightCm: 0,
     quantity: 0,
@@ -1759,6 +1762,9 @@ function mergeState(candidate) {
     state.credentialItems = candidate.credentialItems.map((row, index) => ({
       ...createDefaultCredentialRow(index),
       ...row,
+      widthCmInput: typeof row?.widthCmInput === "string" ? row.widthCmInput : String(row?.widthCm ?? ""),
+      heightCmInput: typeof row?.heightCmInput === "string" ? row.heightCmInput : String(row?.heightCm ?? ""),
+      quantityInput: typeof row?.quantityInput === "string" ? row.quantityInput : String(row?.quantity ?? ""),
       widthCm: toDecimalNumber(row?.widthCm),
       heightCm: toDecimalNumber(row?.heightCm),
       quantity: toWholeNumber(row?.quantity),
@@ -2884,18 +2890,6 @@ function getCredentialMinimumBand(pricing) {
   return pricing.find((tier) => String(tier.label || "").toLowerCase().includes("valor minimo")) || null;
 }
 
-const credentialDraftFieldValues = new Map();
-
-function setCredentialDraftFieldValue(index, field, value) {
-  const key = `${index}:${field}`;
-  credentialDraftFieldValues.set(key, value);
-}
-
-function getCredentialDraftFieldValue(index, field, fallbackValue = "") {
-  const key = `${index}:${field}`;
-  return credentialDraftFieldValues.has(key) ? credentialDraftFieldValues.get(key) : fallbackValue;
-}
-
 function getCredentialRowSnapshotFromDom(index, fallbackRow) {
   if (typeof document === "undefined") {
     return fallbackRow;
@@ -2922,15 +2916,18 @@ function getCredentialRowSnapshotFromDom(index, fallbackRow) {
     materialType: readValue('select[name="materialType"]', fallbackRow.materialType || "Couche 250g"),
     printMode: readValue('select[name="printMode"]', fallbackRow.printMode || "Só frente"),
     lamination: readValue('select[name="lamination"]', fallbackRow.lamination || "Sem laminação"),
-    widthCm: getCredentialDraftFieldValue(index, "widthCm", readValue('input[name="widthCm"]', fallbackRow.widthCm)),
-    heightCm: getCredentialDraftFieldValue(index, "heightCm", readValue('input[name="heightCm"]', fallbackRow.heightCm)),
-    quantity: getCredentialDraftFieldValue(
-      index,
-      "quantity",
+    widthCmInput: readValue('input[name="widthCm"]', fallbackRow.widthCmInput ?? fallbackRow.widthCm),
+    heightCmInput: readValue('input[name="heightCm"]', fallbackRow.heightCmInput ?? fallbackRow.heightCm),
+    quantityInput:
       quantityInputByPosition instanceof HTMLInputElement
         ? quantityInputByPosition.value
-        : readValue('input[name="quantity"]', fallbackRow.quantity)
-    ),
+        : readValue('input[name="quantity"]', fallbackRow.quantityInput ?? fallbackRow.quantity),
+    widthCm: readValue('input[name="widthCm"]', fallbackRow.widthCmInput ?? fallbackRow.widthCm),
+    heightCm: readValue('input[name="heightCm"]', fallbackRow.heightCmInput ?? fallbackRow.heightCm),
+    quantity:
+      quantityInputByPosition instanceof HTMLInputElement
+        ? quantityInputByPosition.value
+        : readValue('input[name="quantity"]', fallbackRow.quantityInput ?? fallbackRow.quantity),
     artCreationFee: readValue('input[name="artCreationFee"]', fallbackRow.artCreationFee),
     discountType: readValue('select[name="discountType"]', fallbackRow.discountType || "R$"),
     discountValue: readValue('input[name="discountValue"]', fallbackRow.discountValue),
@@ -6995,14 +6992,17 @@ async function initApp() {
       }
       if (widthInput instanceof HTMLInputElement) {
         setCredentialDraftFieldValue(rowIndex, "widthCm", widthInput.value);
+        row.widthCmInput = widthInput.value;
         row.widthCm = toDecimalNumber(widthInput.value);
       }
       if (heightInput instanceof HTMLInputElement) {
         setCredentialDraftFieldValue(rowIndex, "heightCm", heightInput.value);
+        row.heightCmInput = heightInput.value;
         row.heightCm = toDecimalNumber(heightInput.value);
       }
       if (quantityInput instanceof HTMLInputElement) {
         setCredentialDraftFieldValue(rowIndex, "quantity", quantityInput.value);
+        row.quantityInput = quantityInput.value;
         row.quantity = toWholeNumber(quantityInput.value);
       }
       if (artCreationInput instanceof HTMLInputElement) {
@@ -7177,9 +7177,9 @@ async function initApp() {
                 </button>
               </div>
             </td>
-            <td><input class="cell-input" name="widthCm" type="text" inputmode="decimal" value="${escapeHtml(row.widthCm)}" placeholder="0,0"></td>
-            <td><input class="cell-input" name="heightCm" type="text" inputmode="decimal" value="${escapeHtml(row.heightCm)}" placeholder="0,0"></td>
-            <td><input class="cell-input" name="quantity" type="text" inputmode="numeric" value="${escapeHtml(row.quantity)}" placeholder="0"></td>
+            <td><input class="cell-input" name="widthCm" type="text" inputmode="decimal" value="${escapeHtml(row.widthCmInput ?? row.widthCm)}" placeholder="0,0"></td>
+            <td><input class="cell-input" name="heightCm" type="text" inputmode="decimal" value="${escapeHtml(row.heightCmInput ?? row.heightCm)}" placeholder="0,0"></td>
+            <td><input class="cell-input" name="quantity" type="text" inputmode="numeric" value="${escapeHtml(row.quantityInput ?? row.quantity)}" placeholder="0"></td>
             <td><span class="readonly-value subtle">${formatAreaM2(row.areaM2)}</span></td>
             <td><span class="readonly-value subtle">${row.itemsPerSheet > 0 ? formatInteger(row.itemsPerSheet) : "-"}</span></td>
             <td><span class="readonly-value subtle">${row.sheetsNeeded > 0 ? formatInteger(row.sheetsNeeded) : "-"}</span></td>
@@ -8687,8 +8687,10 @@ async function initApp() {
     } else if (field === "lamination") {
       row.lamination = normalizeOptionValue(target.value, OPTIONS.credentialLamination, row.lamination || "Sem laminação");
     } else if (field === "widthCm" || field === "heightCm") {
+      row[`${field}Input`] = target.value;
       row[field] = toDecimalNumber(target.value);
     } else if (field === "quantity") {
+      row.quantityInput = target.value;
       row[field] = toWholeNumber(target.value);
     } else if (field === "artCreationFee" || field === "discountValue") {
       row[field] = toMoneyNumber(target.value);
