@@ -2890,56 +2890,12 @@ function getCredentialMinimumBand(pricing) {
   return pricing.find((tier) => String(tier.label || "").toLowerCase().includes("valor minimo")) || null;
 }
 
-function getCredentialRowSnapshotFromDom(index, fallbackRow) {
-  if (typeof document === "undefined") {
-    return fallbackRow;
-  }
-
-  const rowElement = document.querySelector(`#credential-rows-table-body tr[data-credential-row-index="${index}"]`);
-  if (!(rowElement instanceof HTMLTableRowElement)) {
-    return fallbackRow;
-  }
-
-  const readValue = (selector, fallbackValue = "") => {
-    const element = rowElement.querySelector(selector);
-    return element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement
-      ? element.value
-      : fallbackValue;
-  };
-
-  const quantityCell = rowElement.children[8];
-  const quantityInputByPosition = quantityCell?.querySelector("input");
-
-  return {
-    ...fallbackRow,
-    description: readValue('input[name="description"]', fallbackRow.description || ""),
-    materialType: readValue('select[name="materialType"]', fallbackRow.materialType || "Couche 250g"),
-    printMode: readValue('select[name="printMode"]', fallbackRow.printMode || "Só frente"),
-    lamination: readValue('select[name="lamination"]', fallbackRow.lamination || "Sem laminação"),
-    widthCmInput: readValue('input[name="widthCm"]', fallbackRow.widthCmInput ?? fallbackRow.widthCm),
-    heightCmInput: readValue('input[name="heightCm"]', fallbackRow.heightCmInput ?? fallbackRow.heightCm),
-    quantityInput:
-      quantityInputByPosition instanceof HTMLInputElement
-        ? quantityInputByPosition.value
-        : readValue('input[name="quantity"]', fallbackRow.quantityInput ?? fallbackRow.quantity),
-    widthCm: readValue('input[name="widthCm"]', fallbackRow.widthCmInput ?? fallbackRow.widthCm),
-    heightCm: readValue('input[name="heightCm"]', fallbackRow.heightCmInput ?? fallbackRow.heightCm),
-    quantity:
-      quantityInputByPosition instanceof HTMLInputElement
-        ? quantityInputByPosition.value
-        : readValue('input[name="quantity"]', fallbackRow.quantityInput ?? fallbackRow.quantity),
-    artCreationFee: readValue('input[name="artCreationFee"]', fallbackRow.artCreationFee),
-    discountType: readValue('select[name="discountType"]', fallbackRow.discountType || "R$"),
-    discountValue: readValue('input[name="discountValue"]', fallbackRow.discountValue),
-  };
-}
-
 function calculateCredentialWorkbook(state, config) {
   const warnings = [];
   const laminationPricePerM2 = getCredentialLaminationPrice(config);
 
   const rows = state.credentialItems.map((sourceRow, index) => {
-    const row = getCredentialRowSnapshotFromDom(index, sourceRow);
+    const row = sourceRow;
     const widthCm = toDecimalNumber(row.widthCm);
     const heightCm = toDecimalNumber(row.heightCm);
     const quantity = toWholeNumber(row.quantity);
@@ -6954,71 +6910,7 @@ async function initApp() {
       : `<div class="empty-state"><strong>Nenhum orçamento salvo ainda</strong><span>Salve um fechamento para manter um histórico rápido de clientes, valores e resumos recentes.</span></div>`;
   }
 
-  function syncCredentialRowsFromDom() {
-    if (!credentialRowsTableBody) {
-      return;
-    }
-
-    const rowElements = credentialRowsTableBody.querySelectorAll("tr[data-credential-row-index]");
-    rowElements.forEach((rowElement) => {
-      const rowIndex = Number(rowElement.getAttribute("data-credential-row-index"));
-      const row = state.credentialItems[rowIndex];
-      if (!row) {
-        return;
-      }
-
-      const descriptionInput = rowElement.querySelector('input[name="description"]');
-      const materialSelect = rowElement.querySelector('select[name="materialType"]');
-      const printModeSelect = rowElement.querySelector('select[name="printMode"]');
-      const laminationSelect = rowElement.querySelector('select[name="lamination"]');
-      const widthInput = rowElement.querySelector('input[name="widthCm"]');
-      const heightInput = rowElement.querySelector('input[name="heightCm"]');
-      const quantityInput = rowElement.querySelector('input[name="quantity"]');
-      const artCreationInput = rowElement.querySelector('input[name="artCreationFee"]');
-      const discountTypeSelect = rowElement.querySelector('select[name="discountType"]');
-      const discountValueInput = rowElement.querySelector('input[name="discountValue"]');
-
-      if (descriptionInput instanceof HTMLInputElement) {
-        row.description = descriptionInput.value;
-      }
-      if (materialSelect instanceof HTMLSelectElement) {
-        row.materialType = normalizeOptionValue(materialSelect.value, OPTIONS.credentialMaterials, row.materialType || "Couche 250g");
-      }
-      if (printModeSelect instanceof HTMLSelectElement) {
-        row.printMode = normalizeOptionValue(printModeSelect.value, OPTIONS.printModes, row.printMode || "Só frente");
-      }
-      if (laminationSelect instanceof HTMLSelectElement) {
-        row.lamination = normalizeOptionValue(laminationSelect.value, OPTIONS.credentialLamination, row.lamination || "Sem laminação");
-      }
-      if (widthInput instanceof HTMLInputElement) {
-        setCredentialDraftFieldValue(rowIndex, "widthCm", widthInput.value);
-        row.widthCmInput = widthInput.value;
-        row.widthCm = toDecimalNumber(widthInput.value);
-      }
-      if (heightInput instanceof HTMLInputElement) {
-        setCredentialDraftFieldValue(rowIndex, "heightCm", heightInput.value);
-        row.heightCmInput = heightInput.value;
-        row.heightCm = toDecimalNumber(heightInput.value);
-      }
-      if (quantityInput instanceof HTMLInputElement) {
-        setCredentialDraftFieldValue(rowIndex, "quantity", quantityInput.value);
-        row.quantityInput = quantityInput.value;
-        row.quantity = toWholeNumber(quantityInput.value);
-      }
-      if (artCreationInput instanceof HTMLInputElement) {
-        row.artCreationFee = toMoneyNumber(artCreationInput.value);
-      }
-      if (discountTypeSelect instanceof HTMLSelectElement) {
-        row.discountType = normalizeDiscountType(discountTypeSelect.value);
-      }
-      if (discountValueInput instanceof HTMLInputElement) {
-        row.discountValue = toMoneyNumber(discountValueInput.value);
-      }
-    });
-  }
-
   function renderRowsAndSummary() {
-    syncCredentialRowsFromDom();
     const workbook = calculateWorkbook(state, config);
     const colorWorkbook = calculateColorPrintWorkbook(state, config);
     const credentialWorkbook = calculateCredentialWorkbook(state, config);
@@ -8742,13 +8634,7 @@ async function initApp() {
     if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) {
       return;
     }
-    const rowElement = target.closest("tr[data-credential-row-index]");
-    const rowIndex = Number(rowElement?.getAttribute("data-credential-row-index"));
-    if (Number.isInteger(rowIndex) && ["widthCm", "heightCm", "quantity"].includes(target.name)) {
-      setCredentialDraftFieldValue(rowIndex, target.name, target.value);
-    }
-    syncCredentialRowsFromDom();
-    persistLocalOnly();
+    updateCredentialRowField(target, { rerender: false });
     if (preserveFocus && target instanceof HTMLInputElement) {
       rerenderCredentialRowsPreservingFocus(target);
       return;
@@ -8772,24 +8658,6 @@ async function initApp() {
     refreshCredentialTableFromDom(target);
   });
 
-  credentialRowsTableBody.addEventListener("keyup", (event) => {
-    const target = event.target;
-    if (!isCredentialEditableField(target)) {
-      return;
-    }
-    refreshCredentialTableFromDom(target, { preserveFocus: true });
-  });
-
-  credentialRowsTableBody.addEventListener("focusout", (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) {
-      return;
-    }
-    if (!target.closest("tr[data-credential-row-index]")) {
-      return;
-    }
-    refreshCredentialTableFromDom(target);
-  });
 
   function updateReadyProductRowField(target, options = {}) {
     const { rerender = true } = options;
