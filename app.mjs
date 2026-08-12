@@ -8682,7 +8682,7 @@ async function initApp() {
     if (!["widthCm", "heightCm", "quantity", "artCreationFee", "discountValue", "description"].includes(target.name)) {
       return;
     }
-    updateCredentialRowField(target);
+    updateCredentialRowField(target, { rerender: false });
   });
 
   credentialRowsTableBody.addEventListener("change", (event) => {
