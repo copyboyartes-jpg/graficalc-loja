@@ -6911,6 +6911,7 @@ async function initApp() {
   }
 
   function renderRowsAndSummary() {
+    syncCredentialRowsFromDom();
     const workbook = calculateWorkbook(state, config);
     const colorWorkbook = calculateColorPrintWorkbook(state, config);
     const credentialWorkbook = calculateCredentialWorkbook(state, config);
@@ -8598,6 +8599,71 @@ async function initApp() {
     return true;
   }
 
+  function syncCredentialRowFromDom(rowElement) {
+    if (!(rowElement instanceof HTMLTableRowElement)) {
+      return false;
+    }
+
+    const rowIndex = Number(rowElement.dataset.credentialRowIndex);
+    const row = state.credentialItems[rowIndex];
+    if (!row) {
+      return false;
+    }
+
+    const descriptionInput = rowElement.querySelector('input[name="description"]');
+    const materialSelect = rowElement.querySelector('select[name="materialType"]');
+    const printModeSelect = rowElement.querySelector('select[name="printMode"]');
+    const laminationSelect = rowElement.querySelector('select[name="lamination"]');
+    const widthInput = rowElement.querySelector('input[name="widthCm"]');
+    const heightInput = rowElement.querySelector('input[name="heightCm"]');
+    const quantityInput = rowElement.querySelector('input[name="quantity"]');
+    const artCreationFeeInput = rowElement.querySelector('input[name="artCreationFee"]');
+    const discountTypeSelect = rowElement.querySelector('select[name="discountType"]');
+    const discountValueInput = rowElement.querySelector('input[name="discountValue"]');
+
+    if (descriptionInput instanceof HTMLInputElement) {
+      row.description = descriptionInput.value;
+    }
+    if (materialSelect instanceof HTMLSelectElement) {
+      row.materialType = normalizeOptionValue(materialSelect.value, OPTIONS.credentialMaterials, row.materialType || "Couche 250g");
+    }
+    if (printModeSelect instanceof HTMLSelectElement) {
+      row.printMode = normalizeOptionValue(printModeSelect.value, OPTIONS.printModes, row.printMode || "Só frente");
+    }
+    if (laminationSelect instanceof HTMLSelectElement) {
+      row.lamination = normalizeOptionValue(laminationSelect.value, OPTIONS.credentialLamination, row.lamination || "Sem laminação");
+    }
+    if (widthInput instanceof HTMLInputElement) {
+      row.widthCmInput = widthInput.value;
+      row.widthCm = toDecimalNumber(widthInput.value);
+    }
+    if (heightInput instanceof HTMLInputElement) {
+      row.heightCmInput = heightInput.value;
+      row.heightCm = toDecimalNumber(heightInput.value);
+    }
+    if (quantityInput instanceof HTMLInputElement) {
+      row.quantityInput = quantityInput.value;
+      row.quantity = toWholeNumber(quantityInput.value);
+    }
+    if (artCreationFeeInput instanceof HTMLInputElement) {
+      row.artCreationFee = toMoneyNumber(artCreationFeeInput.value);
+    }
+    if (discountTypeSelect instanceof HTMLSelectElement) {
+      row.discountType = normalizeDiscountType(discountTypeSelect.value);
+    }
+    if (discountValueInput instanceof HTMLInputElement) {
+      row.discountValue = toMoneyNumber(discountValueInput.value);
+    }
+
+    return true;
+  }
+
+  function syncCredentialRowsFromDom() {
+    credentialRowsTableBody.querySelectorAll("tr[data-credential-row-index]").forEach((rowElement) => {
+      syncCredentialRowFromDom(rowElement);
+    });
+  }
+
   function rerenderCredentialRowsPreservingFocus(target) {
     const rowElement = target.closest("tr[data-credential-row-index]");
     const rowIndex = rowElement?.dataset.credentialRowIndex || "";
@@ -8634,7 +8700,12 @@ async function initApp() {
     if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) {
       return;
     }
-    updateCredentialRowField(target, { rerender: false });
+    const rowElement = target.closest("tr[data-credential-row-index]");
+    if (rowElement instanceof HTMLTableRowElement) {
+      syncCredentialRowFromDom(rowElement);
+    } else {
+      updateCredentialRowField(target, { rerender: false });
+    }
     if (preserveFocus && target instanceof HTMLInputElement) {
       rerenderCredentialRowsPreservingFocus(target);
       return;
@@ -8651,6 +8722,22 @@ async function initApp() {
   });
 
   credentialRowsTableBody.addEventListener("change", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) {
+      return;
+    }
+    refreshCredentialTableFromDom(target);
+  });
+
+  credentialRowsTableBody.addEventListener("keyup", (event) => {
+    const target = event.target;
+    if (!isCredentialEditableField(target)) {
+      return;
+    }
+    refreshCredentialTableFromDom(target, { preserveFocus: true });
+  });
+
+  credentialRowsTableBody.addEventListener("focusout", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) {
       return;
