@@ -2901,6 +2901,9 @@ function getCredentialRowSnapshotFromDom(index, fallbackRow) {
       : fallbackValue;
   };
 
+  const quantityCell = rowElement.children[8];
+  const quantityInputByPosition = quantityCell?.querySelector("input");
+
   return {
     ...fallbackRow,
     description: readValue('input[name="description"]', fallbackRow.description || ""),
@@ -2909,7 +2912,10 @@ function getCredentialRowSnapshotFromDom(index, fallbackRow) {
     lamination: readValue('select[name="lamination"]', fallbackRow.lamination || "Sem laminação"),
     widthCm: readValue('input[name="widthCm"]', fallbackRow.widthCm),
     heightCm: readValue('input[name="heightCm"]', fallbackRow.heightCm),
-    quantity: readValue('input[name="quantity"]', fallbackRow.quantity),
+    quantity:
+      quantityInputByPosition instanceof HTMLInputElement
+        ? quantityInputByPosition.value
+        : readValue('input[name="quantity"]', fallbackRow.quantity),
     artCreationFee: readValue('input[name="artCreationFee"]', fallbackRow.artCreationFee),
     discountType: readValue('select[name="discountType"]', fallbackRow.discountType || "R$"),
     discountValue: readValue('input[name="discountValue"]', fallbackRow.discountValue),
