@@ -8589,6 +8589,32 @@ async function initApp() {
     return true;
   }
 
+  function rerenderCredentialRowsPreservingFocus(target) {
+    const rowElement = target.closest("tr[data-credential-row-index]");
+    const rowIndex = rowElement?.dataset.credentialRowIndex || "";
+    const fieldName = target.name || "";
+    const selectionStart = typeof target.selectionStart === "number" ? target.selectionStart : null;
+    const selectionEnd = typeof target.selectionEnd === "number" ? target.selectionEnd : null;
+
+    renderRowsAndSummary();
+
+    if (!rowIndex || !fieldName) {
+      return;
+    }
+
+    const nextTarget = credentialRowsTableBody.querySelector(
+      `tr[data-credential-row-index="${rowIndex}"] [name="${fieldName}"]`
+    );
+    if (!(nextTarget instanceof HTMLInputElement || nextTarget instanceof HTMLTextAreaElement)) {
+      return;
+    }
+
+    nextTarget.focus();
+    if (selectionStart !== null && selectionEnd !== null) {
+      nextTarget.setSelectionRange(selectionStart, selectionEnd);
+    }
+  }
+
   credentialRowsTableBody.addEventListener("input", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLInputElement)) {
@@ -8597,7 +8623,10 @@ async function initApp() {
     if (!["widthCm", "heightCm", "quantity", "artCreationFee", "discountValue", "description"].includes(target.name)) {
       return;
     }
-    updateCredentialRowField(target, { rerender: false });
+    if (!updateCredentialRowField(target, { rerender: false })) {
+      return;
+    }
+    rerenderCredentialRowsPreservingFocus(target);
   });
 
   credentialRowsTableBody.addEventListener("change", (event) => {
