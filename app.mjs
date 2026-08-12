@@ -8673,18 +8673,31 @@ async function initApp() {
     }
   }
 
+  function isCredentialEditableField(target) {
+    return target instanceof HTMLInputElement
+      && ["widthCm", "heightCm", "quantity", "artCreationFee", "discountValue", "description"].includes(target.name);
+  }
+
+  function refreshCredentialTableFromDom(target, options = {}) {
+    const { preserveFocus = false } = options;
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) {
+      return;
+    }
+    syncCredentialRowsFromDom();
+    persistLocalOnly();
+    if (preserveFocus && target instanceof HTMLInputElement) {
+      rerenderCredentialRowsPreservingFocus(target);
+      return;
+    }
+    renderRowsAndSummary();
+  }
+
   credentialRowsTableBody.addEventListener("input", (event) => {
     const target = event.target;
-    if (!(target instanceof HTMLInputElement)) {
+    if (!isCredentialEditableField(target)) {
       return;
     }
-    if (!["widthCm", "heightCm", "quantity", "artCreationFee", "discountValue", "description"].includes(target.name)) {
-      return;
-    }
-    if (!updateCredentialRowField(target, { rerender: false })) {
-      return;
-    }
-    rerenderCredentialRowsPreservingFocus(target);
+    refreshCredentialTableFromDom(target, { preserveFocus: true });
   });
 
   credentialRowsTableBody.addEventListener("change", (event) => {
@@ -8692,7 +8705,26 @@ async function initApp() {
     if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) {
       return;
     }
-    updateCredentialRowField(target);
+    refreshCredentialTableFromDom(target);
+  });
+
+  credentialRowsTableBody.addEventListener("keyup", (event) => {
+    const target = event.target;
+    if (!isCredentialEditableField(target)) {
+      return;
+    }
+    refreshCredentialTableFromDom(target, { preserveFocus: true });
+  });
+
+  credentialRowsTableBody.addEventListener("focusout", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) {
+      return;
+    }
+    if (!target.closest("tr[data-credential-row-index]")) {
+      return;
+    }
+    refreshCredentialTableFromDom(target);
   });
 
   function updateReadyProductRowField(target, options = {}) {
