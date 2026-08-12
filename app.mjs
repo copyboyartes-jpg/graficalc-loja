@@ -2884,11 +2884,44 @@ function getCredentialMinimumBand(pricing) {
   return pricing.find((tier) => String(tier.label || "").toLowerCase().includes("valor minimo")) || null;
 }
 
+function getCredentialRowSnapshotFromDom(index, fallbackRow) {
+  if (typeof document === "undefined") {
+    return fallbackRow;
+  }
+
+  const rowElement = document.querySelector(`#credential-rows-table-body tr[data-credential-row-index="${index}"]`);
+  if (!(rowElement instanceof HTMLTableRowElement)) {
+    return fallbackRow;
+  }
+
+  const readValue = (selector, fallbackValue = "") => {
+    const element = rowElement.querySelector(selector);
+    return element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement
+      ? element.value
+      : fallbackValue;
+  };
+
+  return {
+    ...fallbackRow,
+    description: readValue('input[name="description"]', fallbackRow.description || ""),
+    materialType: readValue('select[name="materialType"]', fallbackRow.materialType || "Couche 250g"),
+    printMode: readValue('select[name="printMode"]', fallbackRow.printMode || "Só frente"),
+    lamination: readValue('select[name="lamination"]', fallbackRow.lamination || "Sem laminação"),
+    widthCm: readValue('input[name="widthCm"]', fallbackRow.widthCm),
+    heightCm: readValue('input[name="heightCm"]', fallbackRow.heightCm),
+    quantity: readValue('input[name="quantity"]', fallbackRow.quantity),
+    artCreationFee: readValue('input[name="artCreationFee"]', fallbackRow.artCreationFee),
+    discountType: readValue('select[name="discountType"]', fallbackRow.discountType || "R$"),
+    discountValue: readValue('input[name="discountValue"]', fallbackRow.discountValue),
+  };
+}
+
 function calculateCredentialWorkbook(state, config) {
   const warnings = [];
   const laminationPricePerM2 = getCredentialLaminationPrice(config);
 
-  const rows = state.credentialItems.map((row, index) => {
+  const rows = state.credentialItems.map((sourceRow, index) => {
+    const row = getCredentialRowSnapshotFromDom(index, sourceRow);
     const widthCm = toDecimalNumber(row.widthCm);
     const heightCm = toDecimalNumber(row.heightCm);
     const quantity = toWholeNumber(row.quantity);
