@@ -2973,7 +2973,9 @@ function calculateCredentialWorkbook(state, config) {
 
       const sheetsNeeded = Math.ceil(quantity / fit.itemsPerSheet);
       const impressionsNeeded = sheetsNeeded * sides;
-      const pricingBandQuantity = quantity * sides;
+      // The color-print tier is priced by the requested credential quantity.
+      // Front and back doubles the impressions, not the quantity tier.
+      const pricingBandQuantity = quantity;
       const pricingKey = getColorPaperPricingKey(material.paperType);
       const pricing = config.colorPrintPricing?.[pricingKey] || [];
       const sheetPrice = lookupTier(pricing, pricingBandQuantity);
@@ -2994,7 +2996,7 @@ function calculateCredentialWorkbook(state, config) {
         lanyardTotal,
         artCreationFee,
         ...rowDiscount,
-        tierLabel: `${fit.itemsPerSheet} por A4 | faixa ${quantity * sides} impressões`,
+        tierLabel: `${fit.itemsPerSheet} por A4 | faixa ${quantity} credenciais`,
       };
     }
 
