@@ -197,7 +197,7 @@ const POLASEAL_SIZES = [
 ];
 const COLOR_EXTRA_OPTIONS = {
   holes: ["Sem furo", "Furo 6mm", "Furo 4mm"],
-  folds: ["Sem dobra", "Dobra"],
+  folds: ["Sem dobra", "1 dobra", "2 dobras"],
   lamination: [
     "Sem plastificação",
     "Com plastificação",
@@ -1747,7 +1747,9 @@ function mergeState(candidate) {
         ? ""
         : toMoneyNumber(row?.cutPriceOverride),
       holeOption: COLOR_EXTRA_OPTIONS.holes.includes(row?.holeOption) ? row.holeOption : "Sem furo",
-      foldOption: COLOR_EXTRA_OPTIONS.folds.includes(row?.foldOption) ? row.foldOption : "Sem dobra",
+      foldOption: row?.foldOption === "Dobra"
+        ? "1 dobra"
+        : COLOR_EXTRA_OPTIONS.folds.includes(row?.foldOption) ? row.foldOption : "Sem dobra",
       laminationOption: normalizeColorLaminationOption(row?.laminationOption),
       polasealSize: ["auto", ...POLASEAL_SIZES.map((sheet) => sheet.id)].includes(row?.polasealSize) ? row.polasealSize : "auto",
       artCreationFee: toMoneyNumber(row?.artCreationFee),
@@ -2510,7 +2512,8 @@ function calculateColorExtras(row, widthMm, heightMm, quantity, config) {
   const foldMinimum = Number(extras.folds?.[0]?.value || 10);
   const foldEachHundred = Number(extras.folds?.[1]?.value || 5);
   const holeTotal = row.holeOption && row.holeOption !== "Sem furo" ? calculateHundredExtra(quantity, holeMinimum, holeEachHundred) : 0;
-  const foldTotal = row.foldOption === "Dobra" ? calculateHundredExtra(quantity, foldMinimum, foldEachHundred) : 0;
+  const foldCount = row.foldOption === "2 dobras" ? 2 : row.foldOption === "1 dobra" ? 1 : 0;
+  const foldTotal = foldCount * calculateHundredExtra(quantity, foldMinimum, foldEachHundred);
   let laminationTotal = 0;
   const laminationFit = calculatePolasealFit(widthMm, heightMm, row.polasealSize);
   const normalizedLaminationOption = normalizeColorLaminationOption(row.laminationOption);
@@ -2534,7 +2537,7 @@ function calculateColorExtras(row, widthMm, heightMm, quantity, config) {
   const total = holeTotal + foldTotal + laminationTotal;
   const labels = [];
   if (holeTotal > 0) labels.push(`${row.holeOption}: ${formatCurrency(holeTotal)}`);
-  if (foldTotal > 0) labels.push(`Dobra: ${formatCurrency(foldTotal)}`);
+  if (foldTotal > 0) labels.push(`${row.foldOption}: ${formatCurrency(foldTotal)}`);
   if (laminationTotal > 0) labels.push(`${normalizedLaminationOption}: ${formatCurrency(laminationTotal)}`);
 
   return {
@@ -5457,7 +5460,7 @@ function getColorFinishSelectionCount(row) {
   let count = 0;
   if (row.cutPriceOverride !== "" && row.cutPriceOverride !== null && typeof row.cutPriceOverride !== "undefined") count += 1;
   if (row.holeOption && row.holeOption !== "Sem furo") count += 1;
-  if (row.foldOption === "Dobra") count += 1;
+  if (row.foldOption && row.foldOption !== "Sem dobra") count += 1;
   return count;
 }
 
@@ -7618,7 +7621,7 @@ async function initApp() {
           </div>
         </label>
         <label class="finish-picker-option">
-          <input type="checkbox" value="fold"${row.foldOption === "Dobra" ? " checked" : ""} data-color-finish-card>
+          <input type="checkbox" value="fold"${row.foldOption !== "Sem dobra" ? " checked" : ""} data-color-finish-card>
           <div class="finish-picker-option-body">
             <div class="finish-option-copy">
               <span class="finish-option-label">Dobra</span>
