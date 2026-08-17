@@ -2963,7 +2963,7 @@ function calculateCredentialWorkbook(state, config) {
         };
       }
 
-      const fit = getBestFitOnA4(widthMm, heightMm);
+      const fit = getBestFitOnSheet(A4_WIDTH_MM, A4_HEIGHT_MM, widthMm, heightMm);
       if (!fit.itemsPerSheet) {
         return {
           ...baseRow,
