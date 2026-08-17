@@ -2027,6 +2027,11 @@ function saveConfigViewMode(mode) {
   localStorage.setItem(STORAGE_KEYS.configView, mode === "advanced" ? "advanced" : "basic");
 }
 
+function normalizeConfigSection(section) {
+  const validSections = ["impressos", "credenciais", "produtos-prontos", "cartoes", "panfletos", "blocos-sulfite", "blocos-autocopiativo", "m2", "resinados", "metro-linear", "orcamento-livre"];
+  return validSections.includes(section) ? section : "calculo";
+}
+
 function loadConfigSection() {
   if (typeof localStorage === "undefined") {
     return "calculo";
@@ -2034,7 +2039,7 @@ function loadConfigSection() {
 
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.configSection);
-    return raw === "impressos" || raw === "credenciais" || raw === "produtos-prontos" || raw === "cartoes" || raw === "panfletos" || raw === "blocos-sulfite" || raw === "blocos-autocopiativo" || raw === "m2" || raw === "resinados" || raw === "orcamento-livre" ? raw : "calculo";
+    return normalizeConfigSection(raw);
   } catch {
     return "calculo";
   }
@@ -2044,7 +2049,7 @@ function saveConfigSection(section) {
   if (typeof localStorage === "undefined") {
     return;
   }
-  const safeSection = section === "impressos" || section === "credenciais" || section === "produtos-prontos" || section === "cartoes" || section === "panfletos" || section === "blocos-sulfite" || section === "blocos-autocopiativo" || section === "m2" || section === "resinados" || section === "orcamento-livre" ? section : "calculo";
+  const safeSection = normalizeConfigSection(section);
   localStorage.setItem(STORAGE_KEYS.configSection, safeSection);
 }
 
@@ -4719,7 +4724,38 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
     ),
   ];
 
-  const safeSection = activeSection === "impressos" || activeSection === "credenciais" || activeSection === "produtos-prontos" || activeSection === "cartoes" || activeSection === "panfletos" || activeSection === "blocos-sulfite" || activeSection === "blocos-autocopiativo" || activeSection === "m2" || activeSection === "resinados" || activeSection === "orcamento-livre" ? activeSection : "calculo";
+  const linearMeterCards = [
+    createConfigCardMarkup(
+      "Tabela de metro linear",
+      "Produtos, larguras e valores de referência usados na aba de Metro linear.",
+      `
+        <div class="table-shell">
+          <table class="config-table">
+            <thead><tr><th>Produto</th><th>Largura</th><th>Valor por metro</th><th>Valor mínimo</th></tr></thead>
+            <tbody>
+              ${LINEAR_METER_CATALOG.filter((product) => product.rate)
+                .map((product) => `
+                  <tr>
+                    <td>${escapeHtml(product.label)}</td>
+                    <td>${escapeHtml(product.widthLabel)}</td>
+                    <td>${formatCurrency(product.rate)}</td>
+                    <td>${formatCurrency(product.minimumOrder)}</td>
+                  </tr>
+                `)
+                .join("")}
+            </tbody>
+          </table>
+        </div>
+      `
+    ),
+    createConfigCardMarkup(
+      "DTF têxtil e DTF UV",
+      "As faixas dessas duas tabelas variam por prazo e metragem para calcular o orçamento corretamente.",
+      `<p class="helper-text">DTF têxtil: largura de 58 cm, com valores por prazo. DTF UV: largura de 28 cm, com tabelas padrão e urgente.</p>`
+    ),
+  ];
+
+  const safeSection = normalizeConfigSection(activeSection);
   const configGroups = {
     calculo: createConfigGroupMarkup(
       "calculo",
@@ -4773,6 +4809,13 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
       "Aba: Cálculo de m²",
       "Aqui ficam as faixas de preço, acabamentos e produtos extras do cálculo por área.",
       m2Cards,
+      safeSection
+    ),
+    "metro-linear": createConfigGroupMarkup(
+      "metro-linear",
+      "Aba: Metro linear",
+      "Consulte aqui a tabela usada para DTF, UV, canvas e papéis vendidos por metro.",
+      linearMeterCards,
       safeSection
     ),
     resinados: createConfigGroupMarkup(
@@ -6201,7 +6244,7 @@ async function initApp() {
   const config = loadFromStorage(STORAGE_KEYS.config, mergeConfig);
   let configViewMode = loadConfigViewMode();
   let activeConfigSection = loadConfigSection();
-  let lastConfigSourceTab = activeConfigSection === "impressos" || activeConfigSection === "credenciais" || activeConfigSection === "produtos-prontos" || activeConfigSection === "cartoes" || activeConfigSection === "panfletos" || activeConfigSection === "blocos-sulfite" || activeConfigSection === "blocos-autocopiativo" || activeConfigSection === "m2" || activeConfigSection === "resinados" || activeConfigSection === "metro-linear" || activeConfigSection === "orcamento-livre" ? activeConfigSection : "calculo";
+  let lastConfigSourceTab = normalizeConfigSection(activeConfigSection);
   let isConfigUnlocked = loadSessionFlag(SESSION_KEYS.configUnlocked);
   let sharedSyncTimer = null;
   let sharedSyncInFlight = false;
@@ -6618,7 +6661,7 @@ async function initApp() {
 
   function selectTab(tabName) {
     if (tabName === "configuracao") {
-      activeConfigSection = lastConfigSourceTab === "impressos" || lastConfigSourceTab === "credenciais" || lastConfigSourceTab === "produtos-prontos" || lastConfigSourceTab === "cartoes" || lastConfigSourceTab === "panfletos" || lastConfigSourceTab === "blocos-sulfite" || lastConfigSourceTab === "blocos-autocopiativo" || lastConfigSourceTab === "m2" || lastConfigSourceTab === "resinados" || lastConfigSourceTab === "metro-linear" || lastConfigSourceTab === "orcamento-livre" ? lastConfigSourceTab : "calculo";
+      activeConfigSection = normalizeConfigSection(lastConfigSourceTab);
       saveConfigSection(activeConfigSection);
       renderConfig();
       if (!isConfigUnlocked) {
@@ -9250,9 +9293,7 @@ async function initApp() {
 
     const sectionButton = event.target.closest("[data-config-section]");
     if (sectionButton) {
-      activeConfigSection = sectionButton.dataset.configSection === "impressos" || sectionButton.dataset.configSection === "credenciais" || sectionButton.dataset.configSection === "produtos-prontos" || sectionButton.dataset.configSection === "cartoes" || sectionButton.dataset.configSection === "panfletos" || sectionButton.dataset.configSection === "blocos-sulfite" || sectionButton.dataset.configSection === "blocos-autocopiativo" || sectionButton.dataset.configSection === "m2" || sectionButton.dataset.configSection === "resinados" || sectionButton.dataset.configSection === "orcamento-livre"
-        ? sectionButton.dataset.configSection
-        : "calculo";
+      activeConfigSection = normalizeConfigSection(sectionButton.dataset.configSection);
       saveConfigSection(activeConfigSection);
       renderConfig();
       setConfigStatus("Seção da configuração atualizada.", "success");
