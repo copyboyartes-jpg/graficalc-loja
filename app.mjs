@@ -8464,20 +8464,32 @@ async function initApp() {
     "bleedMm",
     "linearMeters",
   ]);
+  const zeroClearingFieldSelector = [
+    "#rows-table-body input",
+    "#color-rows-table-body input",
+    "#m2-rows-table-body input",
+    "#credential-rows-table-body input",
+    "#ready-rows-table-body input",
+    "#resin-rows-table-body input",
+    "#linear-meter-rows-table-body input",
+    "#free-quote-rows-table-body input",
+  ].join(", ");
 
-  document.addEventListener("focusin", (event) => {
-    const target = event.target;
+  const clearInitialZero = (target) => {
     if (!(target instanceof HTMLInputElement)
       || target.disabled
       || target.readOnly
-      || !target.closest(".budget-table")
+      || !target.matches(zeroClearingFieldSelector)
       || !zeroClearingFields.has(target.name)
       || Number(target.value.replace(",", ".")) !== 0) {
       return;
     }
 
     target.value = "";
-  });
+  };
+
+  document.addEventListener("pointerdown", (event) => clearInitialZero(event.target));
+  document.addEventListener("focusin", (event) => clearInitialZero(event.target));
 
   document.getElementById("apply-preset-active").addEventListener("click", () => {
     applyPreset("active");
