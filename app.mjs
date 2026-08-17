@@ -8453,6 +8453,32 @@ async function initApp() {
     });
   });
 
+  const zeroClearingFields = new Set([
+    "quantity",
+    "pages",
+    "colorPages",
+    "widthMm",
+    "heightMm",
+    "widthCm",
+    "heightCm",
+    "bleedMm",
+    "linearMeters",
+  ]);
+
+  document.addEventListener("focusin", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)
+      || target.disabled
+      || target.readOnly
+      || !target.closest(".budget-table")
+      || !zeroClearingFields.has(target.name)
+      || Number(target.value.replace(",", ".")) !== 0) {
+      return;
+    }
+
+    target.value = "";
+  });
+
   document.getElementById("apply-preset-active").addEventListener("click", () => {
     applyPreset("active");
   });
