@@ -191,9 +191,9 @@ const DEFAULT_M2_DESCRIPTIONS = {
 const A4_WIDTH_MM = 210;
 const A4_HEIGHT_MM = 297;
 const POLASEAL_SIZES = [
-  { id: "a4", label: "A4", width: 220, height: 307 },
-  { id: "oficio", label: "Ofício", width: 222, height: 336 },
-  { id: "a3", label: "A3", width: 303, height: 426 },
+  { id: "a4", label: "220 x 303 mm", width: 220, height: 303 },
+  { id: "oficio", label: "223 x 336 mm", width: 223, height: 336 },
+  { id: "a3", label: "303 x 426 mm", width: 303, height: 426 },
 ];
 const COLOR_EXTRA_OPTIONS = {
   holes: ["Sem furo", "Furo 6mm", "Furo 4mm"],
@@ -1038,6 +1038,7 @@ function createDefaultColorPrintRow(index) {
     holeOption: "Sem furo",
     foldOption: "Sem dobra",
     laminationOption: "Sem plastificação",
+    polasealSize: "auto",
     artCreationFee: 0,
     discountType: "R$",
     discountValue: 0,
@@ -1748,6 +1749,7 @@ function mergeState(candidate) {
       holeOption: COLOR_EXTRA_OPTIONS.holes.includes(row?.holeOption) ? row.holeOption : "Sem furo",
       foldOption: COLOR_EXTRA_OPTIONS.folds.includes(row?.foldOption) ? row.foldOption : "Sem dobra",
       laminationOption: normalizeColorLaminationOption(row?.laminationOption),
+      polasealSize: ["auto", ...POLASEAL_SIZES.map((sheet) => sheet.id)].includes(row?.polasealSize) ? row.polasealSize : "auto",
       artCreationFee: toMoneyNumber(row?.artCreationFee),
       discountType: normalizeDiscountType(row?.discountType),
       discountValue: toMoneyNumber(row?.discountValue),
@@ -2456,7 +2458,7 @@ function getWholeLaminationUnit(sheetId, quantity) {
   return 4.65;
 }
 
-function calculatePolasealFit(widthMm, heightMm) {
+function calculatePolasealFit(widthMm, heightMm, selectedSize = "auto") {
   const pieceWidth = widthMm + 10;
   const pieceHeight = heightMm + 10;
   const fits = POLASEAL_SIZES.map((sheet) => ({
@@ -2468,12 +2470,16 @@ function calculatePolasealFit(widthMm, heightMm) {
   const a3 = fits.find((fit) => fit.id === "a3");
   const regularBest = [a4, oficio].sort((a, b) => b.itemsPerSheet - a.itemsPerSheet)[0];
   const shouldUseA3 = (regularBest.itemsPerSheet <= 0 && a3.itemsPerSheet > 0) || (regularBest.itemsPerSheet === 1 && a3.itemsPerSheet >= 3);
-  const best = shouldUseA3 ? a3 : regularBest;
+  const recommended = shouldUseA3 ? a3 : regularBest;
+  const best = selectedSize === "auto"
+    ? recommended
+    : fits.find((fit) => fit.id === selectedSize) || recommended;
 
   return {
     pieceWidth,
     pieceHeight,
     best,
+    recommended,
     description: best?.itemsPerSheet > 0
       ? `${best.label}: ${best.itemsPerSheet} por polaseal${best.rotated ? " (girado)" : ""}`
       : "Não cabe nos tamanhos de polaseal cadastrados",
@@ -2506,7 +2512,7 @@ function calculateColorExtras(row, widthMm, heightMm, quantity, config) {
   const holeTotal = row.holeOption && row.holeOption !== "Sem furo" ? calculateHundredExtra(quantity, holeMinimum, holeEachHundred) : 0;
   const foldTotal = row.foldOption === "Dobra" ? calculateHundredExtra(quantity, foldMinimum, foldEachHundred) : 0;
   let laminationTotal = 0;
-  const laminationFit = calculatePolasealFit(widthMm, heightMm);
+  const laminationFit = calculatePolasealFit(widthMm, heightMm, row.polasealSize);
   const normalizedLaminationOption = normalizeColorLaminationOption(row.laminationOption);
 
   if (normalizedLaminationOption === "Com plastificação") {
@@ -3680,6 +3686,8 @@ function calculateColorPrintWorkbook(state, config) {
         colorExtrasTotal: 0,
         colorExtrasSummary: "",
         laminationFitDescription: "",
+        polasealLabel: "-",
+        polasealUtilization: "Informe as medidas",
         artCreationFee: getArtCreationFee(row),
         ...applyRowDiscount(row, (row.cutPriceOverride === "" ? 0 : toMoneyNumber(row.cutPriceOverride)) + getArtCreationFee(row), quantity),
         estimatedCuts: 0,
@@ -3712,6 +3720,8 @@ function calculateColorPrintWorkbook(state, config) {
         colorExtrasTotal: 0,
         colorExtrasSummary: "",
         laminationFitDescription: "",
+        polasealLabel: "-",
+        polasealUtilization: "Não cabe",
         artCreationFee: getArtCreationFee(row),
         ...applyRowDiscount(row, (row.cutPriceOverride === "" ? 0 : toMoneyNumber(row.cutPriceOverride)) + getArtCreationFee(row), quantity),
         estimatedCuts: 0,
@@ -3759,6 +3769,10 @@ function calculateColorPrintWorkbook(state, config) {
       colorExtrasTotal: colorExtras.total,
       colorExtrasSummary: colorExtras.summary,
       laminationFitDescription: colorExtras.laminationFit.description,
+      polasealLabel: colorExtras.laminationFit.best?.label || "-",
+      polasealUtilization: colorExtras.laminationFit.best?.itemsPerSheet > 0
+        ? `${formatInteger(colorExtras.laminationFit.best.itemsPerSheet)} por Polaseal${colorExtras.laminationFit.best.rotated ? " (girado)" : ""}`
+        : "Não cabe",
       artCreationFee,
       ...rowDiscount,
       estimatedCuts,
@@ -5444,7 +5458,6 @@ function getColorFinishSelectionCount(row) {
   if (row.cutPriceOverride !== "" && row.cutPriceOverride !== null && typeof row.cutPriceOverride !== "undefined") count += 1;
   if (row.holeOption && row.holeOption !== "Sem furo") count += 1;
   if (row.foldOption === "Dobra") count += 1;
-  if (normalizeColorLaminationOption(row.laminationOption) !== "Sem plastificação") count += 1;
   return count;
 }
 
@@ -6969,11 +6982,11 @@ async function initApp() {
           <tr class="${row.active ? "" : "is-empty"}" data-color-row-index="${index}">
             <td><strong>${String(index + 1).padStart(2, "0")}</strong></td>
             <td><input class="cell-input description" name="description" value="${escapeHtml(row.description)}"></td>
+            <td><select class="cell-select" name="size">${buildOptions(OPTIONS.colorPrintSizes, row.size || "A4")}</select></td>
             <td><input class="cell-input" name="widthMm" type="number" min="0" step="0.1" value="${usesCustomSize && row.widthMm > 0 ? escapeHtml(row.widthMm) : ""}" placeholder="${usesCustomSize ? "0,0" : "não usado"}"${usesCustomSize ? "" : " disabled"}></td>
             <td><input class="cell-input" name="heightMm" type="number" min="0" step="0.1" value="${usesCustomSize && row.heightMm > 0 ? escapeHtml(row.heightMm) : ""}" placeholder="${usesCustomSize ? "0,0" : "não usado"}"${usesCustomSize ? "" : " disabled"}></td>
             <td><input class="cell-input" name="bleedMm" type="number" min="0" step="0.1" value="${usesCustomSize && row.bleedMm > 0 ? escapeHtml(row.bleedMm) : ""}" placeholder="${usesCustomSize ? "0,0" : "não usado"}"${usesCustomSize ? "" : " disabled"}></td>
             <td><select class="cell-select" name="printMode">${buildOptions(OPTIONS.printModes, row.printMode)}</select></td>
-            <td><select class="cell-select" name="size">${buildOptions(OPTIONS.colorPrintSizes, row.size || "A4")}</select></td>
             <td><select class="cell-select" name="paperType">${buildOptions(OPTIONS.colorPaperTypes, row.paperType)}</select></td>
             <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${row.quantity > 0 ? escapeHtml(row.quantity) : ""}"></td>
             <td><span class="readonly-value subtle">${formatInteger(row.itemsPerSheet)}</span></td>
@@ -6981,6 +6994,12 @@ async function initApp() {
             <td><span class="readonly-value subtle">${formatInteger(row.a4Impressions)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.printTotal)}</span></td>
             <td>${createColorFinishPickerMarkup(row)}</td>
+            <td><select class="cell-select" name="laminationOption">${buildOptions(COLOR_EXTRA_OPTIONS.lamination, normalizeColorLaminationOption(row.laminationOption))}</select></td>
+            <td>${row.size === "Tamanho personalizado" ? `<select class="cell-select" name="polasealSize">
+              <option value="auto"${row.polasealSize === "auto" ? " selected" : ""}>Automático (${escapeHtml(row.polasealLabel)})</option>
+              ${POLASEAL_SIZES.map((sheet) => `<option value="${sheet.id}"${row.polasealSize === sheet.id ? " selected" : ""}>${escapeHtml(sheet.label)}</option>`).join("")}
+            </select>` : `<span class="readonly-value subtle">-</span>`}</td>
+            <td><span class="readonly-value subtle">${escapeHtml(row.size === "Tamanho personalizado" ? row.polasealUtilization : "Plastificação inteira")}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.colorExtrasTotal || 0)}</span></td>
             <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
             <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
@@ -7555,7 +7574,7 @@ async function initApp() {
       <div class="finish-popover-header">
         <div class="finish-popover-title">
           <strong>Acabamentos</strong>
-          <span>Ajuste corte, furo, dobra e plastificação desta linha.</span>
+          <span>Ajuste corte, furo e dobra desta linha.</span>
         </div>
         <button type="button" class="button finish-popover-close" data-color-finish-close>Fechar</button>
       </div>
@@ -7564,7 +7583,7 @@ async function initApp() {
         <div class="finish-picker-option-body">
           <div class="finish-option-copy">
             <span class="finish-option-label">Sem acabamento</span>
-            <small>Use esta opção quando o item não tiver corte adicional, furo, dobra ou plastificação.</small>
+            <small>Use esta opção quando o item não tiver corte adicional, furo ou dobra.</small>
           </div>
         </div>
       </label>
@@ -7613,21 +7632,6 @@ async function initApp() {
             </div>
           </div>
         </label>
-        <label class="finish-picker-option">
-          <input type="checkbox" value="lamination"${normalizeColorLaminationOption(row.laminationOption) !== "Sem plastificação" ? " checked" : ""} data-color-finish-card>
-          <div class="finish-picker-option-body">
-            <div class="finish-option-copy">
-              <span class="finish-option-label">Plastificação</span>
-              <small>${escapeHtml(row.laminationFitDescription || "O app calcula automaticamente o melhor aproveitamento do polaseal.")}</small>
-            </div>
-            <div class="finish-eyelet-settings">
-              <span>Tipo</span>
-              <select class="cell-select" data-color-finish-field="laminationOption">
-                ${buildOptions(COLOR_EXTRA_OPTIONS.lamination, row.laminationOption || "Sem plastificação")}
-              </select>
-            </div>
-          </div>
-        </label>
       </div>
       <div class="finish-popover-footer">
         <span class="finish-popover-summary">${escapeHtml(selectedCount ? `${selectedCount} acabamento(s) ativo(s) | ${formatCurrency(activeTotal)}` : "Nenhum acabamento selecionado")}</span>
@@ -7659,7 +7663,6 @@ async function initApp() {
       const cutInput = popover.querySelector('[data-color-finish-field="cutPriceOverride"]');
       const holeSelect = popover.querySelector('[data-color-finish-field="holeOption"]');
       const foldSelect = popover.querySelector('[data-color-finish-field="foldOption"]');
-      const laminationSelect = popover.querySelector('[data-color-finish-field="laminationOption"]');
 
       if (cutInput instanceof HTMLInputElement) {
         row.cutPriceOverride = cutInput.value === "" ? "" : toMoneyNumber(cutInput.value);
@@ -7669,9 +7672,6 @@ async function initApp() {
       }
       if (foldSelect instanceof HTMLSelectElement) {
         row.foldOption = foldSelect.value || "Sem dobra";
-      }
-      if (laminationSelect instanceof HTMLSelectElement) {
-        row.laminationOption = normalizeColorLaminationOption(laminationSelect.value);
       }
 
       normalizeColorPrintRowBySize(row);
@@ -7689,7 +7689,6 @@ async function initApp() {
         row.cutPriceOverride = "";
         row.holeOption = "Sem furo";
         row.foldOption = "Sem dobra";
-        row.laminationOption = "Sem plastificação";
         normalizeColorPrintRowBySize(row);
         persist();
         renderRowsAndSummary();
@@ -7709,7 +7708,6 @@ async function initApp() {
         row.cutPriceOverride = "";
         row.holeOption = "Sem furo";
         row.foldOption = "Sem dobra";
-        row.laminationOption = "Sem plastificação";
         normalizeColorPrintRowBySize(row);
         persist();
         renderRowsAndSummary();
