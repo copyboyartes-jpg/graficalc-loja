@@ -6328,67 +6328,6 @@ async function initApp() {
     setStatusMessage(syncStatus, message, tone);
   }
 
-  const customTabOrderSelector = [
-    'input:not([type="hidden"]):not([disabled]):not([readonly])',
-    "select:not([disabled])",
-    "textarea:not([disabled]):not([readonly])",
-    "button[data-credential-lanyard-toggle]:not([disabled])",
-    "button[data-m2-finish-toggle]:not([disabled])",
-  ].join(", ");
-
-  function getActiveTabPanel() {
-    return tabPanels.find((panel) => panel.classList.contains("is-active")) || null;
-  }
-
-  function isTabOrderElementVisible(element) {
-    if (!(element instanceof HTMLElement)) {
-      return false;
-    }
-
-    if (element.hidden || element.closest("[hidden]")) {
-      return false;
-    }
-
-    if (element.getAttribute("aria-hidden") === "true" || element.closest('[aria-hidden="true"]')) {
-      return false;
-    }
-
-    return element.offsetParent !== null || element === document.activeElement;
-  }
-
-  function getCustomTabOrderElements(panel) {
-    if (!(panel instanceof HTMLElement)) {
-      return [];
-    }
-
-    return [...panel.querySelectorAll(customTabOrderSelector)].filter((element) => isTabOrderElementVisible(element));
-  }
-
-  function shouldUseCustomTabOrder(target) {
-    if (!(target instanceof HTMLElement)) {
-      return false;
-    }
-
-    if (target.closest("#confirm-modal:not([hidden])")) {
-      return false;
-    }
-
-    if (
-      target.closest("#credential-lanyard-popover")
-      || target.closest("#business-card-quantity-popover")
-      || target.closest("#m2-finish-popover")
-      || target.closest("#color-finish-popover")
-    ) {
-      return false;
-    }
-
-    if (target.isContentEditable || target.closest('[contenteditable="true"]')) {
-      return false;
-    }
-
-    return true;
-  }
-
   function readClientRecordForm() {
     return {
       name: clientRecordName?.value.trim() || "",
@@ -8150,37 +8089,6 @@ async function initApp() {
     button.addEventListener("click", () => {
       selectTab(button.dataset.tabTarget);
     });
-  });
-
-  document.addEventListener("keydown", (event) => {
-    if (event.key !== "Tab" || event.altKey || event.ctrlKey || event.metaKey) {
-      return;
-    }
-
-    const target = event.target;
-    if (!shouldUseCustomTabOrder(target)) {
-      return;
-    }
-
-    const activePanel = getActiveTabPanel();
-    if (!activePanel || !activePanel.contains(target)) {
-      return;
-    }
-
-    const editableElements = getCustomTabOrderElements(activePanel);
-    if (editableElements.length < 2) {
-      return;
-    }
-
-    const currentIndex = editableElements.indexOf(target);
-    if (currentIndex === -1) {
-      return;
-    }
-
-    event.preventDefault();
-    const direction = event.shiftKey ? -1 : 1;
-    const nextIndex = (currentIndex + direction + editableElements.length) % editableElements.length;
-    editableElements[nextIndex]?.focus();
   });
 
   document.getElementById("import-button").addEventListener("click", () => {
