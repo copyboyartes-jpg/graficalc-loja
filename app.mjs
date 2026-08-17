@@ -172,6 +172,7 @@ const M2_CATALOG = [
   { id: "uv-cut", label: "Adesivo impressão UV com corte especial", configKey: "uvCut", bleedMm: 2 },
   { id: "uv-verniz", label: "Adesivo impressão UV com verniz ou tinta branca", configKey: "uvVerniz", bleedMm: 2 },
   { id: "flat-cut", label: "Adesivo corte reto/sem acabamento", configKey: "flatCut" },
+  { id: "lona", label: "Lona", configKey: "lona" },
   { id: "banner", label: "Banner", configKey: "banner" },
   { id: "perfurado", label: "Adesivo perfurado", configKey: "perfurado" },
   { id: "ps1mm", label: "Chapa PS1mm", configKey: "ps1mm" },
@@ -181,6 +182,7 @@ const M2_CATALOG = [
 const DEFAULT_M2_DESCRIPTIONS = {
   "digital-cut": "Adesivo vinil com impressão digital",
   "flat-cut": "Adesivo vinil com impressão digital",
+  lona: "Lona",
   perfurado: "Adesivo perfurado com impressão digital",
   "uv-cut": "Adesivo vinil com impressão UV",
   "uv-verniz": "Adesivo vinil com impressão UV",
@@ -952,6 +954,14 @@ function createDefaultConfig() {
       ],
       flatCut: [
         { min: 1, value: 30, label: "Valor minimo" },
+        { min: 2, value: 70, label: "até 2 m²" },
+        { min: 4, value: 65, label: "de 2 até 4 m²" },
+        { min: 6, value: 63, label: "de 4 até 6 m²" },
+        { min: 10, value: 60, label: "de 6 até 10 m²" },
+        { min: 1000000, value: 58, label: "acima de 10 m²" },
+      ],
+      lona: [
+        { min: 1, value: 30, label: "Valor mínimo" },
         { min: 2, value: 70, label: "até 2 m²" },
         { min: 4, value: 65, label: "de 2 até 4 m²" },
         { min: 6, value: 63, label: "de 4 até 6 m²" },
