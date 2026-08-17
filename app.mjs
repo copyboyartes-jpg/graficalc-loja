@@ -688,6 +688,33 @@ const READY_PRODUCT_CATALOG = [
   },
 ];
 
+function createDefaultLinearMeterPricing() {
+  return {
+    dtfTextile: {
+      widthLabel: "58 cm",
+      variants: [
+        { id: "2-dias", label: "Até 2 dias úteis", minimumOrder: 15, tiers: [{ upTo: 0.5, rate: 60 }, { upTo: 1, rate: 50 }, { upTo: 3, rate: 40 }, { upTo: null, rate: 35 }] },
+        { id: "amanha", label: "Necessito pra amanhã", minimumOrder: 20, tiers: [{ upTo: 0.5, rate: 90 }, { upTo: 1, rate: 70 }, { upTo: 3, rate: 55 }, { upTo: null, rate: 50 }] },
+        { id: "hoje", label: "Necessito pra hoje", minimumOrder: 40, tiers: [{ upTo: 0.5, rate: 110 }, { upTo: 1, rate: 100 }, { upTo: 3, rate: 90 }, { upTo: null, rate: 85 }] },
+      ],
+    },
+    dtfUv: {
+      widthLabel: "28 cm",
+      variants: [
+        { id: "padrao", label: "Tabela padrão", minimumHalfMeter: 65, oneMeterTotal: 80, rateUpTo3m: 75, rateAbove3m: 65 },
+        { id: "urgente", label: "Tabela urgente", minimumHalfMeter: 110, oneMeterTotal: 170, rateUpTo3m: 165, rateAbove3m: 100 },
+      ],
+    },
+    products: {
+      canvas: { rate: 110, minimumOrder: 45 },
+      "papel-glossy": { rate: 90, minimumOrder: 32 },
+      "couche-210g": { rate: 39, minimumOrder: 39 },
+      "couche-170g": { rate: 34, minimumOrder: 34 },
+      "papel-65g": { rate: 34, minimumOrder: 34 },
+    },
+  };
+}
+
 function createDefaultConfig() {
   return {
     printPricing: {
@@ -927,6 +954,7 @@ function createDefaultConfig() {
         },
       },
     },
+    linearMeterPricing: createDefaultLinearMeterPricing(),
     m2Pricing: {
       digitalCut: [
         { min: 1, value: 30, label: "Valor minimo" },
@@ -1657,6 +1685,28 @@ function mergeConfig(candidate) {
     };
   }
 
+  if (candidate.linearMeterPricing && typeof candidate.linearMeterPricing === "object") {
+    const pricing = sanitizeValue(candidate.linearMeterPricing);
+    merged.linearMeterPricing = {
+      ...merged.linearMeterPricing,
+      ...pricing,
+      dtfTextile: {
+        ...merged.linearMeterPricing.dtfTextile,
+        ...pricing.dtfTextile,
+        variants: Array.isArray(pricing.dtfTextile?.variants) ? pricing.dtfTextile.variants : merged.linearMeterPricing.dtfTextile.variants,
+      },
+      dtfUv: {
+        ...merged.linearMeterPricing.dtfUv,
+        ...pricing.dtfUv,
+        variants: Array.isArray(pricing.dtfUv?.variants) ? pricing.dtfUv.variants : merged.linearMeterPricing.dtfUv.variants,
+      },
+      products: {
+        ...merged.linearMeterPricing.products,
+        ...(pricing.products || {}),
+      },
+    };
+  }
+
   merged.m2Finishes = normalizeM2Finishes(candidate.m2Finishes, defaults.m2Finishes);
 
   if (Array.isArray(candidate.catalogSections)) {
@@ -2169,8 +2219,22 @@ function isLinearMeterRowActive(row) {
   return Boolean((row?.description || "").trim() || toDecimalNumber(row?.linearMeters) > 0 || getArtCreationFee(row) > 0 || toMoneyNumber(row?.discountValue) > 0);
 }
 
-function getLinearMeterProduct(productType) {
-  return LINEAR_METER_CATALOG.find((item) => item.id === productType) || LINEAR_METER_CATALOG[0];
+function getLinearMeterCatalog(config) {
+  const pricing = config?.linearMeterPricing || createDefaultLinearMeterPricing();
+  return LINEAR_METER_CATALOG.map((product) => {
+    if (product.id === "dtf-textil") {
+      return { ...product, widthLabel: pricing.dtfTextile?.widthLabel || product.widthLabel, variants: pricing.dtfTextile?.variants || product.variants };
+    }
+    if (product.id === "dtf-uv") {
+      return { ...product, widthLabel: pricing.dtfUv?.widthLabel || product.widthLabel, variants: pricing.dtfUv?.variants || product.variants };
+    }
+    return { ...product, ...(pricing.products?.[product.id] || {}) };
+  });
+}
+
+function getLinearMeterProduct(productType, config) {
+  const catalog = getLinearMeterCatalog(config);
+  return catalog.find((item) => item.id === productType) || catalog[0];
 }
 
 function getLinearMeterVariant(product, variantType) {
@@ -2178,8 +2242,8 @@ function getLinearMeterVariant(product, variantType) {
   return variants.find((item) => item.id === variantType) || variants[0] || null;
 }
 
-function buildLinearMeterProductOptions(currentValue) {
-  return LINEAR_METER_CATALOG.map((item) => `<option value="${escapeHtml(item.id)}"${item.id === currentValue ? " selected" : ""}>${escapeHtml(item.label)}</option>`).join("");
+function buildLinearMeterProductOptions(currentValue, config) {
+  return getLinearMeterCatalog(config).map((item) => `<option value="${escapeHtml(item.id)}"${item.id === currentValue ? " selected" : ""}>${escapeHtml(item.label)}</option>`).join("");
 }
 
 function buildLinearMeterVariantOptions(product, currentValue) {
@@ -4079,8 +4143,9 @@ function calculateM2WorkbookFromConfig(state, config) {
   };
 }
 
-function calculateLinearMeterRow(source, index) {
-  const product = getLinearMeterProduct(source.productType);
+function calculateLinearMeterRow(source, index, config) {
+  const catalog = getLinearMeterCatalog(config);
+  const product = getLinearMeterProduct(source.productType, config);
   const variant = getLinearMeterVariant(product, source.variantType);
   const linearMeters = Math.max(0, toDecimalNumber(source.linearMeters));
   const artCreationFee = getArtCreationFee(source);
@@ -4090,7 +4155,7 @@ function calculateLinearMeterRow(source, index) {
     ...source,
     active,
     valid: false,
-    productType: product?.id || LINEAR_METER_CATALOG[0]?.id || "",
+    productType: product?.id || catalog[0]?.id || "",
     productLabel: product?.label || "",
     variantType: variant?.id || "",
     variantLabel: variant?.label || "",
@@ -4147,7 +4212,7 @@ function calculateLinearMeterRow(source, index) {
   };
 }
 
-function calculateLinearMeterWorkbook(state) {
+function calculateLinearMeterWorkbook(state, config) {
   const rows = state.linearMeterItems.map((row, index) =>
     calculateLinearMeterRow(
       {
@@ -4155,7 +4220,8 @@ function calculateLinearMeterWorkbook(state) {
         ...row,
         id: row?.id || `linear-meter-row-${index + 1}`,
       },
-      index
+      index,
+      config
     )
   );
 
@@ -4724,34 +4790,66 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
     ),
   ];
 
+  const linearPricing = config.linearMeterPricing || createDefaultLinearMeterPricing();
   const linearMeterCards = [
     createConfigCardMarkup(
-      "Tabela de metro linear",
-      "Produtos, larguras e valores de referência usados na aba de Metro linear.",
+      "DTF têxtil",
+      "Altere os valores por prazo e faixa. O cálculo aplica o maior valor entre a faixa de metragem e o pedido mínimo.",
+      `
+        <div class="config-grid compact-grid">
+          <label><span>Largura do material</span><input data-config-prefix="linear-meter" data-config-key="dtfTextile.widthLabel" type="text" value="${escapeHtml(linearPricing.dtfTextile.widthLabel)}"></label>
+        </div>
+        ${linearPricing.dtfTextile.variants.map((variant, variantIndex) => `
+          <div class="inline-config-block">
+            <h4>${escapeHtml(variant.label)}</h4>
+            <div class="config-grid compact-grid">
+              <label><span>Pedido mínimo (R$)</span><input data-config-prefix="linear-meter" data-config-key="dtfTextile.variants.${variantIndex}.minimumOrder" type="number" min="0" step="0.01" value="${escapeHtml(variant.minimumOrder)}"></label>
+              ${variant.tiers.map((tier, tierIndex) => `<label><span>${tierIndex === variant.tiers.length - 1 ? "Acima de 3" : `Até ${formatMeasure(tier.upTo)}`} m (R$/m)</span><input data-config-prefix="linear-meter" data-config-key="dtfTextile.variants.${variantIndex}.tiers.${tierIndex}.rate" type="number" min="0" step="0.01" value="${escapeHtml(tier.rate)}"></label>`).join("")}
+            </div>
+          </div>
+        `).join("")}
+      `
+    ),
+    createConfigCardMarkup(
+      "DTF UV",
+      "Defina o valor de meio metro, do metro fechado e os valores por metro para as duas tabelas.",
+      `
+        <div class="config-grid compact-grid">
+          <label><span>Largura do material</span><input data-config-prefix="linear-meter" data-config-key="dtfUv.widthLabel" type="text" value="${escapeHtml(linearPricing.dtfUv.widthLabel)}"></label>
+        </div>
+        ${linearPricing.dtfUv.variants.map((variant, variantIndex) => `
+          <div class="inline-config-block">
+            <h4>${escapeHtml(variant.label)}</h4>
+            <div class="config-grid compact-grid">
+              <label><span>Até 0,5 m (R$)</span><input data-config-prefix="linear-meter" data-config-key="dtfUv.variants.${variantIndex}.minimumHalfMeter" type="number" min="0" step="0.01" value="${escapeHtml(variant.minimumHalfMeter)}"></label>
+              <label><span>Até 1 m (R$)</span><input data-config-prefix="linear-meter" data-config-key="dtfUv.variants.${variantIndex}.oneMeterTotal" type="number" min="0" step="0.01" value="${escapeHtml(variant.oneMeterTotal)}"></label>
+              <label><span>De 1 até 3 m (R$/m)</span><input data-config-prefix="linear-meter" data-config-key="dtfUv.variants.${variantIndex}.rateUpTo3m" type="number" min="0" step="0.01" value="${escapeHtml(variant.rateUpTo3m)}"></label>
+              <label><span>Acima de 3 m (R$/m)</span><input data-config-prefix="linear-meter" data-config-key="dtfUv.variants.${variantIndex}.rateAbove3m" type="number" min="0" step="0.01" value="${escapeHtml(variant.rateAbove3m)}"></label>
+            </div>
+          </div>
+        `).join("")}
+      `
+    ),
+    createConfigCardMarkup(
+      "Canvas e papéis por metro",
+      "Os valores salvos aqui são usados diretamente no cálculo, respeitando o pedido mínimo.",
       `
         <div class="table-shell">
           <table class="config-table">
             <thead><tr><th>Produto</th><th>Largura</th><th>Valor por metro</th><th>Valor mínimo</th></tr></thead>
             <tbody>
-              ${LINEAR_METER_CATALOG.filter((product) => product.rate)
-                .map((product) => `
-                  <tr>
-                    <td>${escapeHtml(product.label)}</td>
-                    <td>${escapeHtml(product.widthLabel)}</td>
-                    <td>${formatCurrency(product.rate)}</td>
-                    <td>${formatCurrency(product.minimumOrder)}</td>
-                  </tr>
-                `)
-                .join("")}
+              ${getLinearMeterCatalog(config).filter((product) => product.rate).map((product) => `
+                <tr>
+                  <td>${escapeHtml(product.label)}</td>
+                  <td>${escapeHtml(product.widthLabel)}</td>
+                  <td><input data-config-prefix="linear-meter" data-config-key="products.${product.id}.rate" type="number" min="0" step="0.01" value="${escapeHtml(product.rate)}"></td>
+                  <td><input data-config-prefix="linear-meter" data-config-key="products.${product.id}.minimumOrder" type="number" min="0" step="0.01" value="${escapeHtml(product.minimumOrder)}"></td>
+                </tr>
+              `).join("")}
             </tbody>
           </table>
         </div>
       `
-    ),
-    createConfigCardMarkup(
-      "DTF têxtil e DTF UV",
-      "As faixas dessas duas tabelas variam por prazo e metragem para calcular o orçamento corretamente.",
-      `<p class="helper-text">DTF têxtil: largura de 58 cm, com valores por prazo. DTF UV: largura de 28 cm, com tabelas padrão e urgente.</p>`
     ),
   ];
 
@@ -6930,7 +7028,7 @@ async function initApp() {
     const flyerWorkbook = calculateFlyerWorkbook(state);
     const blockSulfiteWorkbook = calculateBlockWorkbook(state, "sulfite");
     const blockAutocopiativoWorkbook = calculateBlockWorkbook(state, "autocopiativo");
-    const linearMeterWorkbook = calculateLinearMeterWorkbook(state);
+    const linearMeterWorkbook = calculateLinearMeterWorkbook(state, config);
     const m2Workbook = calculateM2WorkbookFromConfig(state, config);
     const resinWorkbook = calculateResinWorkbook(state, config);
     const m2Catalog = getM2Catalog(config);
@@ -7290,8 +7388,8 @@ async function initApp() {
         (row, index) => `
           <tr class="${row.active ? "" : "is-empty"}" data-linear-meter-row-index="${index}">
             <td><strong>${String(index + 1).padStart(2, "0")}</strong></td>
-            <td><select class="cell-select" name="productType">${buildLinearMeterProductOptions(row.productType)}</select></td>
-            <td><select class="cell-select" name="variantType">${buildLinearMeterVariantOptions(getLinearMeterProduct(row.productType), row.variantType)}</select></td>
+            <td><select class="cell-select" name="productType">${buildLinearMeterProductOptions(row.productType, config)}</select></td>
+            <td><select class="cell-select" name="variantType">${buildLinearMeterVariantOptions(getLinearMeterProduct(row.productType, config), row.variantType)}</select></td>
             <td><input class="cell-input description" name="description" value="${escapeHtml(row.description)}" placeholder="${escapeHtml(row.productLabel || "Ex.: DTF têxtil")}"></td>
             <td><span class="readonly-value subtle">${escapeHtml(row.fixedWidthLabel || "-")}</span></td>
             <td><input class="cell-input" name="linearMeters" type="number" min="0" step="0.01" value="${row.linearMeters > 0 ? escapeHtml(row.linearMeters) : ""}" placeholder="0,00"></td>
@@ -8979,7 +9077,7 @@ async function initApp() {
     } else if (field === "discountType") {
       row[field] = normalizeDiscountType(target.value);
     } else if (field === "productType") {
-      const product = getLinearMeterProduct(target.value);
+      const product = getLinearMeterProduct(target.value, config);
       row.productType = product?.id || LINEAR_METER_CATALOG[0]?.id || "dtf-textil";
       row.variantType = product?.variants?.[0]?.id || "";
     } else if (field === "variantType") {
@@ -9175,6 +9273,27 @@ async function initApp() {
         renderRowsAndSummary();
         setConfigStatus("Produto extra atualizado.", "success");
       }
+      return;
+    }
+
+    if (prefix === "linear-meter") {
+      const path = key.split(".");
+      let destination = config.linearMeterPricing;
+      for (let index = 0; index < path.length - 1; index += 1) {
+        const segment = path[index];
+        if (!destination || typeof destination !== "object" || !(segment in destination)) {
+          return;
+        }
+        destination = destination[segment];
+      }
+      const field = path[path.length - 1];
+      if (!destination || typeof destination !== "object" || !(field in destination)) {
+        return;
+      }
+      destination[field] = field === "widthLabel" ? target.value : toMoneyNumber(target.value);
+      persist();
+      renderRowsAndSummary();
+      setConfigStatus("Tabela de metro linear atualizada.", "success");
       return;
     }
 
@@ -9568,7 +9687,7 @@ async function initApp() {
     const freeQuoteWorkbook = calculateFreeQuoteWorkbook(state);
     const businessCardWorkbook = calculateBusinessCardWorkbook(state);
     const flyerWorkbook = calculateFlyerWorkbook(state);
-    const linearMeterWorkbook = calculateLinearMeterWorkbook(state);
+    const linearMeterWorkbook = calculateLinearMeterWorkbook(state, config);
     const m2Workbook = calculateM2WorkbookFromConfig(state, config);
     const resinWorkbook = calculateResinWorkbook(state, config);
     const blockSulfiteWorkbook = calculateBlockWorkbook(state, "sulfite");
@@ -9718,7 +9837,7 @@ async function initApp() {
     const freeQuoteWorkbook = calculateFreeQuoteWorkbook(state);
     const businessCardWorkbook = calculateBusinessCardWorkbook(state);
     const flyerWorkbook = calculateFlyerWorkbook(state);
-    const linearMeterWorkbook = calculateLinearMeterWorkbook(state);
+    const linearMeterWorkbook = calculateLinearMeterWorkbook(state, config);
     const m2Workbook = calculateM2WorkbookFromConfig(state, config);
     const resinWorkbook = calculateResinWorkbook(state, config);
     const title = state.client.name.trim() || `Orçamento ${new Date().toLocaleDateString("pt-BR")}`;
