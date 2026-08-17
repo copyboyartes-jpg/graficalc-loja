@@ -7087,34 +7087,13 @@ async function initApp() {
         `
       )
       .join("");
-    credentialRowsTableBody
-      .querySelectorAll("input, select, textarea")
-      .forEach((field) => {
-        if (!(field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement)) {
-          return;
+    credentialRowsTableBody.querySelectorAll("input[name]").forEach((field) => {
+      field.addEventListener("input", () => {
+        if (isCredentialEditableField(field)) {
+          refreshCredentialTableFromDom(field, { preserveFocus: true });
         }
-        if (field.dataset.credentialBound === "true") {
-          return;
-        }
-        field.dataset.credentialBound = "true";
-        field.addEventListener("input", () => {
-          if (isCredentialEditableField(field)) {
-            refreshCredentialTableFromDom(field, { preserveFocus: true });
-          }
-        });
-        field.addEventListener("change", () => {
-          refreshCredentialTableFromDom(field);
-        });
-        field.addEventListener("blur", () => {
-          refreshCredentialTableFromDom(field);
-        });
-        field.addEventListener("keyup", () => {
-          if (isCredentialEditableField(field)) {
-            refreshCredentialTableFromDom(field, { preserveFocus: true });
-          }
-        });
       });
-
+    });
     warningList.innerHTML = workbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("");
     colorWarningList.innerHTML = colorWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("");
     credentialWarningList.innerHTML = credentialWorkbook.warnings.length
@@ -8583,7 +8562,7 @@ async function initApp() {
   }
 
   function updateCredentialRowField(target, options = {}) {
-    const { rerender = true } = options;
+    const { rerender = true, persist: shouldPersist = true } = options;
     if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) {
       return false;
     }
@@ -8616,7 +8595,9 @@ async function initApp() {
     } else {
       row[field] = target.value;
     }
-    persistLocalOnly();
+    if (shouldPersist) {
+      persistLocalOnly();
+    }
     if (rerender) {
       renderRowsAndSummary();
     }
@@ -8654,26 +8635,40 @@ async function initApp() {
       && ["widthCm", "heightCm", "quantity", "artCreationFee", "discountValue", "description"].includes(target.name);
   }
 
+  function synchronizeCredentialRowsFromDom() {
+    if (!credentialRowsTableBody?.isConnected) {
+      return;
+    }
+
+    credentialRowsTableBody
+      .querySelectorAll("tr[data-credential-row-index]")
+      .forEach((rowElement) => {
+        const row = state.credentialItems[Number(rowElement.dataset.credentialRowIndex)];
+        if (!row) {
+          return;
+        }
+        rowElement.querySelectorAll("input[name], select[name], textarea[name]").forEach((field) => {
+          if (!(field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement)) {
+            return;
+          }
+          updateCredentialRowField(field, { rerender: false, persist: false });
+        });
+      });
+  }
+
   function refreshCredentialTableFromDom(target, options = {}) {
     const { preserveFocus = false } = options;
     if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) {
       return;
     }
-    updateCredentialRowField(target, { rerender: false });
+    synchronizeCredentialRowsFromDom();
+    persistLocalOnly();
     if (preserveFocus && target instanceof HTMLInputElement) {
       rerenderCredentialRowsPreservingFocus(target);
       return;
     }
     renderRowsAndSummary();
   }
-
-  credentialRowsTableBody.addEventListener("input", (event) => {
-    const target = event.target;
-    if (!isCredentialEditableField(target)) {
-      return;
-    }
-    refreshCredentialTableFromDom(target, { preserveFocus: true });
-  });
 
   credentialRowsTableBody.addEventListener("change", (event) => {
     const target = event.target;
