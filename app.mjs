@@ -8399,6 +8399,64 @@ async function initApp() {
   document.addEventListener("pointerdown", (event) => clearInitialZero(event.target));
   document.addEventListener("focusin", (event) => clearInitialZero(event.target));
 
+  const calculationTableBodySelector = [
+    "#rows-table-body",
+    "#color-rows-table-body",
+    "#credential-rows-table-body",
+    "#ready-rows-table-body",
+    "#free-quote-rows-table-body",
+    "#business-card-rows-table-body",
+    "#flyer-rows-table-body",
+    "#block-sulfite-rows-table-body",
+    "#block-autocopiativo-rows-table-body",
+    "#linear-meter-rows-table-body",
+    "#m2-rows-table-body",
+    "#resin-rows-table-body",
+  ].join(", ");
+  const calculationTabFieldSelector = [
+    'input:not([type="hidden"]):not([type="checkbox"]):not([disabled]):not([readonly])',
+    "select:not([disabled])",
+    "textarea:not([disabled]):not([readonly])",
+    "button[data-credential-lanyard-toggle]:not([disabled])",
+    "button[data-finish-picker-toggle]:not([disabled])",
+    "button[data-color-finish-toggle]:not([disabled])",
+  ].join(", ");
+
+  function getCalculationTabFields(tableBody) {
+    return [...tableBody.querySelectorAll(calculationTabFieldSelector)].filter((field) => field.offsetParent !== null);
+  }
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Tab" || event.altKey || event.ctrlKey || event.metaKey) {
+      return;
+    }
+
+    const target = event.target;
+    if (!(target instanceof HTMLElement) || target.closest(".finish-picker-popover")) {
+      return;
+    }
+
+    const tableBody = target.closest(calculationTableBodySelector);
+    if (!(tableBody instanceof HTMLTableSectionElement)) {
+      return;
+    }
+
+    const fields = getCalculationTabFields(tableBody);
+    const currentIndex = fields.indexOf(target);
+    const nextIndex = currentIndex + (event.shiftKey ? -1 : 1);
+    if (currentIndex === -1 || nextIndex < 0 || nextIndex >= fields.length) {
+      return;
+    }
+
+    event.preventDefault();
+    target.blur();
+    requestAnimationFrame(() => {
+      const updatedTableBody = document.getElementById(tableBody.id);
+      const updatedFields = updatedTableBody ? getCalculationTabFields(updatedTableBody) : [];
+      updatedFields[nextIndex]?.focus();
+    });
+  });
+
   document.getElementById("apply-preset-active").addEventListener("click", () => {
     applyPreset("active");
   });
