@@ -7000,9 +7000,9 @@ async function initApp() {
             <td><select class="cell-select" name="printMode">${buildOptions(OPTIONS.printModes, row.printMode)}</select></td>
             <td><select class="cell-select" name="finishing">${buildOptions(OPTIONS.finishing, row.finishing)}</select></td>
             <td><input class="cell-input" name="bindingGroup" value="${escapeHtml(row.bindingGroup)}" placeholder="Ex.: Grupo A"></td>
-            <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${escapeHtml(row.quantity)}"></td>
-            <td><input class="cell-input" name="pages" type="number" min="0" step="1" value="${escapeHtml(row.pages)}"></td>
-            <td><input class="cell-input" name="colorPages" type="number" min="0" step="1" value="${escapeHtml(row.colorPages ?? 0)}"></td>
+            <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${row.quantity > 0 ? escapeHtml(row.quantity) : ""}"></td>
+            <td><input class="cell-input" name="pages" type="number" min="0" step="1" value="${row.pages > 0 ? escapeHtml(row.pages) : ""}"></td>
+            <td><input class="cell-input" name="colorPages" type="number" min="0" step="1" value="${row.colorPages > 0 ? escapeHtml(row.colorPages) : ""}"></td>
             <td><select class="cell-select" name="coverType">${buildOptions(OPTIONS.coverTypes, row.coverType)}</select></td>
             <td><select class="cell-select" name="coverPaper">${buildOptions(OPTIONS.coverPapers, row.coverPaper)}</select></td>
             <td><select class="cell-select" name="backCoverType">${buildOptions(OPTIONS.backCoverTypes, row.backCoverType)}</select></td>
@@ -7032,11 +7032,11 @@ async function initApp() {
             <td><input class="cell-input description" name="description" value="${escapeHtml(row.description)}"></td>
             <td><input class="cell-input" name="widthMm" type="number" min="0" step="0.1" value="${usesCustomSize && row.widthMm > 0 ? escapeHtml(row.widthMm) : ""}" placeholder="${usesCustomSize ? "0,0" : "não usado"}"${usesCustomSize ? "" : " disabled"}></td>
             <td><input class="cell-input" name="heightMm" type="number" min="0" step="0.1" value="${usesCustomSize && row.heightMm > 0 ? escapeHtml(row.heightMm) : ""}" placeholder="${usesCustomSize ? "0,0" : "não usado"}"${usesCustomSize ? "" : " disabled"}></td>
-            <td><input class="cell-input" name="bleedMm" type="number" min="0" step="0.1" value="${usesCustomSize ? escapeHtml(row.bleedMm ?? 0) : ""}" placeholder="${usesCustomSize ? "0,0" : "não usado"}"${usesCustomSize ? "" : " disabled"}></td>
+            <td><input class="cell-input" name="bleedMm" type="number" min="0" step="0.1" value="${usesCustomSize && row.bleedMm > 0 ? escapeHtml(row.bleedMm) : ""}" placeholder="${usesCustomSize ? "0,0" : "não usado"}"${usesCustomSize ? "" : " disabled"}></td>
             <td><select class="cell-select" name="printMode">${buildOptions(OPTIONS.printModes, row.printMode)}</select></td>
             <td><select class="cell-select" name="size">${buildOptions(OPTIONS.colorPrintSizes, row.size || "A4")}</select></td>
             <td><select class="cell-select" name="paperType">${buildOptions(OPTIONS.colorPaperTypes, row.paperType)}</select></td>
-            <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${escapeHtml(row.quantity)}"></td>
+            <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${row.quantity > 0 ? escapeHtml(row.quantity) : ""}"></td>
             <td><span class="readonly-value subtle">${formatInteger(row.itemsPerSheet)}</span></td>
             <td><span class="readonly-value subtle">${formatInteger(row.a4Sheets)}</span></td>
             <td><span class="readonly-value subtle">${formatInteger(row.a4Impressions)}</span></td>
@@ -7071,9 +7071,9 @@ async function initApp() {
                 </button>
               </div>
             </td>
-            <td><input class="cell-input" name="widthCm" type="text" inputmode="decimal" value="${escapeHtml(row.widthCm)}" placeholder="0,0"></td>
-            <td><input class="cell-input" name="heightCm" type="text" inputmode="decimal" value="${escapeHtml(row.heightCm)}" placeholder="0,0"></td>
-            <td><input class="cell-input" name="quantity" type="text" inputmode="numeric" value="${escapeHtml(row.quantity)}" placeholder="0"></td>
+            <td><input class="cell-input" name="widthCm" type="text" inputmode="decimal" value="${row.widthCm > 0 ? escapeHtml(row.widthCm) : ""}" placeholder="0,0"></td>
+            <td><input class="cell-input" name="heightCm" type="text" inputmode="decimal" value="${row.heightCm > 0 ? escapeHtml(row.heightCm) : ""}" placeholder="0,0"></td>
+            <td><input class="cell-input" name="quantity" type="text" inputmode="numeric" value="${row.quantity > 0 ? escapeHtml(row.quantity) : ""}" placeholder="0"></td>
             <td><span class="readonly-value subtle">${formatAreaM2(row.areaM2)}</span></td>
             <td><span class="readonly-value subtle">${row.itemsPerSheet > 0 ? formatInteger(row.itemsPerSheet) : "-"}</span></td>
             <td><span class="readonly-value subtle">${row.sheetsNeeded > 0 ? formatInteger(row.sheetsNeeded) : "-"}</span></td>
@@ -7115,7 +7115,7 @@ async function initApp() {
             <td><strong>${String(index + 1).padStart(2, "0")}</strong></td>
             <td><select class="cell-select" name="productType">${buildReadyProductOptions(row.productType)}</select></td>
             <td><input class="cell-input description" name="description" value="${escapeHtml(row.description === row.productLabel ? "" : row.description)}" placeholder="${escapeHtml(row.productLabel)}"></td>
-            <td><input class="cell-input" name="quantity" type="text" inputmode="numeric" value="${escapeHtml(row.quantity)}" placeholder="0"></td>
+            <td><input class="cell-input" name="quantity" type="text" inputmode="numeric" value="${row.quantity > 0 ? escapeHtml(row.quantity) : ""}" placeholder="0"></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.unitPrice)}</span></td>
             <td><input class="cell-input" name="artCreationFee" type="text" inputmode="decimal" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
             <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
@@ -7142,7 +7142,7 @@ async function initApp() {
           <tr class="${row.active ? "" : "is-empty"}" data-free-quote-row-index="${index}">
             <td><strong>${String(index + 1).padStart(2, "0")}</strong></td>
             <td><input class="cell-input description" name="description" value="${escapeHtml(row.description)}" placeholder="Ex.: Serviço avulso"></td>
-            <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${escapeHtml(row.quantity)}" placeholder="0"></td>
+            <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${row.quantity > 0 ? escapeHtml(row.quantity) : ""}" placeholder="0"></td>
             <td><input class="cell-input" name="unitValue" type="number" min="0" step="0.01" value="${escapeHtml(row.unitValue)}" placeholder="0,00"></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.baseTotal || 0)}</span></td>
             <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
@@ -7280,7 +7280,7 @@ async function initApp() {
             <td><select class="cell-select" name="variantType">${buildLinearMeterVariantOptions(getLinearMeterProduct(row.productType), row.variantType)}</select></td>
             <td><input class="cell-input description" name="description" value="${escapeHtml(row.description)}" placeholder="${escapeHtml(row.productLabel || "Ex.: DTF têxtil")}"></td>
             <td><span class="readonly-value subtle">${escapeHtml(row.fixedWidthLabel || "-")}</span></td>
-            <td><input class="cell-input" name="linearMeters" type="number" min="0" step="0.01" value="${escapeHtml(row.linearMeters)}" placeholder="0,00"></td>
+            <td><input class="cell-input" name="linearMeters" type="number" min="0" step="0.01" value="${row.linearMeters > 0 ? escapeHtml(row.linearMeters) : ""}" placeholder="0,00"></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.baseTotal)}</span></td>
             <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
             <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
@@ -7326,9 +7326,9 @@ async function initApp() {
                 <option value="m"${row.measureUnit === "m" ? " selected" : ""}>m</option>
               </select>
             </td>
-            <td><input class="cell-input" name="widthMm" type="number" min="0" step="0.1" value="${escapeHtml(row.widthMm)}" placeholder="0,0"></td>
-            <td><input class="cell-input" name="heightMm" type="number" min="0" step="0.1" value="${escapeHtml(row.heightMm)}" placeholder="0,0"></td>
-            <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${escapeHtml(row.quantity)}" placeholder="0"></td>
+            <td><input class="cell-input" name="widthMm" type="number" min="0" step="0.1" value="${row.widthMm > 0 ? escapeHtml(row.widthMm) : ""}" placeholder="0,0"></td>
+            <td><input class="cell-input" name="heightMm" type="number" min="0" step="0.1" value="${row.heightMm > 0 ? escapeHtml(row.heightMm) : ""}" placeholder="0,0"></td>
+            <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${row.quantity > 0 ? escapeHtml(row.quantity) : ""}" placeholder="0"></td>
             <td><span class="readonly-value subtle">${formatAreaM2(row.areaM2)}</span></td>
             <td><span class="readonly-value subtle">${escapeHtml(row.tierLabel)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.tierValue)}</span></td>
@@ -7359,7 +7359,7 @@ async function initApp() {
             </td>
             <td><input class="cell-input" name="widthMm" type="number" min="0" step="0.01" value="${row.widthMm > 0 ? escapeHtml(row.widthMm / 10) : ""}" placeholder="0,0"></td>
             <td><input class="cell-input" name="heightMm" type="number" min="0" step="0.01" value="${row.heightMm > 0 ? escapeHtml(row.heightMm / 10) : ""}" placeholder="0,0"></td>
-            <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${escapeHtml(row.quantity)}" placeholder="0"></td>
+            <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${row.quantity > 0 ? escapeHtml(row.quantity) : ""}" placeholder="0"></td>
             <td><span class="readonly-value subtle">${row.finalWidthMm > 0 && row.finalHeightMm > 0 ? `${formatResinMeasureCm(row.finalWidthMm)} x ${formatResinMeasureCm(row.finalHeightMm)} cm` : "-"}</span></td>
             <td><span class="readonly-value subtle">${escapeHtml(row.orientation || "-")}</span></td>
             <td><span class="readonly-value subtle">${formatInteger(row.piecesPerSheet || 0)}</span></td>
