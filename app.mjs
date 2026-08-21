@@ -1150,6 +1150,9 @@ function createDefaultLinearMeterRow(index) {
     productType: "dtf-textil",
     variantType: "2-dias",
     description: "",
+    widthCm: 0,
+    heightCm: 0,
+    quantity: 0,
     linearMeters: 0,
     artCreationFee: 0,
     discountType: "R$",
@@ -1936,6 +1939,9 @@ function mergeState(candidate) {
     state.linearMeterItems = candidate.linearMeterItems.map((row, index) => ({
       ...createDefaultLinearMeterRow(index),
       ...row,
+      widthCm: toDecimalNumber(row?.widthCm),
+      heightCm: toDecimalNumber(row?.heightCm),
+      quantity: toWholeNumber(row?.quantity),
       linearMeters: toDecimalNumber(row?.linearMeters),
       artCreationFee: toMoneyNumber(row?.artCreationFee),
       discountType: normalizeDiscountType(row?.discountType),
@@ -2233,7 +2239,7 @@ function getArtCreationFee(row) {
 }
 
 function isLinearMeterRowActive(row) {
-  return Boolean((row?.description || "").trim() || toDecimalNumber(row?.linearMeters) > 0 || getArtCreationFee(row) > 0 || toMoneyNumber(row?.discountValue) > 0);
+  return Boolean((row?.description || "").trim() || toDecimalNumber(row?.widthCm) > 0 || toDecimalNumber(row?.heightCm) > 0 || toWholeNumber(row?.quantity) > 0 || toDecimalNumber(row?.linearMeters) > 0 || getArtCreationFee(row) > 0 || toMoneyNumber(row?.discountValue) > 0);
 }
 
 function getLinearMeterCatalog(config) {
@@ -4160,11 +4166,48 @@ function calculateM2WorkbookFromConfig(state, config) {
   };
 }
 
+function getLinearMeterMaterialWidthCm(widthLabel) {
+  const normalized = String(widthLabel || "").trim().toLowerCase().replace(",", ".");
+  const value = Number.parseFloat(normalized);
+  if (!Number.isFinite(value) || value <= 0) {
+    return 0;
+  }
+  return normalized.includes("cm") ? value : value * 100;
+}
+
+function getLinearMeterLayout(widthCm, heightCm, quantity, materialWidthCm) {
+  const orientations = [
+    { itemWidthCm: widthCm, itemHeightCm: heightCm, rotated: false },
+    { itemWidthCm: heightCm, itemHeightCm: widthCm, rotated: true },
+  ]
+    .filter((orientation) => orientation.itemWidthCm > 0 && orientation.itemHeightCm > 0 && orientation.itemWidthCm <= materialWidthCm)
+    .map((orientation) => {
+      const columns = Math.floor(materialWidthCm / orientation.itemWidthCm);
+      const rows = Math.ceil(quantity / columns);
+      return {
+        ...orientation,
+        columns,
+        rows,
+        linearMeters: (rows * orientation.itemHeightCm) / 100,
+      };
+    });
+
+  return orientations.sort((first, second) => first.linearMeters - second.linearMeters)[0] || null;
+}
+
 function calculateLinearMeterRow(source, index, config) {
   const catalog = getLinearMeterCatalog(config);
   const product = getLinearMeterProduct(source.productType, config);
   const variant = getLinearMeterVariant(product, source.variantType);
-  const linearMeters = Math.max(0, toDecimalNumber(source.linearMeters));
+  const widthCm = Math.max(0, toDecimalNumber(source.widthCm));
+  const heightCm = Math.max(0, toDecimalNumber(source.heightCm));
+  const quantity = Math.max(0, toWholeNumber(source.quantity));
+  const materialWidthCm = getLinearMeterMaterialWidthCm(product?.widthLabel);
+  const hasDimensions = widthCm > 0 || heightCm > 0 || quantity > 0;
+  const layout = widthCm > 0 && heightCm > 0 && quantity > 0
+    ? getLinearMeterLayout(widthCm, heightCm, quantity, materialWidthCm)
+    : null;
+  const linearMeters = layout?.linearMeters || (hasDimensions ? 0 : Math.max(0, toDecimalNumber(source.linearMeters)));
   const artCreationFee = getArtCreationFee(source);
   const active = isLinearMeterRowActive(source);
 
@@ -4177,6 +4220,13 @@ function calculateLinearMeterRow(source, index, config) {
     variantType: variant?.id || "",
     variantLabel: variant?.label || "",
     fixedWidthLabel: product?.widthLabel || "-",
+    widthCm,
+    heightCm,
+    quantity,
+    materialWidthCm,
+    columns: layout?.columns || 0,
+    rows: layout?.rows || 0,
+    rotated: Boolean(layout?.rotated),
     linearMeters,
     artCreationFee,
     baseTotal: 0,
@@ -4192,10 +4242,24 @@ function calculateLinearMeterRow(source, index, config) {
     return baseRow;
   }
 
+  if (hasDimensions && (widthCm <= 0 || heightCm <= 0 || quantity <= 0)) {
+    return {
+      ...baseRow,
+      warning: `Item ${String(index + 1).padStart(2, "0")}: informe largura, altura e quantidade maiores que zero.`,
+    };
+  }
+
+  if (hasDimensions && !layout) {
+    return {
+      ...baseRow,
+      warning: `Item ${String(index + 1).padStart(2, "0")}: a peça não cabe na largura de ${product?.widthLabel || "material"}.`,
+    };
+  }
+
   if (linearMeters <= 0) {
     return {
       ...baseRow,
-      warning: `Item ${String(index + 1).padStart(2, "0")}: informe um metro linear maior que zero.`,
+      warning: `Item ${String(index + 1).padStart(2, "0")}: informe largura, altura e quantidade maiores que zero.`,
     };
   }
 
@@ -6163,7 +6227,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       sourceIndex: index,
       kind: "Metro linear",
       description: row.description || row.productLabel,
-      detail: `${formatMeasure(row.linearMeters)} m | ${row.productLabel}${row.variantLabel ? ` | ${row.variantLabel}` : ""} | Largura: ${row.fixedWidthLabel}`,
+      detail: `${formatMeasure(row.linearMeters)} m | ${row.productLabel}${row.variantLabel ? ` | ${row.variantLabel}` : ""} | Largura: ${row.fixedWidthLabel}${row.columns > 0 ? ` | Aproveitamento: ${row.columns} col. x ${row.rows} lin.${row.rotated ? " (girado)" : ""}` : ""}`,
       artDetail: formatArtCreationDetail(row),
       discountDetail: row.discountDescription,
       total: row.total,
@@ -6334,7 +6398,7 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
       text: `- ${row.description || `Bloco autocopiativo ${index + 1}`} | ${row.quantity} blocos | ${row.format} | ${row.measure} | ${row.vias} via${row.vias > 1 ? "s" : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...linearMeterWorkbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || row.productLabel || `Metro linear ${index + 1}`} | ${formatMeasure(row.linearMeters)} m | ${row.productLabel}${row.variantLabel ? ` | ${row.variantLabel}` : ""} | Largura: ${row.fixedWidthLabel}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
+      text: `- ${row.description || row.productLabel || `Metro linear ${index + 1}`} | ${formatMeasure(row.linearMeters)} m | ${row.productLabel}${row.variantLabel ? ` | ${row.variantLabel}` : ""} | Largura: ${row.fixedWidthLabel}${row.columns > 0 ? ` | Aproveitamento: ${row.columns} col. x ${row.rows} lin.${row.rotated ? " (girado)" : ""}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...m2Workbook.activeRows.map((row, index) => ({
       text: `- ${getM2RowDescription(row) || `M² ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.finishSummary ? `${row.finishSummary} | ` : ""}${formatArtCreationDetail(row) ? `${formatArtCreationDetail(row)} | ` : ""}${row.discountDescription ? `${row.discountDescription} | ` : ""}${formatCurrency(row.total)}`,
@@ -7424,7 +7488,11 @@ async function initApp() {
             <td><select class="cell-select" name="variantType">${buildLinearMeterVariantOptions(getLinearMeterProduct(row.productType, config), row.variantType)}</select></td>
             <td><input class="cell-input description" name="description" value="${escapeHtml(row.description)}" placeholder="${escapeHtml(row.productLabel || "Ex.: DTF têxtil")}"></td>
             <td><span class="readonly-value subtle">${escapeHtml(row.fixedWidthLabel || "-")}</span></td>
-            <td><input class="cell-input" name="linearMeters" type="number" min="0" step="0.01" value="${row.linearMeters > 0 ? escapeHtml(row.linearMeters) : ""}" placeholder="0,00"></td>
+            <td><input class="cell-input" name="widthCm" type="number" min="0" step="0.1" value="${row.widthCm > 0 ? escapeHtml(row.widthCm) : ""}" placeholder="0"></td>
+            <td><input class="cell-input" name="heightCm" type="number" min="0" step="0.1" value="${row.heightCm > 0 ? escapeHtml(row.heightCm) : ""}" placeholder="0"></td>
+            <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${row.quantity > 0 ? escapeHtml(row.quantity) : ""}" placeholder="0"></td>
+            <td><span class="readonly-value subtle">${row.columns > 0 ? `${row.columns} col. x ${row.rows} lin.${row.rotated ? " | girado" : ""}` : "-"}</span></td>
+            <td><span class="readonly-value subtle">${formatMeasure(row.linearMeters)} m</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.baseTotal)}</span></td>
             <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
             <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
@@ -9102,8 +9170,12 @@ async function initApp() {
       return;
     }
 
-    if (field === "linearMeters") {
+    if (field === "widthCm" || field === "heightCm") {
       row[field] = toDecimalNumber(target.value);
+      row.linearMeters = 0;
+    } else if (field === "quantity") {
+      row[field] = toWholeNumber(target.value);
+      row.linearMeters = 0;
     } else if (field === "artCreationFee" || field === "discountValue") {
       row[field] = toMoneyNumber(target.value);
     } else if (field === "discountType") {
