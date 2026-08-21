@@ -6131,7 +6131,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
         sourceIndex: index,
         kind: "Apostila",
         description: row.description,
-        detail: `${formatInteger(row.quantity)} apostilas | ${formatInteger(row.pages)} páginas${row.colorPages > 0 ? ` (${formatInteger(row.blackWhitePages)} PB + ${formatInteger(row.colorPages)} coloridas)` : ""} | ${buildApostilaPrintDetail(row)} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}`,
+        detail: `${formatInteger(row.quantity)} apostilas | Tamanho ${row.size || "A4"} | ${formatInteger(row.pages)} páginas${row.colorPages > 0 ? ` (${formatInteger(row.blackWhitePages)} PB + ${formatInteger(row.colorPages)} coloridas)` : ""} | ${buildApostilaPrintDetail(row)} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}`,
         extraDetail: coverDetail,
         artDetail: formatArtCreationDetail(row),
         discountDetail: row.discountDescription,
@@ -6370,7 +6370,7 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
     ...workbook.activeRows.map((row, index) => {
       const coverDetail = buildApostilaCoverDetail(row);
       return {
-        text: `- ${row.description || `Apostila ${index + 1}`} | ${row.quantity} apostilas | ${row.pages} páginas${row.colorPages > 0 ? ` (${row.blackWhitePages} PB + ${row.colorPages} coloridas)` : ""} | ${buildApostilaPrintDetail(row)} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}${coverDetail ? ` | ${coverDetail}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
+        text: `- ${row.description || `Apostila ${index + 1}`} | ${row.quantity} apostilas | Tamanho ${row.size || "A4"} | ${row.pages} páginas${row.colorPages > 0 ? ` (${row.blackWhitePages} PB + ${row.colorPages} coloridas)` : ""} | ${buildApostilaPrintDetail(row)} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}${coverDetail ? ` | ${coverDetail}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
       };
     }),
     ...colorWorkbook.activeRows.map((row, index) => ({
