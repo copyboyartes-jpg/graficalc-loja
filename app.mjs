@@ -693,9 +693,9 @@ function createDefaultLinearMeterPricing() {
     dtfTextile: {
       widthLabel: "58 cm",
       variants: [
-        { id: "2-dias", label: "Até 2 dias úteis", minimumOrder: 15, tiers: [{ upTo: 0.5, rate: 60 }, { upTo: 1, rate: 50 }, { upTo: 3, rate: 40 }, { upTo: null, rate: 35 }] },
-        { id: "amanha", label: "Necessito pra amanhã", minimumOrder: 20, tiers: [{ upTo: 0.5, rate: 90 }, { upTo: 1, rate: 70 }, { upTo: 3, rate: 55 }, { upTo: null, rate: 50 }] },
-        { id: "hoje", label: "Necessito pra hoje", minimumOrder: 40, tiers: [{ upTo: 0.5, rate: 110 }, { upTo: 1, rate: 100 }, { upTo: 3, rate: 90 }, { upTo: null, rate: 85 }] },
+        { id: "2-dias", label: "Até 2 dias úteis", minimumOrder: 15, tiers: [{ upTo: 0.5, rate: 60, applicationRate: 0 }, { upTo: 1, rate: 50, applicationRate: 0 }, { upTo: 3, rate: 40, applicationRate: 0 }, { upTo: null, rate: 35, applicationRate: 0 }] },
+        { id: "amanha", label: "Necessito pra amanhã", minimumOrder: 20, tiers: [{ upTo: 0.5, rate: 90, applicationRate: 0 }, { upTo: 1, rate: 70, applicationRate: 0 }, { upTo: 3, rate: 55, applicationRate: 0 }, { upTo: null, rate: 50, applicationRate: 0 }] },
+        { id: "hoje", label: "Necessito pra hoje", minimumOrder: 40, tiers: [{ upTo: 0.5, rate: 110, applicationRate: 0 }, { upTo: 1, rate: 100, applicationRate: 0 }, { upTo: 3, rate: 90, applicationRate: 0 }, { upTo: null, rate: 85, applicationRate: 0 }] },
       ],
     },
     dtfUv: {
@@ -1693,12 +1693,29 @@ function mergeConfig(candidate) {
       dtfTextile: {
         ...merged.linearMeterPricing.dtfTextile,
         ...pricing.dtfTextile,
-        variants: Array.isArray(pricing.dtfTextile?.variants) ? pricing.dtfTextile.variants : merged.linearMeterPricing.dtfTextile.variants,
+        variants: Array.isArray(pricing.dtfTextile?.variants)
+          ? merged.linearMeterPricing.dtfTextile.variants.map((defaultVariant, variantIndex) => {
+              const savedVariant = pricing.dtfTextile.variants[variantIndex] || {};
+              return {
+                ...defaultVariant,
+                ...savedVariant,
+                tiers: defaultVariant.tiers.map((defaultTier, tierIndex) => ({
+                  ...defaultTier,
+                  ...(savedVariant.tiers?.[tierIndex] || {}),
+                })),
+              };
+            })
+          : merged.linearMeterPricing.dtfTextile.variants,
       },
       dtfUv: {
         ...merged.linearMeterPricing.dtfUv,
         ...pricing.dtfUv,
-        variants: Array.isArray(pricing.dtfUv?.variants) ? pricing.dtfUv.variants : merged.linearMeterPricing.dtfUv.variants,
+        variants: Array.isArray(pricing.dtfUv?.variants)
+          ? merged.linearMeterPricing.dtfUv.variants.map((defaultVariant, variantIndex) => ({
+              ...defaultVariant,
+              ...(pricing.dtfUv.variants[variantIndex] || {}),
+            }))
+          : merged.linearMeterPricing.dtfUv.variants,
       },
       products: {
         ...merged.linearMeterPricing.products,
@@ -4187,7 +4204,9 @@ function calculateLinearMeterRow(source, index, config) {
   if (product?.id === "dtf-textil") {
     const tiers = Array.isArray(variant?.tiers) ? variant.tiers : [];
     const selectedTier = tiers.find((tier) => linearMeters <= tier.upTo) || tiers[tiers.length - 1];
-    baseTotal = Math.max(toMoneyNumber(variant?.minimumOrder), linearMeters * Number(selectedTier?.rate || 0));
+    const materialTotal = Math.max(toMoneyNumber(variant?.minimumOrder), linearMeters * toMoneyNumber(selectedTier?.rate));
+    const applicationTotal = linearMeters * toMoneyNumber(selectedTier?.applicationRate);
+    baseTotal = materialTotal + applicationTotal;
   } else if (product?.id === "dtf-uv") {
     if (linearMeters <= 0.5) {
       baseTotal = toMoneyNumber(variant?.minimumHalfMeter);
@@ -4794,7 +4813,7 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
   const linearMeterCards = [
     createConfigCardMarkup(
       "DTF têxtil",
-      "Altere os valores por prazo e faixa. O cálculo aplica o maior valor entre a faixa de metragem e o pedido mínimo.",
+      "Altere o valor do material e da aplicação por faixa. O cálculo aplica o maior valor entre a faixa de metragem e o pedido mínimo, depois soma a aplicação.",
       `
         <div class="config-grid compact-grid">
           <label><span>Largura do material</span><input data-config-prefix="linear-meter" data-config-key="dtfTextile.widthLabel" type="text" value="${escapeHtml(linearPricing.dtfTextile.widthLabel)}"></label>
@@ -4803,8 +4822,21 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
           <div class="inline-config-block">
             <h4>${escapeHtml(variant.label)}</h4>
             <div class="config-grid compact-grid">
-              <label><span>Pedido mínimo (R$)</span><input data-config-prefix="linear-meter" data-config-key="dtfTextile.variants.${variantIndex}.minimumOrder" type="number" min="0" step="0.01" value="${escapeHtml(variant.minimumOrder)}"></label>
-              ${variant.tiers.map((tier, tierIndex) => `<label><span>${tierIndex === variant.tiers.length - 1 ? "Acima de 3" : `Até ${formatMeasure(tier.upTo)}`} m (R$/m)</span><input data-config-prefix="linear-meter" data-config-key="dtfTextile.variants.${variantIndex}.tiers.${tierIndex}.rate" type="number" min="0" step="0.01" value="${escapeHtml(tier.rate)}"></label>`).join("")}
+              <label><span>Pedido mínimo do material (R$)</span><input data-config-prefix="linear-meter" data-config-key="dtfTextile.variants.${variantIndex}.minimumOrder" type="number" min="0" step="0.01" value="${escapeHtml(variant.minimumOrder)}"></label>
+            </div>
+            <div class="table-shell">
+              <table class="config-table">
+                <thead><tr><th>Faixa</th><th>Material (R$/m)</th><th>Aplicação (R$/m)</th></tr></thead>
+                <tbody>
+                  ${variant.tiers.map((tier, tierIndex) => `
+                    <tr>
+                      <td>${tierIndex === variant.tiers.length - 1 ? "Acima de 3 m" : `Até ${formatMeasure(tier.upTo)} m`}</td>
+                      <td><input data-config-prefix="linear-meter" data-config-key="dtfTextile.variants.${variantIndex}.tiers.${tierIndex}.rate" type="number" min="0" step="0.01" value="${escapeHtml(tier.rate)}"></td>
+                      <td><input data-config-prefix="linear-meter" data-config-key="dtfTextile.variants.${variantIndex}.tiers.${tierIndex}.applicationRate" type="number" min="0" step="0.01" value="${escapeHtml(tier.applicationRate ?? 0)}"></td>
+                    </tr>
+                  `).join("")}
+                </tbody>
+              </table>
             </div>
           </div>
         `).join("")}
