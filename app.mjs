@@ -1049,6 +1049,7 @@ function createDefaultRow(index) {
     bindingGroup: "",
     quantity: 0,
     pages: 0,
+    pagesPerSheet: 1,
     colorPages: 0,
     coverType: "Sem capa",
     coverPaper: "Sulfite 75g",
@@ -1803,6 +1804,9 @@ function mergeState(candidate) {
       ...row,
       quantity: toWholeNumber(row?.quantity),
       pages: toWholeNumber(row?.pages),
+      pagesPerSheet: [1, 2, 4, 6].includes(toWholeNumber(row?.pagesPerSheet))
+        ? toWholeNumber(row.pagesPerSheet)
+        : 1,
       colorPages: toWholeNumber(row?.colorPages),
       artCreationFee: toMoneyNumber(row?.artCreationFee),
       discountType: normalizeDiscountType(row?.discountType),
@@ -2385,6 +2389,25 @@ function getApostilaPagesPerSheet(size) {
   return 1;
 }
 
+function getApostilaInnerPagesPerSheet(row) {
+  // A5 and A6 already use their physical imposition on A4 sheets.
+  if (row?.size !== "A4") {
+    return getApostilaPagesPerSheet(row?.size);
+  }
+
+  const pagesPerSheet = toWholeNumber(row?.pagesPerSheet);
+  return [1, 2, 4, 6].includes(pagesPerSheet) ? pagesPerSheet : 1;
+}
+
+function getApostilaSizeDetail(row) {
+  const size = row.size || "A4";
+  const pagesPerSheet = getApostilaInnerPagesPerSheet(row);
+  if (size === "A4" && pagesPerSheet > 1) {
+    return `Apostila tamanho ${size} impressa com ${pagesPerSheet} páginas por folha`;
+  }
+  return `Tamanho ${size}`;
+}
+
 function getPrintTotalByType(printType, rowImpressions, effectiveQuantity, config, printMode) {
   if (printType === "Preto e branco") {
     return getBlackWhiteTotal(rowImpressions, effectiveQuantity, config, printMode);
@@ -2416,7 +2439,8 @@ function getBindingSheetsPerCopy(row) {
   if (pages <= 0) {
     return 0;
   }
-  return row.printMode === "Frente e verso" ? Math.ceil(pages / 2) : pages;
+  const imposedPages = Math.ceil(pages / getApostilaInnerPagesPerSheet(row));
+  return row.printMode === "Frente e verso" ? Math.ceil(imposedPages / 2) : imposedPages;
 }
 
 function getInnerImpressions(row) {
@@ -2425,7 +2449,7 @@ function getInnerImpressions(row) {
   if (copies <= 0 || pages <= 0) {
     return 0;
   }
-  const pagesPerA4 = Math.ceil(pages / getApostilaPagesPerSheet(row.size));
+  const pagesPerA4 = Math.ceil(pages / getApostilaInnerPagesPerSheet(row));
   return copies * pagesPerA4;
 }
 
@@ -2681,11 +2705,11 @@ function getNormalizedColorPages(row) {
   return Math.min(colorPages, totalPages);
 }
 
-function getPagesPerA4(pageCount, size) {
+function getPagesPerA4(pageCount, row) {
   if (pageCount <= 0) {
     return 0;
   }
-  return Math.ceil(pageCount / getApostilaPagesPerSheet(size));
+  return Math.ceil(pageCount / getApostilaInnerPagesPerSheet(row));
 }
 
 function getInnerImpressionBreakdown(row) {
@@ -2706,8 +2730,8 @@ function getInnerImpressionBreakdown(row) {
   const fullColorMode = row.printType !== "Preto e branco" && colorPages === 0;
   const colorPagesPerCopy = fullColorMode ? totalPages : colorPages;
   const blackWhitePagesPerCopy = fullColorMode ? 0 : Math.max(0, totalPages - colorPagesPerCopy);
-  const colorImpressions = copies * getPagesPerA4(colorPagesPerCopy, row.size);
-  const blackWhiteImpressions = copies * getPagesPerA4(blackWhitePagesPerCopy, row.size);
+  const colorImpressions = copies * getPagesPerA4(colorPagesPerCopy, row);
+  const blackWhiteImpressions = copies * getPagesPerA4(blackWhitePagesPerCopy, row);
 
   return {
     totalImpressions: colorImpressions + blackWhiteImpressions,
@@ -6131,7 +6155,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
         sourceIndex: index,
         kind: "Apostila",
         description: row.description,
-        detail: `${formatInteger(row.quantity)} apostilas | Tamanho ${row.size || "A4"} | ${formatInteger(row.pages)} páginas${row.colorPages > 0 ? ` (${formatInteger(row.blackWhitePages)} PB + ${formatInteger(row.colorPages)} coloridas)` : ""} | ${buildApostilaPrintDetail(row)} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}`,
+        detail: `${formatInteger(row.quantity)} apostilas | ${getApostilaSizeDetail(row)} | ${formatInteger(row.pages)} páginas${row.colorPages > 0 ? ` (${formatInteger(row.blackWhitePages)} PB + ${formatInteger(row.colorPages)} coloridas)` : ""} | ${buildApostilaPrintDetail(row)} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}`,
         extraDetail: coverDetail,
         artDetail: formatArtCreationDetail(row),
         discountDetail: row.discountDescription,
@@ -6370,7 +6394,7 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
     ...workbook.activeRows.map((row, index) => {
       const coverDetail = buildApostilaCoverDetail(row);
       return {
-        text: `- ${row.description || `Apostila ${index + 1}`} | ${row.quantity} apostilas | Tamanho ${row.size || "A4"} | ${row.pages} páginas${row.colorPages > 0 ? ` (${row.blackWhitePages} PB + ${row.colorPages} coloridas)` : ""} | ${buildApostilaPrintDetail(row)} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}${coverDetail ? ` | ${coverDetail}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
+        text: `- ${row.description || `Apostila ${index + 1}`} | ${row.quantity} apostilas | ${getApostilaSizeDetail(row)} | ${row.pages} páginas${row.colorPages > 0 ? ` (${row.blackWhitePages} PB + ${row.colorPages} coloridas)` : ""} | ${buildApostilaPrintDetail(row)} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}${coverDetail ? ` | ${coverDetail}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
       };
     }),
     ...colorWorkbook.activeRows.map((row, index) => ({
@@ -7204,6 +7228,7 @@ async function initApp() {
             <td><input class="cell-input" name="bindingGroup" value="${escapeHtml(row.bindingGroup)}" placeholder="Ex.: Grupo A"></td>
             <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${row.quantity > 0 ? escapeHtml(row.quantity) : ""}"></td>
             <td><input class="cell-input" name="pages" type="number" min="0" step="1" value="${row.pages > 0 ? escapeHtml(row.pages) : ""}"></td>
+            <td><select class="cell-select" name="pagesPerSheet">${buildOptions(["1", "2", "4", "6"], String(row.pagesPerSheet || 1))}</select></td>
             <td><input class="cell-input" name="colorPages" type="number" min="0" step="1" value="${row.colorPages > 0 ? escapeHtml(row.colorPages) : ""}"></td>
             <td><select class="cell-select" name="coverType">${buildOptions(OPTIONS.coverTypes, row.coverType)}</select></td>
             <td><select class="cell-select" name="coverPaper">${buildOptions(OPTIONS.coverPapers, row.coverPaper)}</select></td>
@@ -8743,6 +8768,9 @@ async function initApp() {
     }
     if (field === "quantity" || field === "pages" || field === "colorPages") {
       row[field] = toWholeNumber(target.value);
+    } else if (field === "pagesPerSheet") {
+      const pagesPerSheet = toWholeNumber(target.value);
+      row.pagesPerSheet = [1, 2, 4, 6].includes(pagesPerSheet) ? pagesPerSheet : 1;
     } else if (field === "artCreationFee" || field === "discountValue") {
       row[field] = toMoneyNumber(target.value);
     } else if (field === "discountType") {
