@@ -688,6 +688,19 @@ const READY_PRODUCT_CATALOG = [
   },
 ];
 
+function createDefaultReadyProductPricing() {
+  return Object.fromEntries(
+    READY_PRODUCT_CATALOG
+      .filter((product) => product.pricingMode !== "plainBadge" && product.pricingMode !== "printedBadge")
+      .map((product) => [product.id, {
+        unitPrice: Number.isFinite(Number(product.unitPrice)) ? Number(product.unitPrice) : 0,
+        minQuantity: toWholeNumber(product.minQuantity),
+        quoteDescription: product.quoteDescription || "",
+        tiers: Array.isArray(product.tiers) ? deepClone(product.tiers) : [],
+      }])
+  );
+}
+
 function createDefaultLinearMeterPricing() {
   return {
     dtfTextile: {
@@ -927,6 +940,7 @@ function createDefaultConfig() {
         { quantity: 50, total: 200, label: "50 un" },
       ],
     },
+    readyProductPricing: createDefaultReadyProductPricing(),
     cutPricing: {
       upToFiveSheets: [
         { minUp: 1, value: 2.0, label: "Ate 11 por folha" },
@@ -1661,6 +1675,28 @@ function mergeConfig(candidate) {
         ? sanitizeValue(candidate.credentialLanyardPricing.printedPackages)
         : merged.credentialLanyardPricing.printedPackages,
     };
+  }
+
+  if (candidate.readyProductPricing && typeof candidate.readyProductPricing === "object") {
+    for (const [productId, defaultPricing] of Object.entries(merged.readyProductPricing)) {
+      const candidatePricing = candidate.readyProductPricing[productId];
+      if (!candidatePricing || typeof candidatePricing !== "object") {
+        continue;
+      }
+      merged.readyProductPricing[productId] = {
+        ...defaultPricing,
+        ...sanitizeValue(candidatePricing),
+        unitPrice: Number.isFinite(Number(candidatePricing.unitPrice))
+          ? Number(candidatePricing.unitPrice)
+          : defaultPricing.unitPrice,
+        minQuantity: Number.isFinite(Number(candidatePricing.minQuantity))
+          ? Number(candidatePricing.minQuantity)
+          : defaultPricing.minQuantity,
+        tiers: Array.isArray(candidatePricing.tiers)
+          ? sanitizeValue(candidatePricing.tiers)
+          : defaultPricing.tiers,
+      };
+    }
   }
 
   if (candidate.cutPricing && typeof candidate.cutPricing === "object") {
@@ -2986,7 +3022,18 @@ function getReadyProductSelection(config, productType, quantity = 0) {
       : toMoneyNumber(packageTier.total)
     : 0;
   const options = READY_PRODUCT_CATALOG.map((item) => {
-    let unitPrice = toMoneyNumber(item.unitPrice);
+    const configuredPricing = config?.readyProductPricing?.[item.id] || {};
+    const unitPriceConfigured = Object.prototype.hasOwnProperty.call(configuredPricing, "unitPrice")
+      ? toMoneyNumber(configuredPricing.unitPrice)
+      : toMoneyNumber(item.unitPrice);
+    const minimumQuantity = Object.prototype.hasOwnProperty.call(configuredPricing, "minQuantity")
+      ? toWholeNumber(configuredPricing.minQuantity)
+      : toWholeNumber(item.minQuantity);
+    const tiers = Array.isArray(configuredPricing.tiers) ? configuredPricing.tiers : item.tiers || [];
+    const quoteDescription = typeof configuredPricing.quoteDescription === "string"
+      ? configuredPricing.quoteDescription
+      : item.quoteDescription;
+    let unitPrice = unitPriceConfigured;
     let totalPrice = null;
     let billedQuantity = requestedQuantity;
     let packageLabel = "";
@@ -2998,11 +3045,13 @@ function getReadyProductSelection(config, productType, quantity = 0) {
       unitPrice = billedQuantity > 0 ? totalPrice / billedQuantity : 0;
       packageLabel = packageTier?.label || `${billedQuantity} un`;
     } else if (item.pricingMode === "tieredUnit") {
-      unitPrice = lookupTier(item.tiers || [], requestedQuantity);
+      unitPrice = lookupTier(tiers, requestedQuantity);
     }
 
     return {
       ...item,
+      minQuantity: minimumQuantity,
+      quoteDescription,
       unitPrice,
       totalPrice,
       billedQuantity,
@@ -4867,9 +4916,14 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
 
   const produtosProntosCards = [
     createConfigCardMarkup(
-      "Cordões e produtos vendidos separadamente",
-      "Esses valores aparecem na aba de produtos prontos para orçar itens avulsos. Os cordões seguem a configuração abaixo e os carimbos usam a tabela fixa cadastrada no sistema.",
+      "Cordões vendidos separadamente",
+      "Os cordões usam esta tabela na aba de produtos prontos. Os demais itens possuem preços e faixas configuráveis no bloco seguinte.",
       createCredentialLanyardPricingMarkup(config.credentialLanyardPricing)
+    ),
+    createConfigCardMarkup(
+      "Demais produtos prontos",
+      "Ajuste preços por unidade, pedidos mínimos, faixas de quantidade e descrições padrão de carimbos, crachás, canecas, windbanners e acessórios.",
+      createReadyProductPricingMarkup(config.readyProductPricing)
     ),
   ];
 
@@ -5577,6 +5631,70 @@ function createCredentialRoundLanyardPricingMarkup(credentialLanyardPricing) {
     `,
     "Este é o cordão usado diretamente na aba de credenciais."
   );
+}
+
+function createReadyProductPricingMarkup(readyProductPricing) {
+  const pricing = readyProductPricing || createDefaultReadyProductPricing();
+  const configurableProducts = READY_PRODUCT_CATALOG.filter(
+    (product) => product.pricingMode !== "plainBadge" && product.pricingMode !== "printedBadge"
+  );
+  const unitProducts = configurableProducts.filter((product) => product.pricingMode !== "tieredUnit");
+  const tieredProducts = configurableProducts.filter((product) => product.pricingMode === "tieredUnit");
+
+  return [
+    createInlineConfigBlockMarkup(
+      "Valores por unidade",
+      `
+        <div class="table-shell">
+          <table class="config-table">
+            <thead><tr><th>Produto</th><th>Categoria</th><th>Valor un. (R$)</th><th>Descrição padrão no orçamento</th></tr></thead>
+            <tbody>
+              ${unitProducts.map((product) => {
+                const productPricing = pricing[product.id] || {};
+                return `
+                  <tr>
+                    <td>${escapeHtml(product.label)}</td>
+                    <td>${escapeHtml(product.category)}</td>
+                    <td><input data-config-prefix="ready-product" data-config-key="unitPrice" data-ready-product-id="${escapeHtml(product.id)}" type="number" min="0" step="0.01" value="${escapeHtml(productPricing.unitPrice ?? product.unitPrice ?? 0)}"></td>
+                    <td><input data-config-prefix="ready-product" data-config-key="quoteDescription" data-ready-product-id="${escapeHtml(product.id)}" type="text" value="${escapeHtml(productPricing.quoteDescription ?? product.quoteDescription ?? "")}" placeholder="Usar nome do produto"></td>
+                  </tr>
+                `;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>
+      `,
+      "Os produtos sem faixa usam diretamente o valor unitário definido acima."
+    ),
+    ...tieredProducts.map((product) => {
+      const productPricing = pricing[product.id] || {};
+      const tiers = Array.isArray(productPricing.tiers) ? productPricing.tiers : product.tiers || [];
+      return createInlineConfigBlockMarkup(
+        product.label,
+        `
+          <div class="config-grid compact-grid">
+            <label><span>Pedido mínimo (un.)</span><input data-config-prefix="ready-product" data-config-key="minQuantity" data-ready-product-id="${escapeHtml(product.id)}" type="number" min="0" step="1" value="${escapeHtml(productPricing.minQuantity ?? product.minQuantity ?? 0)}"></label>
+            <label><span>Descrição padrão no orçamento</span><input data-config-prefix="ready-product" data-config-key="quoteDescription" data-ready-product-id="${escapeHtml(product.id)}" type="text" value="${escapeHtml(productPricing.quoteDescription ?? product.quoteDescription ?? "")}" placeholder="Usar nome do produto"></label>
+          </div>
+          <div class="table-shell">
+            <table class="config-table">
+              <thead><tr><th>Quantidade mínima da faixa</th><th>Valor un. (R$)</th><th>Nome da faixa</th></tr></thead>
+              <tbody>
+                ${tiers.map((tier, tierIndex) => `
+                  <tr>
+                    <td><input data-config-prefix="ready-product" data-config-key="min" data-ready-product-id="${escapeHtml(product.id)}" data-ready-product-tier="${tierIndex}" type="number" min="1" step="1" value="${escapeHtml(tier.min)}"></td>
+                    <td><input data-config-prefix="ready-product" data-config-key="value" data-ready-product-id="${escapeHtml(product.id)}" data-ready-product-tier="${tierIndex}" type="number" min="0" step="0.01" value="${escapeHtml(tier.value)}"></td>
+                    <td><input data-config-prefix="ready-product" data-config-key="label" data-ready-product-id="${escapeHtml(product.id)}" data-ready-product-tier="${tierIndex}" type="text" value="${escapeHtml(tier.label)}"></td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>
+        `,
+        "A faixa com a maior quantidade mínima que não ultrapasse o pedido será aplicada."
+      );
+    }),
+  ].join("");
 }
 
 function createCredentialPsPricingMarkup(m2Pricing) {
@@ -9379,6 +9497,8 @@ async function initApp() {
     const prefix = target.dataset.configPrefix;
     const rowIndex = Number(target.dataset.configRow);
     const key = target.dataset.configKey;
+    const readyProductId = target.dataset.readyProductId;
+    const readyProductTier = Number(target.dataset.readyProductTier);
     const catalogProductTab = target.dataset.catalogProductTab;
     const catalogProductIndex = Number(target.dataset.catalogProductIndex);
     const catalogProductKey = target.dataset.catalogProductKey;
@@ -9426,6 +9546,40 @@ async function initApp() {
       persist();
       renderRowsAndSummary();
       setConfigStatus("Tabela de metro linear atualizada.", "success");
+      return;
+    }
+
+    if (prefix === "ready-product") {
+      const productPricing = config.readyProductPricing?.[readyProductId];
+      if (!productPricing) {
+        return;
+      }
+      if (Number.isFinite(readyProductTier)) {
+        const tier = productPricing.tiers?.[readyProductTier];
+        if (!tier) {
+          return;
+        }
+        if (key === "min") {
+          tier.min = toWholeNumber(target.value);
+        } else if (key === "value") {
+          tier.value = toMoneyNumber(target.value);
+        } else if (key === "label") {
+          tier.label = target.value;
+        } else {
+          return;
+        }
+      } else if (key === "unitPrice") {
+        productPricing.unitPrice = toMoneyNumber(target.value);
+      } else if (key === "minQuantity") {
+        productPricing.minQuantity = toWholeNumber(target.value);
+      } else if (key === "quoteDescription") {
+        productPricing.quoteDescription = target.value;
+      } else {
+        return;
+      }
+      persist();
+      renderRowsAndSummary();
+      setConfigStatus("Produto pronto atualizado.", "success");
       return;
     }
 
