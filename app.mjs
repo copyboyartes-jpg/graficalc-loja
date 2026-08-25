@@ -460,7 +460,7 @@ const READY_PRODUCT_CATALOG = [
   },
   {
     id: "Windbanner promocional 1,20m - somente tecido",
-    label: "Windbanner promocional 1,20m - somente tecido",
+    label: "Windbanner promocional 1,30m - somente tecido",
     category: "Windbanner promocional",
     pricingMode: "tieredUnit",
     minQuantity: 5,
@@ -472,7 +472,7 @@ const READY_PRODUCT_CATALOG = [
   },
   {
     id: "Windbanner promocional 1,20m - tecido e haste",
-    label: "Windbanner promocional 1,20m - tecido e haste",
+    label: "Windbanner promocional 1,30m - tecido e haste",
     category: "Windbanner promocional",
     pricingMode: "tieredUnit",
     minQuantity: 5,
@@ -484,7 +484,7 @@ const READY_PRODUCT_CATALOG = [
   },
   {
     id: "Windbanner promocional 1,20m - tecido, haste e base",
-    label: "Windbanner promocional 1,20m - tecido, haste e base",
+    label: "Windbanner promocional 1,30m - tecido, haste e base",
     category: "Windbanner promocional",
     pricingMode: "tieredUnit",
     minQuantity: 5,
