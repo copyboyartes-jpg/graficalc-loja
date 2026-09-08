@@ -325,7 +325,7 @@ const BUSINESS_CARD_CATALOG = [
 const FLYER_CATALOG = [
   ...["Couche 120g", "Offset 120g"].flatMap((paper) => [
     { production: "Laser", paper, size: "10x7cm", modes: { "Só frente": [[500, 131], [1000, 235], [2000, 433], [5000, 1040]], "Frente e verso": [[500, 261], [1000, 450], [2000, 830], [5000, 1870]] } },
-    { production: "Laser", paper, size: "10x14cm", modes: { "Só frente": [[200, 104], [500, 197], [1000, 362], [2000, 709], [5000, 1573]], "Frente e verso": [[200, 205], [500, 393], [1000, 707], [2000, 1337], [5000, 2831]] } },
+    { production: "Laser", paper, size: "10x14cm", modes: { "Só frente": [[200, 104], [500, 197], [1000, 362], [1500, 545], [2000, 709], [5000, 1573]], "Frente e verso": [[200, 205], [500, 393], [1000, 707], [1500, 1065], [2000, 1337], [5000, 2831]] } },
     { production: "Laser", paper, size: "14x20cm", modes: { "Só frente": [[100, 78], [200, 142], [300, 189], [500, 300], [750, 433], [1000, 591], [1500, 865], [2000, 1180], [3000, 1650]], "Frente e verso": [[100, 155], [200, 276], [300, 370], [500, 582], [750, 850], [1000, 1150], [1500, 1650], [2000, 2202], [3000, 3146]] } },
     { production: "Laser", paper, size: "9,5x20cm", modes: { "Só frente": [[200, 105], [500, 182], [750, 321], [1000, 432], [2000, 866], [3000, 1225], [5000, 2163]], "Frente e verso": [[200, 208], [500, 432], [750, 624], [1000, 840], [2000, 1644], [3000, 2508], [5000, 4152]] } },
     { production: "Laser", paper, size: "20x28,5cm", modes: { "Só frente": [[100, 138], [200, 268], [300, 398], [400, 519], [500, 657], [1000, 1297], [1500, 1947]], "Frente e verso": [[100, 288], [200, 514], [300, 796], [400, 1021], [500, 1297], [1000, 2561], [1500, 3875]] } },
@@ -6981,18 +6981,33 @@ async function initApp() {
     focusConfigPasswordField();
   }
 
-  function unlockConfiguration(password) {
-    if (password !== CONFIG_ACCESS_PASSWORD) {
-      setConfigStatus("Senha incorreta. A configuração continua bloqueada.", "error");
-      focusConfigPasswordField();
+  async function unlockConfiguration(password) {
+    try {
+      const response = await fetch(SHARED_API_PATH, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "verify_config_access",
+          password,
+        }),
+      });
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || !result?.valid) {
+        setConfigStatus("Senha incorreta. A configuração continua bloqueada.", "error");
+        focusConfigPasswordField();
+        return false;
+      }
+
+      isConfigUnlocked = true;
+      saveSessionFlag(SESSION_KEYS.configUnlocked, true);
+      renderConfig();
+      setConfigStatus("Configuração desbloqueada nesta sessão.", "success");
+      return true;
+    } catch (error) {
+      setConfigStatus("Não foi possível validar a senha agora.", "error");
       return false;
     }
-
-    isConfigUnlocked = true;
-    saveSessionFlag(SESSION_KEYS.configUnlocked, true);
-    renderConfig();
-    setConfigStatus("Configuração desbloqueada nesta sessão.", "success");
-    return true;
   }
 
   function selectTab(tabName) {
@@ -9475,17 +9490,18 @@ async function initApp() {
     setConfigStatus("Desconto da espiral atualizado.", "success");
   });
 
-  configSections.addEventListener("submit", (event) => {
+  configSections.addEventListener("submit", async (event) => {
     if (event.target.id !== "config-lock-form") {
       return;
     }
 
     event.preventDefault();
     const passwordInput = document.getElementById("config-password-input");
-    unlockConfiguration(passwordInput?.value || "");
+    const password = passwordInput?.value || "";
     if (passwordInput) {
       passwordInput.value = "";
     }
+    await unlockConfiguration(password);
   });
 
   configSections.addEventListener("input", (event) => {

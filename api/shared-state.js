@@ -1,3 +1,5 @@
+const crypto = require("node:crypto");
+
 const SHARED_STATE_KEY = "graficalc-global";
 const FALLBACK_SUPABASE_URL = "https://abiwcbjqlffgnrfenvwf.supabase.co";
 
@@ -167,9 +169,36 @@ function readRequestBody(request) {
   });
 }
 
+function passwordsMatch(received, expected) {
+  const receivedBuffer = Buffer.from(received);
+  const expectedBuffer = Buffer.from(expected);
+
+  return receivedBuffer.length === expectedBuffer.length
+    && crypto.timingSafeEqual(receivedBuffer, expectedBuffer);
+}
+
+function verifyConfigAccess(body) {
+  const expectedPassword = String(process.env.CONFIG_ACCESS_PASSWORD || "");
+
+  if (!expectedPassword) {
+    return jsonResponse({ valid: false, error: "Senha de configuracao nao definida." }, 500);
+  }
+
+  const valid = passwordsMatch(String(body?.password || ""), expectedPassword);
+  return jsonResponse({ valid }, valid ? 200 : 401);
+}
+
 async function handleSharedState(request) {
   if (request.method === "GET") {
     return jsonResponse(await readSharedState());
+  }
+
+  if (request.method === "POST") {
+    const body = await readRequestBody(request);
+    if (!body || body.action !== "verify_config_access") {
+      return jsonResponse({ error: "Payload invalido." }, 400);
+    }
+    return verifyConfigAccess(body);
   }
 
   if (request.method === "PUT") {
@@ -184,7 +213,7 @@ async function handleSharedState(request) {
     return {
       status: 204,
       headers: {
-        Allow: "GET, PUT, OPTIONS",
+        Allow: "GET, POST, PUT, OPTIONS",
       },
       body: null,
     };
