@@ -10,7 +10,7 @@ const SESSION_KEYS = {
   renderRecovery: "graficalc-render-recovery-v1",
 };
 
-const CONFIG_ACCESS_PASSWORD = "copyboy2026";
+
 const SHARED_API_PATH = "/api/shared-state";
 const SHARED_SYNC_INTERVAL_MS = 20000;
 
