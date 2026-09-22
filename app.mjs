@@ -3157,12 +3157,9 @@ function calculateCredentialWorkbook(state, config) {
 
       const sheetsNeeded = Math.ceil(quantity / fit.itemsPerSheet);
       const impressionsNeeded = sheetsNeeded * sides;
-      // The color-print tier is priced by the requested credential quantity.
-      // Front and back doubles the impressions, not the quantity tier.
-      const pricingBandQuantity = quantity;
       const pricingKey = getColorPaperPricingKey(material.paperType);
       const pricing = config.colorPrintPricing?.[pricingKey] || [];
-      const sheetPrice = lookupTier(pricing, pricingBandQuantity);
+      const sheetPrice = lookupTier(pricing, impressionsNeeded);
       const baseTotal = impressionsNeeded * sheetPrice;
       const laminationTotal = laminationSelected ? areaM2 * laminationPricePerM2 : 0;
       const rowDiscount = applyRowDiscount(row, baseTotal + laminationTotal + lanyardTotal + artCreationFee, quantity);
@@ -3180,7 +3177,7 @@ function calculateCredentialWorkbook(state, config) {
         lanyardTotal,
         artCreationFee,
         ...rowDiscount,
-        tierLabel: `${fit.itemsPerSheet} por A4 | faixa ${quantity} credenciais`,
+        tierLabel: `${fit.itemsPerSheet} por A4 | faixa ${impressionsNeeded} impressões`,
       };
     }
 
@@ -4875,12 +4872,12 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
   const credenciaisCards = [
     createConfigCardMarkup(
       "Papéis da credencial",
-      "Esses valores abastecem os papéis usados na aba de credenciais. Para PS 1mm e PS 2mm, o sistema continua puxando as faixas do cálculo de m².",
+      "As faixas dos papéis consideram as impressões A4 necessárias, incluindo os dois lados na frente e verso. Para PS 1mm e PS 2mm, o sistema continua puxando as faixas do cálculo de m².",
       [
         createInlineConfigBlockMarkup(
           "Couche 250 / Offset 240 / Reciclato 240",
           createTableMarkup(
-            ["Qtd mínima", "Valor", "Faixa"],
+            ["Impressões mínimas", "Valor", "Faixa"],
             config.colorPrintPricing["250g"],
             "credential-color-250g",
             [
@@ -4893,7 +4890,7 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
         createInlineConfigBlockMarkup(
           "Couche 300 / Metalizados",
           createTableMarkup(
-            ["Qtd mínima", "Valor", "Faixa"],
+            ["Impressões mínimas", "Valor", "Faixa"],
             config.colorPrintPricing["300g"],
             "credential-color-300g",
             [
