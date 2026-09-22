@@ -4047,9 +4047,17 @@ function calculateM2Workbook(state) {
   };
 }
 
+function isM2MinimumBand(tier) {
+  const label = String(tier?.label || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  return label.includes("valor minimo");
+}
+
 function getM2MinimumValue(pricing) {
   const minimumRow = Array.isArray(pricing)
-    ? pricing.find((tier) => String(tier.label || "").toLowerCase().includes("valor minimo"))
+    ? pricing.find(isM2MinimumBand)
     : null;
   return Number(minimumRow?.value || 30);
 }
@@ -4059,7 +4067,7 @@ function getM2PricingBand(pricing, areaM2) {
     return null;
   }
 
-  const bands = pricing.filter((tier) => !String(tier.label || "").toLowerCase().includes("valor minimo"));
+  const bands = pricing.filter((tier) => !isM2MinimumBand(tier));
   return bands.find((tier) => areaM2 <= Number(tier.min || 0)) || bands[bands.length - 1] || null;
 }
 
