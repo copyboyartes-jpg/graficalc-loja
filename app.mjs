@@ -1065,6 +1065,7 @@ function createDefaultRow(index) {
     id: `row-${index + 1}`,
     description: "",
     printType: "Preto e branco",
+    innerPaper: "Sulfite 75g",
     size: "A4",
   printMode: "Só frente",
     finishing: "Sem acabamento",
@@ -1354,6 +1355,7 @@ function createDefaultState() {
     m2CalcMode: "Independente",
     presets: {
       printType: "Preto e branco",
+      innerPaper: "Sulfite 75g",
       size: "A4",
       printMode: "Só frente",
       finishing: "Sem acabamento",
@@ -1810,6 +1812,7 @@ function mergeState(candidate) {
   state.m2CalcMode = OPTIONS.m2CalcModes.includes(candidate.m2CalcMode) ? candidate.m2CalcMode : state.m2CalcMode;
   state.presets = { ...state.presets, ...(candidate.presets || {}) };
   state.presets.size = getValidApostilaSize(state.presets.printType, state.presets.size);
+  state.presets.innerPaper = getValidApostilaInnerPaper(state.presets.innerPaper);
   state.client = { ...state.client, ...(candidate.client || {}) };
   state.company = { ...state.company, ...(candidate.company || {}) };
   state.clients = Array.isArray(candidate.clients)
@@ -1849,6 +1852,7 @@ function mergeState(candidate) {
       ...createDefaultRow(index),
       ...row,
       size: getValidApostilaSize(row?.printType, row?.size),
+      innerPaper: getValidApostilaInnerPaper(row?.innerPaper),
       quantity: toWholeNumber(row?.quantity),
       pages: toWholeNumber(row?.pages),
       pagesPerSheet: [1, 2, 4, 6].includes(toWholeNumber(row?.pagesPerSheet))
@@ -2389,19 +2393,28 @@ function getValidApostilaSize(printType, size) {
   return getApostilaSizeOptions(printType).includes(size) ? size : "A4";
 }
 
+function getValidApostilaInnerPaper(paper) {
+  return OPTIONS.colorPaperTypes.includes(paper) ? paper : "Sulfite 75g";
+}
+
+function getApostilaInnerPaper(row) {
+  return row.printType === "Colorido laser" ? getValidApostilaInnerPaper(row.innerPaper) : "Sulfite 75g";
+}
+
 function getApostilaPricingSize(size) {
   return size === "A3" ? "A3" : "A4";
 }
 
-function getPrintAggregationKey(printType, printMode, size = "A4") {
+function getPrintAggregationKey(printType, printMode, size = "A4", paper = "Sulfite 75g") {
+  const paperKey = printType === "Colorido laser" ? `::${paper}` : "";
   if (size === "A3") {
-    return `${size}::${printType}`;
+    return `${size}::${printType}${paperKey}`;
   }
   if (printType === "Preto e branco") {
     return `${printType}::${printMode === "Frente e verso" ? "Frente e verso" : "Só frente"}`;
   }
 
-  return printType;
+  return `${printType}${paperKey}`;
 }
 
 function getApplicableBlackWhiteTiers(config, printMode) {
@@ -2474,7 +2487,16 @@ function getApostilaSizeDetail(row) {
   return `Tamanho ${size}`;
 }
 
-function getPrintTotalByType(printType, rowImpressions, effectiveQuantity, config, printMode, size = "A4") {
+function getApostilaLaserPricing(size, paper, config) {
+  if (size !== "A3" && paper === "Sulfite 75g") {
+    return config.printPricing.laser;
+  }
+
+  const pricing = size === "A3" ? config.colorPrintPricingA3 : config.colorPrintPricing;
+  return pricing[getColorPaperPricingKey(paper)];
+}
+
+function getPrintTotalByType(printType, rowImpressions, effectiveQuantity, config, printMode, size = "A4", paper = "Sulfite 75g") {
   if (printType === "Preto e branco") {
     return getBlackWhiteTotal(rowImpressions, effectiveQuantity, config, printMode, size);
   }
@@ -2483,14 +2505,20 @@ function getPrintTotalByType(printType, rowImpressions, effectiveQuantity, confi
     return getRegularPrintTotal(rowImpressions, effectiveQuantity, config.printPricing.inkjet);
   }
 
-  const tiers = size === "A3" ? config.colorPrintPricingA3["Sulfite 75g"] : config.printPricing.laser;
-  return getRegularPrintTotal(rowImpressions, effectiveQuantity, tiers);
+  return getRegularPrintTotal(rowImpressions, effectiveQuantity, getApostilaLaserPricing(size, paper, config));
 }
 
 function getApostilaCoverPricing(row, paper, config) {
   return row.size === "A3"
     ? config.colorPrintPricingA3[getColorPaperPricingKey(paper)]
     : config.coverPricing[paper];
+}
+
+function getApostilaMixedColorPricing(row, config) {
+  const paper = getApostilaInnerPaper(row);
+  return row.printType === "Colorido laser" && paper !== "Sulfite 75g"
+    ? getApostilaLaserPricing(row.size, paper, config)
+    : getApostilaCoverPricing(row, "Sulfite 75g", config);
 }
 
 function getCoverImpressions(row, kind) {
@@ -2822,14 +2850,18 @@ function buildApostilaPrintDetail(row) {
   const blackWhitePages = Math.max(0, totalPages - colorPages);
 
   if (colorPages > 0) {
-    return `${blackWhitePages} PB + ${colorPages} coloridas (tabela da capa em Sulfite 75g)`;
+    return row.printType === "Colorido laser"
+      ? `${blackWhitePages} PB + ${colorPages} coloridas | Miolo: ${getApostilaInnerPaper(row)}`
+      : `${blackWhitePages} PB + ${colorPages} coloridas (tabela da capa em Sulfite 75g)`;
   }
 
   if (row.printType === "Preto e branco") {
     return "Preto e branco";
   }
 
-  return row.printType;
+  return row.printType === "Colorido laser"
+    ? `${row.printType} | Miolo: ${getApostilaInnerPaper(row)}`
+    : row.printType;
 }
 
 function isColorPrintRowActive(row) {
@@ -3624,6 +3656,7 @@ function calculateWorkbook(state, config) {
   const rows = state.rows.map((row) => ({
     ...row,
     size: getValidApostilaSize(row.printType, row.size),
+    innerPaper: getValidApostilaInnerPaper(row.innerPaper),
     quantity: toWholeNumber(row.quantity),
     pages: toWholeNumber(row.pages),
     colorPages: toWholeNumber(row.colorPages),
@@ -3639,7 +3672,7 @@ function calculateWorkbook(state, config) {
 
   const aggregateInnerByKey = {};
   const aggregateCoverByPaper = {};
-  const aggregateColorPagesOnSulfite = {};
+  const aggregateColorPagesByPaper = {};
 
   for (const item of rowBase) {
     const size = item.row.size;
@@ -3650,9 +3683,10 @@ function calculateWorkbook(state, config) {
     }
 
     if (item.innerBreakdown.colorImpressions > 0 && item.innerBreakdown.normalizedColorPages > 0) {
-      aggregateColorPagesOnSulfite[pricingSize] = (aggregateColorPagesOnSulfite[pricingSize] || 0) + item.innerBreakdown.colorImpressions;
+      const colorKey = `${pricingSize}::${getApostilaInnerPaper(item.row)}`;
+      aggregateColorPagesByPaper[colorKey] = (aggregateColorPagesByPaper[colorKey] || 0) + item.innerBreakdown.colorImpressions;
     } else if (item.innerBreakdown.colorImpressions > 0 && item.row.printType !== "Preto e branco") {
-      const colorKey = getPrintAggregationKey(item.row.printType, item.row.printMode, size);
+      const colorKey = getPrintAggregationKey(item.row.printType, item.row.printMode, size, getApostilaInnerPaper(item.row));
       aggregateInnerByKey[colorKey] = (aggregateInnerByKey[colorKey] || 0) + item.innerBreakdown.colorImpressions;
     }
 
@@ -3748,7 +3782,7 @@ function calculateWorkbook(state, config) {
     const effectiveColorQty =
       row.printType !== "Preto e branco" && innerBreakdown.normalizedColorPages === 0
         ? state.calcMode === "Somar quantidades"
-          ? aggregateInnerByKey[getPrintAggregationKey(row.printType, row.printMode, row.size)] || 0
+          ? aggregateInnerByKey[getPrintAggregationKey(row.printType, row.printMode, row.size, getApostilaInnerPaper(row))] || 0
           : innerBreakdown.colorImpressions
         : 0;
 
@@ -3775,13 +3809,14 @@ function calculateWorkbook(state, config) {
     }
     if (innerBreakdown.colorImpressions > 0) {
       if (innerBreakdown.normalizedColorPages > 0) {
-        const sulfitePricingQty = state.calcMode === "Somar quantidades"
-          ? aggregateColorPagesOnSulfite[pricingSize] || 0
+        const colorKey = `${pricingSize}::${getApostilaInnerPaper(row)}`;
+        const colorPricingQty = state.calcMode === "Somar quantidades"
+          ? aggregateColorPagesByPaper[colorKey] || 0
           : innerBreakdown.colorImpressions;
-        const sulfiteUnit = lookupTier(getApostilaCoverPricing(row, "Sulfite 75g", config), sulfitePricingQty);
-        innerTotal += innerBreakdown.colorImpressions * sulfiteUnit;
+        const colorUnit = lookupTier(getApostilaMixedColorPricing(row, config), colorPricingQty);
+        innerTotal += innerBreakdown.colorImpressions * colorUnit;
       } else {
-        innerTotal += getPrintTotalByType(row.printType, innerBreakdown.colorImpressions, effectiveColorQty, config, row.printMode, row.size);
+        innerTotal += getPrintTotalByType(row.printType, innerBreakdown.colorImpressions, effectiveColorQty, config, row.printMode, row.size, getApostilaInnerPaper(row));
       }
     }
     const coverUnit = coverImpressions > 0 ? lookupTier(getApostilaCoverPricing(row, row.coverPaper, config), coverPricingQty) : 0;
@@ -4668,6 +4703,7 @@ function trimEmptyRows(rows, minimumCount, isActive) {
 
 function applyPresetToRow(row, preset) {
   row.printType = preset.printType;
+  row.innerPaper = getApostilaInnerPaper(preset);
   row.size = getValidApostilaSize(row.printType, preset.size);
   row.printMode = preset.printMode;
   row.finishing = preset.finishing;
@@ -7109,6 +7145,9 @@ async function initApp() {
     document.getElementById("calc-mode-select").value = state.calcMode;
     document.getElementById("m2-calc-mode-select").value = state.m2CalcMode;
     document.getElementById("preset-print-type").innerHTML = buildOptions(OPTIONS.printTypes, state.presets.printType);
+    const innerPaperSelect = document.getElementById("preset-inner-paper");
+    innerPaperSelect.innerHTML = buildOptions(OPTIONS.colorPaperTypes, state.presets.printType === "Colorido laser" ? state.presets.innerPaper : "Sulfite 75g");
+    innerPaperSelect.disabled = state.presets.printType !== "Colorido laser";
     document.getElementById("preset-size").innerHTML = buildOptions(getApostilaSizeOptions(state.presets.printType), state.presets.size);
     document.getElementById("preset-print-mode").innerHTML = buildOptions(OPTIONS.printModes, state.presets.printMode);
     document.getElementById("preset-finishing").innerHTML = buildOptions(OPTIONS.finishing, state.presets.finishing);
@@ -7425,6 +7464,7 @@ async function initApp() {
             <td><strong>${String(index + 1).padStart(2, "0")}</strong></td>
             <td><input class="cell-input description" name="description" value="${escapeHtml(row.description)}"></td>
             <td><select class="cell-select" name="printType">${buildOptions(OPTIONS.printTypes, row.printType)}</select></td>
+            <td><select class="cell-select" name="innerPaper"${row.printType === "Colorido laser" ? "" : " disabled"}>${buildOptions(OPTIONS.colorPaperTypes, row.printType === "Colorido laser" ? row.innerPaper : "Sulfite 75g")}</select></td>
             <td><select class="cell-select" name="size">${buildOptions(getApostilaSizeOptions(row.printType), row.size)}</select></td>
             <td><select class="cell-select" name="printMode">${buildOptions(OPTIONS.printModes, row.printMode)}</select></td>
             <td><select class="cell-select" name="finishing">${buildOptions(OPTIONS.finishing, row.finishing)}</select></td>
@@ -8509,6 +8549,7 @@ async function initApp() {
   function updatePreset(name, value) {
     state.presets[name] = value;
     state.presets.size = getValidApostilaSize(state.presets.printType, state.presets.size);
+    state.presets.innerPaper = getValidApostilaInnerPaper(state.presets.innerPaper);
     persist();
     renderPresetControls();
   }
@@ -8829,6 +8870,7 @@ async function initApp() {
 
   [
     ["preset-print-type", "printType"],
+    ["preset-inner-paper", "innerPaper"],
     ["preset-size", "size"],
     ["preset-print-mode", "printMode"],
     ["preset-finishing", "finishing"],
@@ -8985,6 +9027,9 @@ async function initApp() {
     }
     if (field === "printType" || field === "size") {
       row.size = getValidApostilaSize(row.printType, row.size);
+    }
+    if (field === "innerPaper") {
+      row.innerPaper = getValidApostilaInnerPaper(row.innerPaper);
     }
     persist();
     renderRowsAndSummary();
