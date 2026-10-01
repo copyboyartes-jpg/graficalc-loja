@@ -16,7 +16,7 @@ const SHARED_SYNC_INTERVAL_MS = 20000;
 
 const OPTIONS = {
   printTypes: ["Preto e branco", "Colorido jato de tinta", "Colorido laser"],
-  sizes: ["A4", "A5", "A6"],
+  sizes: ["A4", "A3", "A5", "A6"],
   colorPrintSizes: ["A4", "A3", "Tamanho personalizado"],
   printModes: ["Só frente", "Frente e verso"],
   finishing: ["Sem acabamento", "Encadernação espiral", "Livreto"],
@@ -741,6 +741,14 @@ function createDefaultConfig() {
         { min: 100, value: 0.18, mode: "unit" },
         { min: 1000, value: 0.13, mode: "unit" },
         { min: 10000, value: 0.12, mode: "unit" },
+      ],
+      blackWhiteA3: [
+        { min: 1, value: 2.5, label: "1 unidade" },
+        { min: 2, value: 1.8, label: "2 a 10" },
+        { min: 11, value: 0.8, label: "11 a 50" },
+        { min: 51, value: 0.55, label: "51 a 100" },
+        { min: 101, value: 0.5, label: "101 a 200" },
+        { min: 201, value: 0.45, label: "Acima de 200" },
       ],
       inkjet: [
         { min: 1, value: 2.0, label: "1 a 10" },
@@ -1602,6 +1610,7 @@ function mergeConfig(candidate) {
   if (candidate.printPricing) {
     merged.printPricing = {
       blackWhite: Array.isArray(candidate.printPricing.blackWhite) ? sanitizeValue(candidate.printPricing.blackWhite) : merged.printPricing.blackWhite,
+      blackWhiteA3: Array.isArray(candidate.printPricing.blackWhiteA3) ? sanitizeValue(candidate.printPricing.blackWhiteA3) : merged.printPricing.blackWhiteA3,
       inkjet: Array.isArray(candidate.printPricing.inkjet) ? sanitizeValue(candidate.printPricing.inkjet) : merged.printPricing.inkjet,
       laser: Array.isArray(candidate.printPricing.laser) ? sanitizeValue(candidate.printPricing.laser) : merged.printPricing.laser,
     };
@@ -1800,6 +1809,7 @@ function mergeState(candidate) {
   state.calcMode = OPTIONS.calcModes.includes(candidate.calcMode) ? candidate.calcMode : state.calcMode;
   state.m2CalcMode = OPTIONS.m2CalcModes.includes(candidate.m2CalcMode) ? candidate.m2CalcMode : state.m2CalcMode;
   state.presets = { ...state.presets, ...(candidate.presets || {}) };
+  state.presets.size = getValidApostilaSize(state.presets.printType, state.presets.size);
   state.client = { ...state.client, ...(candidate.client || {}) };
   state.company = { ...state.company, ...(candidate.company || {}) };
   state.clients = Array.isArray(candidate.clients)
@@ -1838,6 +1848,7 @@ function mergeState(candidate) {
     state.rows = candidate.rows.map((row, index) => ({
       ...createDefaultRow(index),
       ...row,
+      size: getValidApostilaSize(row?.printType, row?.size),
       quantity: toWholeNumber(row?.quantity),
       pages: toWholeNumber(row?.pages),
       pagesPerSheet: [1, 2, 4, 6].includes(toWholeNumber(row?.pagesPerSheet))
@@ -2370,7 +2381,22 @@ function lookupTier(tiers, quantity, valueKey = "value") {
   return Number(selected?.[valueKey] || 0);
 }
 
-function getPrintAggregationKey(printType, printMode) {
+function getApostilaSizeOptions(printType) {
+  return printType === "Colorido jato de tinta" ? OPTIONS.sizes.filter((size) => size !== "A3") : OPTIONS.sizes;
+}
+
+function getValidApostilaSize(printType, size) {
+  return getApostilaSizeOptions(printType).includes(size) ? size : "A4";
+}
+
+function getApostilaPricingSize(size) {
+  return size === "A3" ? "A3" : "A4";
+}
+
+function getPrintAggregationKey(printType, printMode, size = "A4") {
+  if (size === "A3") {
+    return `${size}::${printType}`;
+  }
   if (printType === "Preto e branco") {
     return `${printType}::${printMode === "Frente e verso" ? "Frente e verso" : "Só frente"}`;
   }
@@ -2387,9 +2413,13 @@ function getApplicableBlackWhiteTiers(config, printMode) {
   return tiers.filter((tier) => Number(tier?.min || 0) < 1000);
 }
 
-function getBlackWhiteTotal(rowImpressions, effectiveQuantity, config, printMode) {
+function getBlackWhiteTotal(rowImpressions, effectiveQuantity, config, printMode, size = "A4") {
   if (rowImpressions <= 0 || effectiveQuantity <= 0) {
     return 0;
+  }
+
+  if (size === "A3") {
+    return rowImpressions * lookupTier(config.printPricing.blackWhiteA3, effectiveQuantity);
   }
 
   const tiers = getApplicableBlackWhiteTiers(config, printMode);
@@ -2427,7 +2457,7 @@ function getApostilaPagesPerSheet(size) {
 
 function getApostilaInnerPagesPerSheet(row) {
   // A5 and A6 already use their physical imposition on A4 sheets.
-  if (row?.size !== "A4") {
+  if (row?.size !== "A4" && row?.size !== "A3") {
     return getApostilaPagesPerSheet(row?.size);
   }
 
@@ -2438,22 +2468,29 @@ function getApostilaInnerPagesPerSheet(row) {
 function getApostilaSizeDetail(row) {
   const size = row.size || "A4";
   const pagesPerSheet = getApostilaInnerPagesPerSheet(row);
-  if (size === "A4" && pagesPerSheet > 1) {
+  if ((size === "A4" || size === "A3") && pagesPerSheet > 1) {
     return `Apostila tamanho ${size} impressa com ${pagesPerSheet} páginas por folha`;
   }
   return `Tamanho ${size}`;
 }
 
-function getPrintTotalByType(printType, rowImpressions, effectiveQuantity, config, printMode) {
+function getPrintTotalByType(printType, rowImpressions, effectiveQuantity, config, printMode, size = "A4") {
   if (printType === "Preto e branco") {
-    return getBlackWhiteTotal(rowImpressions, effectiveQuantity, config, printMode);
+    return getBlackWhiteTotal(rowImpressions, effectiveQuantity, config, printMode, size);
   }
 
   if (printType === "Colorido jato de tinta") {
     return getRegularPrintTotal(rowImpressions, effectiveQuantity, config.printPricing.inkjet);
   }
 
-  return getRegularPrintTotal(rowImpressions, effectiveQuantity, config.printPricing.laser);
+  const tiers = size === "A3" ? config.colorPrintPricingA3["Sulfite 75g"] : config.printPricing.laser;
+  return getRegularPrintTotal(rowImpressions, effectiveQuantity, tiers);
+}
+
+function getApostilaCoverPricing(row, paper, config) {
+  return row.size === "A3"
+    ? config.colorPrintPricingA3[getColorPaperPricingKey(paper)]
+    : config.coverPricing[paper];
 }
 
 function getCoverImpressions(row, kind) {
@@ -2503,7 +2540,7 @@ function getSpiralUnitPrice(row, bindingSheetsPerCopy, config) {
   const rateKey = qty >= 101 ? "101" : qty >= 51 ? "51" : qty >= 21 ? "21" : "1";
   const unit = Number(band.rates?.[rateKey] || 0);
   const discount = ["Sem capas plásticas", "Sem capas plasticas"].includes(row.spiralOption) ? Number(config.spiralPlasticDiscount || 0) : 0;
-  return Math.max(0, unit - discount);
+  return Math.max(0, unit - discount) * (row.size === "A3" ? 2 : 1);
 }
 
 function getBookletUnitPrice(quantity, config) {
@@ -2514,10 +2551,10 @@ function getColorPaperPricingKey(paperType) {
   if (paperType === "Sulfite 75g" || paperType === "Offset 120g") {
     return paperType;
   }
-  if (["Couche 170g", "Offset 170g", "Reciclato 170g"].includes(paperType)) {
+  if (["Couche 170g", "Papel couche 170g", "Offset 170g", "Reciclato 170g"].includes(paperType)) {
     return "170g";
   }
-  if (["Couche 250g", "Offset 240g", "Reciclato 240g"].includes(paperType)) {
+  if (["Couche 250g", "Papel couche 250g", "Offset 240g", "Reciclato 240g"].includes(paperType)) {
     return "250g";
   }
   return "300g";
@@ -3586,6 +3623,7 @@ function calculateBlockWorkbook(state, tab) {
 function calculateWorkbook(state, config) {
   const rows = state.rows.map((row) => ({
     ...row,
+    size: getValidApostilaSize(row.printType, row.size),
     quantity: toWholeNumber(row.quantity),
     pages: toWholeNumber(row.pages),
     colorPages: toWholeNumber(row.colorPages),
@@ -3601,27 +3639,31 @@ function calculateWorkbook(state, config) {
 
   const aggregateInnerByKey = {};
   const aggregateCoverByPaper = {};
-  let aggregateColorPagesOnSulfite = 0;
+  const aggregateColorPagesOnSulfite = {};
 
   for (const item of rowBase) {
-    const blackWhiteKey = getPrintAggregationKey("Preto e branco", item.row.printMode);
+    const size = item.row.size;
+    const pricingSize = getApostilaPricingSize(size);
+    const blackWhiteKey = getPrintAggregationKey("Preto e branco", item.row.printMode, size);
     if (item.innerBreakdown.blackWhiteImpressions > 0) {
       aggregateInnerByKey[blackWhiteKey] = (aggregateInnerByKey[blackWhiteKey] || 0) + item.innerBreakdown.blackWhiteImpressions;
     }
 
     if (item.innerBreakdown.colorImpressions > 0 && item.innerBreakdown.normalizedColorPages > 0) {
-      aggregateColorPagesOnSulfite += item.innerBreakdown.colorImpressions;
+      aggregateColorPagesOnSulfite[pricingSize] = (aggregateColorPagesOnSulfite[pricingSize] || 0) + item.innerBreakdown.colorImpressions;
     } else if (item.innerBreakdown.colorImpressions > 0 && item.row.printType !== "Preto e branco") {
-      const colorKey = getPrintAggregationKey(item.row.printType, item.row.printMode);
+      const colorKey = getPrintAggregationKey(item.row.printType, item.row.printMode, size);
       aggregateInnerByKey[colorKey] = (aggregateInnerByKey[colorKey] || 0) + item.innerBreakdown.colorImpressions;
     }
 
     if (item.coverImpressions > 0) {
-      aggregateCoverByPaper[item.row.coverPaper] = (aggregateCoverByPaper[item.row.coverPaper] || 0) + item.coverImpressions;
+      const coverKey = `${pricingSize}::${item.row.coverPaper}`;
+      aggregateCoverByPaper[coverKey] = (aggregateCoverByPaper[coverKey] || 0) + item.coverImpressions;
     }
 
     if (item.backImpressions > 0) {
-      aggregateCoverByPaper[item.row.backCoverPaper] = (aggregateCoverByPaper[item.row.backCoverPaper] || 0) + item.backImpressions;
+      const backKey = `${pricingSize}::${item.row.backCoverPaper}`;
+      aggregateCoverByPaper[backKey] = (aggregateCoverByPaper[backKey] || 0) + item.backImpressions;
     }
   }
 
@@ -3652,6 +3694,7 @@ function calculateWorkbook(state, config) {
     const sheetsPerCopy = entries.reduce((sum, entry) => sum + entry.bindingSheetsPerCopy, 0);
     const mixedFinishing = entries.some((entry) => entry.row.finishing !== finishingType);
     const mixedSpiral = entries.some((entry) => entry.row.spiralOption !== spiralOption);
+    const mixedSizes = entries.some((entry) => entry.row.size !== leader.row.size);
 
     if (mixedFinishing) {
       warnings.push(`Grupo ${groupName}: existem tipos de acabamento diferentes. O app usou o acabamento da primeira linha do grupo.`);
@@ -3659,6 +3702,10 @@ function calculateWorkbook(state, config) {
 
     if (mixedSpiral && finishingType === "Encadernação espiral") {
       warnings.push(`Grupo ${groupName}: existem opções de espiral diferentes. O app usou a opção da primeira linha do grupo.`);
+    }
+
+    if (mixedSizes && finishingType === "Encadernação espiral") {
+      warnings.push(`Grupo ${groupName}: existem tamanhos diferentes. O app usou o tamanho da primeira linha para a encadernação.`);
     }
 
     if (quantitySet.length > 1) {
@@ -3696,46 +3743,49 @@ function calculateWorkbook(state, config) {
     const { row, innerBreakdown, bindingSheetsPerCopy, coverImpressions, backImpressions } = item;
     const effectiveBlackWhiteQty =
       state.calcMode === "Somar quantidades"
-        ? aggregateInnerByKey[getPrintAggregationKey("Preto e branco", row.printMode)] || 0
+        ? aggregateInnerByKey[getPrintAggregationKey("Preto e branco", row.printMode, row.size)] || 0
         : innerBreakdown.blackWhiteImpressions;
     const effectiveColorQty =
       row.printType !== "Preto e branco" && innerBreakdown.normalizedColorPages === 0
         ? state.calcMode === "Somar quantidades"
-          ? aggregateInnerByKey[getPrintAggregationKey(row.printType, row.printMode)] || 0
+          ? aggregateInnerByKey[getPrintAggregationKey(row.printType, row.printMode, row.size)] || 0
           : innerBreakdown.colorImpressions
         : 0;
 
     const samePaper = row.coverPaper === row.backCoverPaper;
+    const pricingSize = getApostilaPricingSize(row.size);
+    const coverKey = `${pricingSize}::${row.coverPaper}`;
+    const backKey = `${pricingSize}::${row.backCoverPaper}`;
     const coverPricingQty =
       state.calcMode === "Somar quantidades"
-        ? aggregateCoverByPaper[row.coverPaper] || 0
+        ? aggregateCoverByPaper[coverKey] || 0
         : samePaper
           ? coverImpressions + backImpressions
           : coverImpressions;
     const backPricingQty =
       state.calcMode === "Somar quantidades"
-        ? aggregateCoverByPaper[row.backCoverPaper] || 0
+        ? aggregateCoverByPaper[backKey] || 0
         : samePaper
           ? coverImpressions + backImpressions
           : backImpressions;
 
     let innerTotal = 0;
     if (innerBreakdown.blackWhiteImpressions > 0) {
-      innerTotal += getBlackWhiteTotal(innerBreakdown.blackWhiteImpressions, effectiveBlackWhiteQty, config, row.printMode);
+      innerTotal += getBlackWhiteTotal(innerBreakdown.blackWhiteImpressions, effectiveBlackWhiteQty, config, row.printMode, row.size);
     }
     if (innerBreakdown.colorImpressions > 0) {
       if (innerBreakdown.normalizedColorPages > 0) {
         const sulfitePricingQty = state.calcMode === "Somar quantidades"
-          ? aggregateColorPagesOnSulfite
+          ? aggregateColorPagesOnSulfite[pricingSize] || 0
           : innerBreakdown.colorImpressions;
-        const sulfiteUnit = lookupTier(config.coverPricing["Sulfite 75g"], sulfitePricingQty);
+        const sulfiteUnit = lookupTier(getApostilaCoverPricing(row, "Sulfite 75g", config), sulfitePricingQty);
         innerTotal += innerBreakdown.colorImpressions * sulfiteUnit;
       } else {
-        innerTotal += getPrintTotalByType(row.printType, innerBreakdown.colorImpressions, effectiveColorQty, config, row.printMode);
+        innerTotal += getPrintTotalByType(row.printType, innerBreakdown.colorImpressions, effectiveColorQty, config, row.printMode, row.size);
       }
     }
-    const coverUnit = coverImpressions > 0 ? lookupTier(config.coverPricing[row.coverPaper], coverPricingQty) : 0;
-    const backUnit = backImpressions > 0 ? lookupTier(config.coverPricing[row.backCoverPaper], backPricingQty) : 0;
+    const coverUnit = coverImpressions > 0 ? lookupTier(getApostilaCoverPricing(row, row.coverPaper, config), coverPricingQty) : 0;
+    const backUnit = backImpressions > 0 ? lookupTier(getApostilaCoverPricing(row, row.backCoverPaper, config), backPricingQty) : 0;
     const coverTotal = coverImpressions * coverUnit;
     const backTotal = backImpressions * backUnit;
 
@@ -4618,7 +4668,7 @@ function trimEmptyRows(rows, minimumCount, isActive) {
 
 function applyPresetToRow(row, preset) {
   row.printType = preset.printType;
-  row.size = preset.size;
+  row.size = getValidApostilaSize(row.printType, preset.size);
   row.printMode = preset.printMode;
   row.finishing = preset.finishing;
   row.coverType = preset.coverType;
@@ -4685,6 +4735,20 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
           "Os dois primeiros valores continuam como total fixo. As faixas de 1000 e 10000 valem apenas para frente e verso; no só frente, acima de 100 continua na mesma faixa."
         ),
         createInlineConfigBlockMarkup(
+          "Preto e branco A3",
+          createTableMarkup(
+            ["Qtd mínima", "Valor por impressão", "Faixa"],
+            config.printPricing.blackWhiteA3,
+            "bw-a3",
+            [
+              { key: "min", type: "number", step: "1" },
+              { key: "value", type: "number", step: "0.01" },
+              { key: "label", type: "text" },
+            ]
+          ),
+          "Frente e verso conta como duas impressões. Laser e capas A3 usam a Tabela A3 de Impressos coloridos."
+        ),
+        createInlineConfigBlockMarkup(
           "Colorido jato de tinta",
           createTableMarkup(
             ["Qtd mínima", "Valor", "Faixa"],
@@ -4740,7 +4804,7 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
         createInlineConfigBlockMarkup(
           "Encadernação espiral",
           createSpiralTableMarkup(config.spiralPricing),
-          "Valores por unidade de apostila, conforme faixa de folhas e quantidade de exemplares."
+          "Valores por unidade de apostila, conforme faixa de folhas e quantidade de exemplares. Para A3, o valor final da encadernação é dobrado."
         ),
         createInlineConfigBlockMarkup(
           "Livreto",
@@ -5963,6 +6027,7 @@ function createM2ProductPricingMarkup(product, productIndex, config, viewMode = 
 
 function getConfigArrayByPrefix(config, prefix) {
   if (prefix === "bw") return config.printPricing.blackWhite;
+  if (prefix === "bw-a3") return config.printPricing.blackWhiteA3;
   if (prefix === "inkjet") return config.printPricing.inkjet;
   if (prefix === "laser") return config.printPricing.laser;
   if (prefix === "booklet") return config.bookletPricing;
@@ -7044,7 +7109,7 @@ async function initApp() {
     document.getElementById("calc-mode-select").value = state.calcMode;
     document.getElementById("m2-calc-mode-select").value = state.m2CalcMode;
     document.getElementById("preset-print-type").innerHTML = buildOptions(OPTIONS.printTypes, state.presets.printType);
-    document.getElementById("preset-size").innerHTML = buildOptions(OPTIONS.sizes, state.presets.size);
+    document.getElementById("preset-size").innerHTML = buildOptions(getApostilaSizeOptions(state.presets.printType), state.presets.size);
     document.getElementById("preset-print-mode").innerHTML = buildOptions(OPTIONS.printModes, state.presets.printMode);
     document.getElementById("preset-finishing").innerHTML = buildOptions(OPTIONS.finishing, state.presets.finishing);
     document.getElementById("preset-cover").innerHTML = buildOptions(OPTIONS.coverTypes, state.presets.coverType);
@@ -7360,7 +7425,7 @@ async function initApp() {
             <td><strong>${String(index + 1).padStart(2, "0")}</strong></td>
             <td><input class="cell-input description" name="description" value="${escapeHtml(row.description)}"></td>
             <td><select class="cell-select" name="printType">${buildOptions(OPTIONS.printTypes, row.printType)}</select></td>
-            <td><select class="cell-select" name="size">${buildOptions(OPTIONS.sizes, row.size)}</select></td>
+            <td><select class="cell-select" name="size">${buildOptions(getApostilaSizeOptions(row.printType), row.size)}</select></td>
             <td><select class="cell-select" name="printMode">${buildOptions(OPTIONS.printModes, row.printMode)}</select></td>
             <td><select class="cell-select" name="finishing">${buildOptions(OPTIONS.finishing, row.finishing)}</select></td>
             <td><input class="cell-input" name="bindingGroup" value="${escapeHtml(row.bindingGroup)}" placeholder="Ex.: Grupo A"></td>
@@ -8443,7 +8508,9 @@ async function initApp() {
 
   function updatePreset(name, value) {
     state.presets[name] = value;
+    state.presets.size = getValidApostilaSize(state.presets.printType, state.presets.size);
     persist();
+    renderPresetControls();
   }
 
   function applyPreset(scope) {
@@ -8915,6 +8982,9 @@ async function initApp() {
       row[field] = normalizeDiscountType(target.value);
     } else {
       row[field] = target.value;
+    }
+    if (field === "printType" || field === "size") {
+      row.size = getValidApostilaSize(row.printType, row.size);
     }
     persist();
     renderRowsAndSummary();
