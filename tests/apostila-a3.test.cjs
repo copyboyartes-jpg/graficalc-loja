@@ -89,6 +89,32 @@ test("livreto A3 mantém o mesmo valor e cálculo A4", () => {
   assert.equal(a3.finishingTotal, 18);
 });
 
+test("livreto A3 com 24 páginas laser couche 170 custa R$ 68", () => {
+  const row = quote({
+    printType: "Colorido laser",
+    innerPaper: "Couche 170g",
+    printMode: "Frente e verso",
+    finishing: "Livreto",
+    pages: 24,
+    quantity: 1,
+  }).rows[0];
+  assert.equal(app.getApostilaInnerPagesPerSheet(row), 2);
+  assert.equal(row.innerImpressions, 12);
+  assert.equal(row.bindingSheetsPerCopy, 6);
+  assert.equal(row.innerTotal, 66);
+  assert.equal(row.finishingTotal, 2);
+  assert.equal(row.total, 68);
+  assert.match(app.getApostilaSizeDetail(row), /2 páginas por folha/);
+});
+
+test("livreto A4 também impõe duas páginas, sem mudar outros acabamentos", () => {
+  const fields = { size: "A4", pages: 24, quantity: 1, pagesPerSheet: 1 };
+  assert.equal(quote({ ...fields, finishing: "Livreto" }).rows[0].innerImpressions, 12);
+  assert.equal(quote({ ...fields, finishing: "Sem acabamento" }).rows[0].innerImpressions, 24);
+  assert.equal(quote({ ...fields, pagesPerSheet: 4, finishing: "Livreto" }).rows[0].innerImpressions, 12);
+  assert.equal(quote({ ...fields, pagesPerSheet: 4, finishing: "Encadernação espiral" }).rows[0].innerImpressions, 6);
+});
+
 test("jato de tinta não aceita A3 nem em estado antigo", () => {
   assert.equal(app.getApostilaSizeOptions("Colorido jato de tinta").includes("A3"), false);
   const state = app.mergeState({ rows: [{ printType: "Colorido jato de tinta", size: "A3", quantity: 1, pages: 1 }] });

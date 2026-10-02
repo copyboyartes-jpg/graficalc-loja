@@ -2474,6 +2474,10 @@ function getApostilaInnerPagesPerSheet(row) {
     return getApostilaPagesPerSheet(row?.size);
   }
 
+  if (row?.finishing === "Livreto") {
+    return 2;
+  }
+
   const pagesPerSheet = toWholeNumber(row?.pagesPerSheet);
   return [1, 2, 4, 6].includes(pagesPerSheet) ? pagesPerSheet : 1;
 }
@@ -7458,6 +7462,7 @@ async function initApp() {
     rowsTableBody.innerHTML = workbook.rows
       .map((row, index) => {
         const rowClass = row.active ? "" : "is-empty";
+        const autoBookletImposition = row.finishing === "Livreto" && (row.size === "A4" || row.size === "A3");
         return `
           <tr class="${rowClass}" data-row-index="${index}">
             <td><input type="checkbox" class="row-selector" data-row-id="${escapeHtml(row.id)}"${selectedRowIds.has(row.id) ? " checked" : ""}></td>
@@ -7471,7 +7476,7 @@ async function initApp() {
             <td><input class="cell-input" name="bindingGroup" value="${escapeHtml(row.bindingGroup)}" placeholder="Ex.: Grupo A"></td>
             <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${row.quantity > 0 ? escapeHtml(row.quantity) : ""}"></td>
             <td><input class="cell-input" name="pages" type="number" min="0" step="1" value="${row.pages > 0 ? escapeHtml(row.pages) : ""}"></td>
-            <td><select class="cell-select" name="pagesPerSheet">${buildOptions(["1", "2", "4", "6"], String(row.pagesPerSheet || 1))}</select></td>
+            <td><select class="cell-select" name="pagesPerSheet"${autoBookletImposition ? " disabled" : ""}>${buildOptions(["1", "2", "4", "6"], autoBookletImposition ? "2" : String(row.pagesPerSheet || 1))}</select></td>
             <td><input class="cell-input" name="colorPages" type="number" min="0" step="1" value="${row.colorPages > 0 ? escapeHtml(row.colorPages) : ""}"></td>
             <td><select class="cell-select" name="coverType">${buildOptions(OPTIONS.coverTypes, row.coverType)}</select></td>
             <td><select class="cell-select" name="coverPaper">${buildOptions(OPTIONS.coverPapers, row.coverPaper)}</select></td>
