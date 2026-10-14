@@ -13,6 +13,7 @@ const SESSION_KEYS = {
 
 const SHARED_API_PATH = "/api/shared-state";
 const SHARED_SYNC_INTERVAL_MS = 20000;
+const M2_LASER_CUT_FINISH_ID = "corte-lazer";
 
 const OPTIONS = {
   printTypes: ["Preto e branco", "Colorido jato de tinta", "Colorido laser"],
@@ -1054,6 +1055,7 @@ function createDefaultConfig() {
       { id: "bainha-corda", label: "Bainha com corda", type: "perimeter", price: 5.0 },
       { id: "laminacao", label: "Laminação", type: "area", price: 25.0 },
       { id: "verniz-laka", label: "Verniz laka", type: "area", price: 5.0 },
+      { id: M2_LASER_CUT_FINISH_ID, label: "Corte lazer", type: "area", price: 10.0 },
     ],
     catalogSections: [],
     spiralPlasticDiscount: 1.5,
@@ -1581,13 +1583,10 @@ function normalizeM2Finishes(candidateFinishes, defaultFinishes) {
       spacingCm: item.spacingCm === "" || item.spacingCm == null ? "" : Number(item.spacingCm),
     }));
 
-  const existingKeys = new Set(
-    normalized.map((item) => `${String(item.id || "").trim().toLowerCase()}::${String(item.label || "").trim().toLowerCase()}`)
-  );
+  const existingIds = new Set(normalized.map((item) => String(item.id || "").trim().toLowerCase()));
 
   for (const finish of defaults) {
-    const key = `${String(finish.id || "").trim().toLowerCase()}::${String(finish.label || "").trim().toLowerCase()}`;
-    if (!existingKeys.has(key)) {
+    if (!existingIds.has(String(finish.id || "").trim().toLowerCase())) {
       normalized.push(deepClone(finish));
     }
   }
@@ -4201,6 +4200,7 @@ function calculateM2WorkbookFromConfig(state, config) {
     const pricePerM2 = Number(tier?.value || 0);
     const configuredFinishExtra = calculateM2FinishExtra(row, product, config);
     const configuredFinishExtraTotal = configuredFinishExtra * quantity;
+    const laserCutExtraTotal = calculateM2FinishExtra(row, product, config, M2_LASER_CUT_FINISH_ID) * quantity;
     const extraCharge = toMoneyNumber(typeof row.extraCharge !== "undefined" ? row.extraCharge : row.finishingExtra);
     const artCreationFee = toMoneyNumber(row.artCreationFee);
     const fixedCharges = extraCharge + artCreationFee;
@@ -4228,6 +4228,7 @@ function calculateM2WorkbookFromConfig(state, config) {
       tierValue: pricePerM2,
       configuredFinishExtra,
       configuredFinishExtraTotal,
+      laserCutExtraTotal,
       extraCharge,
       artCreationFee,
       fixedCharges,
@@ -4273,12 +4274,14 @@ function calculateM2WorkbookFromConfig(state, config) {
 
   const totalsByProduct = {};
   const baseTotalsByProduct = {};
+  const laserCutTotalsByProduct = {};
   const fixedTotalsByProduct = {};
   for (const row of rows) {
     if (!row.active) continue;
     if (shouldGroupSameMaterials) {
       totalsByProduct[row.productId] = (totalsByProduct[row.productId] || 0) + row.total;
       baseTotalsByProduct[row.productId] = (baseTotalsByProduct[row.productId] || 0) + row.subtotal;
+      laserCutTotalsByProduct[row.productId] = (laserCutTotalsByProduct[row.productId] || 0) + row.laserCutExtraTotal;
       fixedTotalsByProduct[row.productId] = (fixedTotalsByProduct[row.productId] || 0) + row.fixedCharges;
     }
   }
@@ -4295,8 +4298,9 @@ function calculateM2WorkbookFromConfig(state, config) {
     const minimumValue = getM2MinimumValue(config.m2Pricing?.[product.pricingKey || product.configKey] || []);
 
     if (!shouldGroupSameMaterials) {
-      const minimumApplied = row.active && row.subtotal > 0 && row.subtotal < minimumValue;
-      const adjustedBase = minimumApplied ? minimumValue : row.subtotal;
+      const minimumBase = row.subtotal - row.laserCutExtraTotal;
+      const minimumApplied = row.active && row.subtotal > 0 && minimumBase < minimumValue;
+      const adjustedBase = minimumApplied ? minimumValue + row.laserCutExtraTotal : row.subtotal;
       return {
         ...row,
         total: row.active ? adjustedBase + row.fixedCharges : 0,
@@ -4310,14 +4314,15 @@ function calculateM2WorkbookFromConfig(state, config) {
 
     const groupTotal = totalsByProduct[row.productId] || 0;
     const groupBaseTotal = baseTotalsByProduct[row.productId] || 0;
+    const groupLaserCutTotal = laserCutTotalsByProduct[row.productId] || 0;
     const groupFixedTotal = fixedTotalsByProduct[row.productId] || 0;
-    const minimumApplied = groupBaseTotal > 0 && groupBaseTotal < minimumValue;
-    const adjustedGroupBaseTotal = minimumApplied ? minimumValue : groupBaseTotal;
+    const minimumApplied = groupBaseTotal > 0 && groupBaseTotal - groupLaserCutTotal < minimumValue;
+    const adjustedGroupBaseTotal = minimumApplied ? minimumValue + groupLaserCutTotal : groupBaseTotal;
     const displayTotal = row.active
       ? minimumApplied
         ? firstActiveIndexByProduct[row.productId] === index
-          ? adjustedGroupBaseTotal + row.fixedCharges
-          : row.fixedCharges
+          ? minimumValue + row.laserCutExtraTotal + row.fixedCharges
+          : row.laserCutExtraTotal + row.fixedCharges
         : row.total
       : 0;
 
@@ -6136,9 +6141,9 @@ function getM2Catalog(config) {
   return baseCatalog;
 }
 
-function calculateM2FinishExtra(row, product, config) {
+function calculateM2FinishExtra(row, product, config, onlyFinishId = null) {
   const finishes = Array.isArray(config.m2Finishes) ? config.m2Finishes : [];
-  const selected = finishes.filter((finish) => Array.isArray(row.finishIds) && row.finishIds.includes(finish.id));
+  const selected = finishes.filter((finish) => Array.isArray(row.finishIds) && row.finishIds.includes(finish.id) && (!onlyFinishId || finish.id === onlyFinishId));
   const dimensions = getM2RowDimensions(row);
   const widthCm = dimensions.widthCm;
   const heightCm = dimensions.heightCm;
