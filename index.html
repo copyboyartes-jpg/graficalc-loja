@@ -1157,6 +1157,43 @@
             </div>
           </article>
 
+          <article class="panel quote-urgency-panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Taxas de urgência</h2>
+                <p class="panel-copy">Configure as opções de produção para amanhã e para hoje. Elas não se acumulam.</p>
+              </div>
+            </div>
+            <div class="quote-form-grid">
+              <label class="full-width">
+                <span>Aplicar taxas de urgência</span>
+                <select id="quote-urgency-scope">
+                  <option value="all">Em todo o orçamento</option>
+                  <option value="selected">Somente nos itens selecionados</option>
+                </select>
+              </label>
+              <div class="quote-urgency-group full-width">
+                <h3>Produzir para amanhã</h3>
+                <div class="quote-form-grid">
+                  <label><span>Tipo de taxa</span><select id="quote-urgency-tomorrow-type"><option value="R$">Valor fixo (R$)</option><option value="%">Porcentagem (%)</option></select></label>
+                  <label><span>Valor da taxa</span><input id="quote-urgency-tomorrow-value" type="number" min="0" step="0.01" value="0"></label>
+                </div>
+              </div>
+              <div class="quote-urgency-group full-width">
+                <h3>Produzir para hoje</h3>
+                <div class="quote-form-grid">
+                  <label><span>Tipo de taxa</span><select id="quote-urgency-today-type"><option value="R$">Valor fixo (R$)</option><option value="%">Porcentagem (%)</option></select></label>
+                  <label><span>Valor da taxa</span><input id="quote-urgency-today-value" type="number" min="0" step="0.01" value="0"></label>
+                </div>
+              </div>
+              <div id="quote-urgency-item-picker" class="quote-urgency-picker full-width" hidden>
+                <strong>Itens que recebem a taxa</strong>
+                <p class="panel-copy">Marque os serviços aos quais as duas opções de urgência se aplicam.</p>
+                <div id="quote-urgency-item-list" class="quote-urgency-item-list"></div>
+              </div>
+            </div>
+          </article>
+
           <article class="panel">
             <div class="panel-heading">
               <div>

@@ -1442,7 +1442,57 @@ textarea {
 
 .quote-grid {
   margin-bottom: 18px;
+  grid-template-areas: "client company" "urgency urgency";
 }
+
+.quote-grid > article:first-child { grid-area: client; }
+.quote-grid > .quote-urgency-panel { grid-area: urgency; }
+.quote-grid > article:last-child { grid-area: company; }
+
+.quote-urgency-group {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.quote-urgency-group h3 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+}
+
+.quote-urgency-picker[hidden] { display: none; }
+
+.quote-urgency-item-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.quote-urgency-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.quote-urgency-item input { width: auto; margin-top: 4px; }
+.quote-urgency-item small { display: block; color: var(--muted); }
+
+.quote-urgency-results { display: grid; gap: 12px; }
+.quote-urgency-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.quote-urgency-option > strong { white-space: nowrap; font-size: 1.2rem; }
 
 .quote-preview-panel {
   overflow: hidden;
@@ -1622,6 +1672,8 @@ textarea {
 }
 
 @media (max-width: 1100px) {
+  .quote-grid { grid-template-areas: "client" "urgency" "company"; }
+  .quote-urgency-item-list { grid-template-columns: 1fr; }
   .hero,
   .workspace-grid,
   .summary-grid,

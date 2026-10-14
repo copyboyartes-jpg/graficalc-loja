@@ -1399,6 +1399,12 @@ function createDefaultState() {
     quoteNotes: "",
     quoteDiscountType: "R$",
     quoteDiscountValue: 0,
+    quoteUrgency: {
+      scope: "all",
+      selectedItemKeys: [],
+      tomorrow: { type: "R$", value: 0 },
+      today: { type: "R$", value: 0 },
+    },
   };
 }
 
@@ -1430,6 +1436,7 @@ function createQuoteHistorySnapshot(state) {
     quoteNotes: state.quoteNotes,
     quoteDiscountType: state.quoteDiscountType,
     quoteDiscountValue: state.quoteDiscountValue,
+    quoteUrgency: state.quoteUrgency,
   });
 }
 
@@ -1477,6 +1484,7 @@ function applyQuoteHistorySnapshot(state, snapshot) {
   state.quoteNotes = restored.quoteNotes;
   state.quoteDiscountType = restored.quoteDiscountType;
   state.quoteDiscountValue = restored.quoteDiscountValue;
+  state.quoteUrgency = deepClone(restored.quoteUrgency);
   return true;
 }
 
@@ -1846,6 +1854,15 @@ function mergeState(candidate) {
   state.quoteNotes = typeof candidate.quoteNotes === "string" ? candidate.quoteNotes : state.quoteNotes;
   state.quoteDiscountType = normalizeDiscountType(candidate.quoteDiscountType);
   state.quoteDiscountValue = toMoneyNumber(candidate.quoteDiscountValue);
+  const urgency = candidate.quoteUrgency && typeof candidate.quoteUrgency === "object" ? candidate.quoteUrgency : {};
+  state.quoteUrgency.scope = urgency.scope === "selected" ? "selected" : "all";
+  state.quoteUrgency.selectedItemKeys = Array.isArray(urgency.selectedItemKeys)
+    ? [...new Set(urgency.selectedItemKeys.filter((key) => typeof key === "string"))]
+    : [];
+  for (const option of ["tomorrow", "today"]) {
+    const saved = urgency[option] && typeof urgency[option] === "object" ? urgency[option] : {};
+    state.quoteUrgency[option] = { type: normalizeDiscountType(saved.type), value: toMoneyNumber(saved.value) };
+  }
 
   if (Array.isArray(candidate.rows) && candidate.rows.length > 0) {
     state.rows = candidate.rows.map((row, index) => ({
@@ -6377,6 +6394,39 @@ function calculateResinWorkbook(state, config) {
   };
 }
 
+function collectQuoteUrgencyItems(workbooks) {
+  const sources = ["apostila", "color", "credential", "ready", "freeQuote", "businessCard", "flyer", "blockSulfite", "blockAutocopiativo", "linearMeter", "m2", "resin"];
+  return workbooks.flatMap((workbook, sourceIndex) => workbook.activeRows.map((row, index) => ({
+    key: `${sources[sourceIndex]}:${row.id || index}`,
+    description: (sources[sourceIndex] === "m2" ? getM2RowDescription(row) : row.description) || row.productLabel || `Item ${index + 1}`,
+    total: Math.max(0, toMoneyNumber(row.total)),
+  })));
+}
+
+function calculateQuoteUrgency(state, items, quoteDiscount) {
+  const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+  const selectedKeys = new Set(state.quoteUrgency.selectedItemKeys);
+  const selectedItems = state.quoteUrgency.scope === "selected"
+    ? items.filter((item) => selectedKeys.has(item.key))
+    : items;
+  const selectedSubtotal = selectedItems.reduce((sum, item) => sum + item.total, 0);
+  const discountedBase = subtotal > 0 ? selectedSubtotal * (quoteDiscount.total / subtotal) : 0;
+  const options = {};
+  for (const option of ["tomorrow", "today"]) {
+    const setting = state.quoteUrgency[option];
+    const amount = setting.value > 0 && selectedSubtotal > 0
+      ? Math.round((setting.type === "%" ? discountedBase * setting.value / 100 : setting.value) * 100) / 100
+      : 0;
+    options[option] = {
+      amount,
+      total: Math.round((quoteDiscount.total + amount) * 100) / 100,
+      setting,
+      active: amount > 0,
+    };
+  }
+  return { ...options, selectedItems };
+}
+
 function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, linearMeterWorkbook, m2Workbook, resinWorkbook) {
   const dateText = new Intl.DateTimeFormat("pt-BR").format(new Date());
   const quoteEntries = [
@@ -6513,6 +6563,19 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
   const combinedSubtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + freeQuoteWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + flyerWorkbook.totals.totalGeneral + blockSulfiteWorkbook.totals.totalGeneral + blockAutocopiativoWorkbook.totals.totalGeneral + linearMeterWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
   const quoteDiscount = calculateDiscount(combinedSubtotal, state.quoteDiscountType, state.quoteDiscountValue);
   const combinedTotal = quoteDiscount.total;
+  const urgency = calculateQuoteUrgency(state, collectQuoteUrgencyItems([workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, linearMeterWorkbook, m2Workbook, resinWorkbook]), quoteDiscount);
+  const urgencyScope = state.quoteUrgency.scope === "selected"
+    ? `Itens com urgência: ${urgency.selectedItems.map((item) => item.description).join(", ")}`
+    : "Aplicada a todo o orçamento";
+  const urgencyMarkup = [
+    ["tomorrow", "Produzir para amanhã"],
+    ["today", "Produzir para hoje"],
+  ].filter(([key]) => urgency[key].active).map(([key, label]) => `
+    <div class="quote-urgency-option">
+      <div><strong>${label}</strong><p class="quote-muted">Taxa: ${formatDiscountValue(urgency[key].setting.type, urgency[key].setting.value)} (${formatCurrency(urgency[key].amount)})</p></div>
+      <strong>${formatCurrency(urgency[key].total)}</strong>
+    </div>
+  `).join("");
   const combinedUnits = workbook.totals.totalQuantity + colorWorkbook.totals.totalQuantity + credentialWorkbook.totals.totalQuantity + readyWorkbook.totals.totalQuantity + freeQuoteWorkbook.totals.totalQuantity + businessCardWorkbook.totals.totalQuantity + flyerWorkbook.totals.totalQuantity + blockSulfiteWorkbook.totals.totalQuantity + blockAutocopiativoWorkbook.totals.totalQuantity + linearMeterWorkbook.totals.totalQuantity + m2Workbook.totals.totalQuantity + resinWorkbook.totals.totalQuantity;
   const lineItemsMarkup = quoteEntries.length
     ? quoteEntries
@@ -6595,12 +6658,14 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       ${state.quoteTotalVisibility !== "hide" ? `
       <div class="quote-total-bar">
         <div>
-          <strong>Total geral</strong>
+          <strong>Valor padrão</strong>
+          <p class="quote-muted">Prazo: ${escapeHtml(state.productionDeadline || "A combinar")}</p>
           <p class="quote-muted">Total de unidades: ${formatInteger(combinedUnits)}</p>
           ${quoteDiscount.hasDiscount ? `<p class="quote-muted">Subtotal: ${formatCurrency(combinedSubtotal)}</p><p class="quote-discount-detail">Desconto geral: ${formatDiscountValue(quoteDiscount.type, quoteDiscount.value)} (-${formatCurrency(quoteDiscount.amount)})</p>` : ""}
         </div>
         <strong>${formatCurrency(combinedTotal)}</strong>
-      </div>` : ""}
+      </div>
+      ${urgencyMarkup ? `<div class="quote-box quote-urgency-results"><h3>Opções de urgência</h3><p class="quote-muted">${escapeHtml(urgencyScope)}</p>${urgencyMarkup}</div>` : ""}` : ""}
     </div>
   `;
 }
@@ -6672,13 +6737,25 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
 
   const combinedSubtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + freeQuoteWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + flyerWorkbook.totals.totalGeneral + blockSulfiteWorkbook.totals.totalGeneral + blockAutocopiativoWorkbook.totals.totalGeneral + linearMeterWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
   const quoteDiscount = calculateDiscount(combinedSubtotal, state.quoteDiscountType, state.quoteDiscountValue);
+  const urgency = calculateQuoteUrgency(state, collectQuoteUrgencyItems([workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, linearMeterWorkbook, m2Workbook, resinWorkbook]), quoteDiscount);
   if (state.quoteTotalVisibility !== "hide") {
     if (quoteDiscount.hasDiscount) {
       lines.push("", `Subtotal: ${formatCurrency(combinedSubtotal)}`);
       lines.push(`Desconto geral: ${formatDiscountValue(quoteDiscount.type, quoteDiscount.value)} (-${formatCurrency(quoteDiscount.amount)})`);
-      lines.push(`Total geral: ${formatCurrency(quoteDiscount.total)}`);
+      lines.push(`Valor padrão (${state.productionDeadline || "prazo a combinar"}): ${formatCurrency(quoteDiscount.total)}`);
     } else {
-      lines.push("", `Total geral: ${formatCurrency(combinedSubtotal)}`);
+      lines.push("", `Valor padrão (${state.productionDeadline || "prazo a combinar"}): ${formatCurrency(quoteDiscount.total)}`);
+    }
+    if (urgency.tomorrow.active || urgency.today.active) {
+      const scopeText = state.quoteUrgency.scope === "selected"
+        ? `Itens com urgência: ${urgency.selectedItems.map((item) => item.description).join(", ")}`
+        : "Aplicada a todo o orçamento";
+      lines.push("", "Opções de urgência:", scopeText);
+      for (const [key, label] of [["tomorrow", "Produzir para amanhã"], ["today", "Produzir para hoje"]]) {
+        if (urgency[key].active) {
+          lines.push(`${label}: taxa ${formatDiscountValue(urgency[key].setting.type, urgency[key].setting.value)} (${formatCurrency(urgency[key].amount)}) | total ${formatCurrency(urgency[key].total)}`);
+        }
+      }
     }
   }
 
@@ -7176,6 +7253,11 @@ async function initApp() {
     document.getElementById("quote-discount-type").value = normalizeDiscountType(state.quoteDiscountType);
     document.getElementById("quote-discount-value").value = state.quoteDiscountValue || 0;
     document.getElementById("quote-notes").value = state.quoteNotes;
+    document.getElementById("quote-urgency-scope").value = state.quoteUrgency.scope;
+    for (const option of ["tomorrow", "today"]) {
+      document.getElementById(`quote-urgency-${option}-type`).value = state.quoteUrgency[option].type;
+      document.getElementById(`quote-urgency-${option}-value`).value = state.quoteUrgency[option].value || 0;
+    }
     document.getElementById("company-name").value = state.company.name;
     document.getElementById("company-cnpj").value = state.company.cnpj;
     document.getElementById("company-contact").value = state.company.contact;
@@ -7869,6 +7951,12 @@ async function initApp() {
       ? resinWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
       : `<div class="warning-item is-success">Sem alertas no momento. Você pode montar várias medidas de resinados no mesmo orçamento por aqui.</div>`;
 
+    const urgencyItems = collectQuoteUrgencyItems([workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, linearMeterWorkbook, m2Workbook, resinWorkbook]);
+    document.getElementById("quote-urgency-item-picker").hidden = state.quoteUrgency.scope !== "selected";
+    document.getElementById("quote-urgency-item-list").innerHTML = urgencyItems.length
+      ? urgencyItems.map((item, index) => `<label class="quote-urgency-item"><input type="checkbox" data-urgency-item-key="${escapeHtml(item.key)}" ${state.quoteUrgency.selectedItemKeys.includes(item.key) ? "checked" : ""}><span>Item ${index + 1}: ${escapeHtml(item.description)} <small>${formatCurrency(item.total)}</small></span></label>`).join("")
+      : `<p class="panel-copy">Adicione itens ao orçamento para selecionar os serviços urgentes.</p>`;
+
     try {
       quotePreview.innerHTML = createQuoteHtml(
         state,
@@ -7910,6 +7998,7 @@ async function initApp() {
     state.m2Items = Array.from({ length: 5 }, (_, index) => createDefaultM2Row(index));
     state.resinItems = Array.from({ length: 5 }, (_, index) => createDefaultResinRow(index));
     selectedRowIds.clear();
+    state.quoteUrgency.selectedItemKeys = [];
     persistLocalOnly();
     renderRowsAndSummary();
   }
@@ -10094,6 +10183,33 @@ async function initApp() {
     if (element.tagName === "SELECT") {
       element.addEventListener("change", updateField);
     }
+  });
+
+  document.getElementById("quote-urgency-scope").addEventListener("change", (event) => {
+    state.quoteUrgency.scope = event.target.value === "selected" ? "selected" : "all";
+    persist();
+    renderRowsAndSummary();
+  });
+  for (const option of ["tomorrow", "today"]) {
+    for (const field of ["type", "value"]) {
+      const element = document.getElementById(`quote-urgency-${option}-${field}`);
+      const updateFee = (event) => {
+        state.quoteUrgency[option][field] = field === "type" ? normalizeDiscountType(event.target.value) : toMoneyNumber(event.target.value);
+        persist();
+        renderRowsAndSummary();
+      };
+      element.addEventListener(field === "type" ? "change" : "input", updateFee);
+    }
+  }
+  document.getElementById("quote-urgency-item-list").addEventListener("change", (event) => {
+    const key = event.target.dataset?.urgencyItemKey;
+    if (!key) return;
+    const selected = new Set(state.quoteUrgency.selectedItemKeys);
+    if (event.target.checked) selected.add(key);
+    else selected.delete(key);
+    state.quoteUrgency.selectedItemKeys = [...selected];
+    persist();
+    renderRowsAndSummary();
   });
 
   document.getElementById("company-logo-input").addEventListener("change", async (event) => {
