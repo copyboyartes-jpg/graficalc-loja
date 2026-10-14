@@ -2634,7 +2634,11 @@ function getColorPrintDisplaySize(row) {
     return row.size || "A4";
   }
 
-  return `${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm | ${row.size || "A4"}`;
+  return `${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} cm`;
+}
+
+function getColorPrintQuoteDetail(row) {
+  return `${formatInteger(row.quantity)} unidades | ${getColorPrintDisplaySize(row)} | ${row.paperType} | ${row.printMode}`;
 }
 
 function normalizeColorPrintRowBySize(row) {
@@ -6393,9 +6397,9 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
     ...colorWorkbook.activeRows.map((row, index) => ({
       source: "color",
       sourceIndex: index,
-      kind: "Impresso colorido",
+      kind: "",
       description: row.description,
-      detail: `${formatInteger(row.quantity)} unidades | ${getColorPrintDisplaySize(row)} | ${row.paperType} | ${row.printMode}`,
+      detail: getColorPrintQuoteDetail(row),
       extraDetail: row.colorExtrasSummary || "",
       artDetail: formatArtCreationDetail(row),
       discountDetail: row.discountDescription,
@@ -6518,7 +6522,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
               <div class="quote-line-main">
                 <strong>${escapeHtml(entry.description || `Item ${index + 1}`)}</strong>
                 <small>
-                  ${escapeHtml(entry.kind)} | ${escapeHtml(entry.detail)}
+                  ${entry.kind ? `${escapeHtml(entry.kind)} | ` : ""}${escapeHtml(entry.detail)}
                 </small>
                 ${entry.extraDetail ? `<small class="quote-extra-detail">${escapeHtml(entry.extraDetail)}</small>` : ""}
                 ${entry.artDetail ? `<small class="quote-extra-detail">${escapeHtml(entry.artDetail)}</small>` : ""}
@@ -6626,7 +6630,7 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
       };
     }),
     ...colorWorkbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || `Impresso ${index + 1}`} | ${row.quantity} unidades | ${getColorPrintDisplaySize(row)} | ${row.paperType} | ${row.printMode}${row.colorExtrasSummary ? ` | ${row.colorExtrasSummary}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
+      text: `- ${row.description || `Impresso ${index + 1}`} | ${getColorPrintQuoteDetail(row)}${row.colorExtrasSummary ? ` | ${row.colorExtrasSummary}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...credentialWorkbook.activeRows.map((row, index) => ({
       text: `- ${row.description || `Credencial ${index + 1}`} | ${row.quantityValue} unidades | ${formatMeasure(row.widthCm)} x ${formatMeasure(row.heightCm)} cm | ${row.materialLabel} | ${row.printMode}${row.lamination === "Com laminação" ? " | Com laminação" : ""}${row.lanyardType !== "none" ? ` | ${row.lanyardLabel}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
