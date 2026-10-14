@@ -891,16 +891,12 @@
       <section class="tab-panel" data-tab-panel="orcamento-livre">
         <div class="summary-grid">
           <article class="summary-card">
-            <span class="summary-label">Linhas ativas</span>
+            <span class="summary-label">Itens</span>
             <strong id="free-quote-summary-active">0</strong>
           </article>
           <article class="summary-card">
-            <span class="summary-label">Itens</span>
+            <span class="summary-label">Valor total</span>
             <strong id="free-quote-summary-total">R$ 0,00</strong>
-          </article>
-          <article class="summary-card">
-            <span class="summary-label">Valor médio</span>
-            <strong id="free-quote-summary-average">R$ 0,00</strong>
           </article>
         </div>
 
@@ -908,7 +904,7 @@
           <div class="panel-heading">
             <div>
               <h2>Orçamento livre</h2>
-              <p class="panel-copy">Use esta aba para digitar serviços avulsos com descrição, quantidade e valor livre. Tudo entra no orçamento final junto com as demais abas.</p>
+              <p class="panel-copy">Adicione itens avulsos com nome, descrição e valor final. Eles entram no orçamento enviado ao cliente junto com os demais serviços.</p>
             </div>
           </div>
 
@@ -918,28 +914,10 @@
           </div>
 
           <p class="helper-text status-note" id="free-quote-feedback">
-            O orçamento livre permite lançar serviços personalizados que não dependem de tabela fixa.
+            Informe o valor final de cada item, sem precisar escolher quantidade ou tabela de preços.
           </p>
 
-          <div class="table-shell">
-            <table class="budget-table">
-              <thead>
-                <tr>
-                  <th>Item</th>
-                  <th>Serviço</th>
-                  <th>Quantidade</th>
-                  <th>Valor un.</th>
-                  <th>Total base</th>
-                  <th>Criação de arte</th>
-                  <th>Tipo desc.</th>
-                  <th>Desconto</th>
-                  <th>Total item</th>
-                  <th>Valor un. final</th>
-                </tr>
-              </thead>
-              <tbody id="free-quote-rows-table-body"></tbody>
-            </table>
-          </div>
+          <div class="free-quote-items" id="free-quote-rows-table-body"></div>
 
           <div class="warning-list" id="free-quote-warning-list"></div>
         </article>

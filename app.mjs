@@ -1320,12 +1320,22 @@ function createDefaultFlyerRow(index) {
 function createDefaultFreeQuoteRow(index) {
   return {
     id: `free-quote-row-${index + 1}`,
+    itemName: "",
     description: "",
-    quantity: 1,
-    unitValue: 0,
-    artCreationFee: 0,
-    discountType: "R$",
-    discountValue: 0,
+    value: 0,
+  };
+}
+
+function normalizeFreeQuoteRow(row, index) {
+  const modern = Object.prototype.hasOwnProperty.call(row, "itemName");
+  const legacySubtotal = toWholeNumber(row.quantity) * toMoneyNumber(row.unitValue) + toMoneyNumber(row.artCreationFee);
+  return {
+    id: row.id || `free-quote-row-${index + 1}`,
+    itemName: modern ? String(row.itemName || "") : String(row.description || ""),
+    description: modern ? String(row.description || "") : "",
+    value: Object.prototype.hasOwnProperty.call(row, "value")
+      ? toMoneyNumber(row.value)
+      : calculateDiscount(legacySubtotal, row.discountType, row.discountValue).total,
   };
 }
 
@@ -1371,7 +1381,7 @@ function createDefaultState() {
     colorPrintItems: Array.from({ length: 5 }, (_, index) => createDefaultColorPrintRow(index)),
     credentialItems: Array.from({ length: 5 }, (_, index) => createDefaultCredentialRow(index)),
     readyProductItems: Array.from({ length: 5 }, (_, index) => createDefaultReadyProductRow(index)),
-    freeQuoteItems: Array.from({ length: 5 }, (_, index) => createDefaultFreeQuoteRow(index)),
+    freeQuoteItems: [createDefaultFreeQuoteRow(0)],
     m2Items: Array.from({ length: 5 }, (_, index) => createDefaultM2Row(index)),
     resinItems: Array.from({ length: 5 }, (_, index) => createDefaultResinRow(index)),
     linearMeterItems: Array.from({ length: 5 }, (_, index) => createDefaultLinearMeterRow(index)),
@@ -1937,16 +1947,10 @@ function mergeState(candidate) {
   }
 
   if (Array.isArray(candidate.freeQuoteItems) && candidate.freeQuoteItems.length > 0) {
-    state.freeQuoteItems = candidate.freeQuoteItems.map((row, index) => ({
-      ...createDefaultFreeQuoteRow(index),
-      ...row,
-      quantity: toWholeNumber(row?.quantity),
-      unitValue: toMoneyNumber(row?.unitValue),
-      artCreationFee: toMoneyNumber(row?.artCreationFee),
-      discountType: normalizeDiscountType(row?.discountType),
-      discountValue: toMoneyNumber(row?.discountValue),
-      id: row?.id || `free-quote-row-${index + 1}`,
-    }));
+    state.freeQuoteItems = candidate.freeQuoteItems
+      .filter((row) => row && typeof row === "object")
+      .map(normalizeFreeQuoteRow);
+    if (state.freeQuoteItems.length === 0) state.freeQuoteItems = [createDefaultFreeQuoteRow(0)];
   }
 
   if (Array.isArray(candidate.m2Items) && candidate.m2Items.length > 0) {
@@ -3393,44 +3397,37 @@ function calculateReadyProductWorkbook(state, config) {
 }
 
 function isFreeQuoteRowActive(row) {
-  return Boolean((row.description || "").trim() || Number(row.quantity) > 0 || Number(row.unitValue) > 0);
+  return Boolean((row.itemName || "").trim() || (row.description || "").trim() || Number(row.value) > 0);
 }
 
 function calculateFreeQuoteWorkbook(state) {
   const rows = state.freeQuoteItems.map((row, index) => {
-    const quantity = toWholeNumber(row.quantity);
-    const unitValue = toMoneyNumber(row.unitValue);
-    const active = isFreeQuoteRowActive(row);
+    const itemName = (row.itemName || "").trim();
     const description = (row.description || "").trim();
-    const subtotal = active ? quantity * unitValue : 0;
-    const artCreationFee = getArtCreationFee(row);
-    const rowDiscount = applyRowDiscount(row, subtotal + artCreationFee, quantity);
-    const warning = active && !description
-      ? `Orçamento livre ${index + 1}: digite uma descrição para este serviço.`
-      : active && quantity <= 0
-        ? `Orçamento livre ${index + 1}: informe uma quantidade maior que zero.`
-        : active && unitValue <= 0
-          ? `Orçamento livre ${index + 1}: informe um valor unitário maior que zero.`
-          : "";
+    const value = toMoneyNumber(row.value);
+    const active = isFreeQuoteRowActive(row);
+    const warning = active && !itemName
+      ? `Orçamento livre ${index + 1}: digite o nome do item.`
+      : active && value <= 0
+        ? `Orçamento livre ${index + 1}: informe um valor maior que zero.`
+        : "";
 
     return {
       ...row,
       active,
-      valid: active ? quantity > 0 && unitValue > 0 && Boolean(description) : false,
-      quantity,
-      unitValue,
-      baseTotal: subtotal,
-      artCreationFee,
-      unitFinalValue: quantity > 0 ? rowDiscount.total / quantity : 0,
-      ...rowDiscount,
+      valid: active && Boolean(itemName) && value > 0,
+      itemName,
+      description,
+      value,
+      quantity: 1,
+      total: value,
       warning,
-      description: description || `Orçamento livre ${index + 1}`,
     };
   });
 
   const activeRows = rows.filter((row) => row.active && row.valid);
   const warnings = rows.filter((row) => row.warning).map((row) => row.warning);
-  const totalQuantity = activeRows.reduce((sum, row) => sum + row.quantity, 0);
+  const totalQuantity = activeRows.length;
   const totalGeneral = activeRows.reduce((sum, row) => sum + row.total, 0);
 
   return {
@@ -5082,7 +5079,7 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
     createConfigCardMarkup(
       "Orçamento livre",
       "Esta aba não usa tabela fixa de preços.",
-      `<p class="helper-text">Os serviços, quantidades e valores são digitados diretamente nas linhas de orçamento livre. Quando o campo estiver zerado ou sem descrição, a linha não aparece no orçamento final.</p>`
+      `<p class="helper-text">Digite nome do item, descrição e valor final na aba Orçamento livre. Itens sem nome ou sem valor não aparecem no orçamento do cliente.</p>`
     ),
   ];
 
@@ -6403,7 +6400,7 @@ function collectQuoteUrgencyItems(workbooks) {
   const sources = ["apostila", "color", "credential", "ready", "freeQuote", "businessCard", "flyer", "blockSulfite", "blockAutocopiativo", "linearMeter", "m2", "resin"];
   return workbooks.flatMap((workbook, sourceIndex) => workbook.activeRows.map((row, index) => ({
     key: `${sources[sourceIndex]}:${row.id || index}`,
-    description: (sources[sourceIndex] === "m2" ? getM2RowDescription(row) : row.description) || row.productLabel || `Item ${index + 1}`,
+    description: (sources[sourceIndex] === "m2" ? getM2RowDescription(row) : sources[sourceIndex] === "freeQuote" ? row.itemName : row.description) || row.productLabel || `Item ${index + 1}`,
     total: Math.max(0, toMoneyNumber(row.total)),
   })));
 }
@@ -6484,11 +6481,9 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
     ...freeQuoteWorkbook.activeRows.map((row, index) => ({
       source: "freeQuote",
       sourceIndex: index,
-      kind: "Orçamento livre",
-      description: row.description || `Serviço livre ${index + 1}`,
-      detail: `${formatInteger(row.quantity)} un. | ${formatCurrency(row.unitValue)} por un. | ${formatCurrency(row.baseTotal)} base`,
-      extraDetail: row.artCreationFee > 0 ? `Criação de arte: ${formatCurrency(row.artCreationFee)}` : "",
-      discountDetail: row.discountDescription,
+      kind: "",
+      description: row.itemName || `Item ${index + 1}`,
+      detail: row.description,
       total: row.total,
     })),
     ...businessCardWorkbook.activeRows.map((row, index) => ({
@@ -6589,9 +6584,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
             <div class="quote-line">
               <div class="quote-line-main">
                 <strong>${escapeHtml(entry.description || `Item ${index + 1}`)}</strong>
-                <small>
-                  ${entry.kind ? `${escapeHtml(entry.kind)} | ` : ""}${escapeHtml(entry.detail)}
-                </small>
+                ${entry.kind || entry.detail ? `<small>${entry.kind ? `${escapeHtml(entry.kind)}${entry.detail ? " | " : ""}` : ""}${escapeHtml(entry.detail || "")}</small>` : ""}
                 ${entry.extraDetail ? `<small class="quote-extra-detail">${escapeHtml(entry.extraDetail)}</small>` : ""}
                 ${entry.artDetail ? `<small class="quote-extra-detail">${escapeHtml(entry.artDetail)}</small>` : ""}
                 ${entry.discountDetail ? `<small class="quote-discount-detail">${escapeHtml(entry.discountDetail)}</small>` : ""}
@@ -6709,7 +6702,7 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
       text: `- ${row.description || `Produto pronto ${index + 1}`} | ${row.quantity} unidades | ${row.productLabel}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...freeQuoteWorkbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || `Serviço livre ${index + 1}`} | ${formatInteger(row.quantity)} un. | ${formatCurrency(row.unitValue)} por un. | ${formatCurrency(row.baseTotal)} base${row.artCreationFee > 0 ? ` | Criação de arte: ${formatCurrency(row.artCreationFee)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
+      text: `- ${row.itemName || `Item ${index + 1}`}${row.description ? ` | ${row.description}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...businessCardWorkbook.activeRows.map((row, index) => ({
       text: `- ${row.description || `Cartão de visita ${index + 1}`} | ${row.quantity} cartões | ${row.productionType} | ${row.materialLabel} | ${row.printMode} | Pacote: ${row.packageLabel}${row.extraFinishTotal > 0 ? ` | Acabamento adicional: ${formatCurrency(row.extraFinishTotal)}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
@@ -6801,7 +6794,7 @@ async function initApp() {
   state.colorPrintItems = trimEmptyRows(state.colorPrintItems, 5, isColorPrintRowActive);
   state.credentialItems = trimEmptyRows(state.credentialItems, 5, isCredentialRowActive);
   state.readyProductItems = trimEmptyRows(state.readyProductItems, 5, isReadyProductRowActive);
-  state.freeQuoteItems = trimEmptyRows(state.freeQuoteItems, 5, (row) => Boolean((row.description || "").trim() || Number(row.quantity) > 0 || Number(row.unitValue) > 0 || Number(row.artCreationFee) > 0));
+  state.freeQuoteItems = trimEmptyRows(state.freeQuoteItems, 1, isFreeQuoteRowActive);
   state.businessCardItems = trimEmptyRows(state.businessCardItems, 5, isBusinessCardRowActive);
   state.flyerItems = trimEmptyRows(state.flyerItems, 5, isFlyerRowActive);
   state.blockItems.sulfite = trimEmptyRows(state.blockItems.sulfite, 5, isBlockRowActive);
@@ -7512,7 +7505,6 @@ async function initApp() {
 
     document.getElementById("free-quote-summary-active").textContent = formatInteger(freeQuoteWorkbook.totals.activeLines);
     document.getElementById("free-quote-summary-total").textContent = formatCurrency(freeQuoteWorkbook.totals.totalGeneral);
-    document.getElementById("free-quote-summary-average").textContent = formatCurrency(freeQuoteWorkbook.totals.averageValue);
 
     document.getElementById("business-summary-active").textContent = formatInteger(businessCardWorkbook.totals.activeLines);
     document.getElementById("business-summary-quantity").textContent = formatInteger(businessCardWorkbook.totals.totalQuantity);
@@ -7711,18 +7703,14 @@ async function initApp() {
     freeQuoteRowsTableBody.innerHTML = freeQuoteWorkbook.rows
       .map(
         (row, index) => `
-          <tr class="${row.active ? "" : "is-empty"}" data-free-quote-row-index="${index}">
-            <td><strong>${String(index + 1).padStart(2, "0")}</strong></td>
-            <td><input class="cell-input description" name="description" value="${escapeHtml(row.description)}" placeholder="Ex.: Serviço avulso"></td>
-            <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${row.quantity > 0 ? escapeHtml(row.quantity) : ""}" placeholder="0"></td>
-            <td><input class="cell-input" name="unitValue" type="number" min="0" step="0.01" value="${escapeHtml(row.unitValue)}" placeholder="0,00"></td>
-            <td><span class="readonly-value subtle">${formatCurrency(row.baseTotal || 0)}</span></td>
-            <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
-            <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
-            <td><input class="cell-input" name="discountValue" type="number" min="0" step="0.01" value="${escapeHtml(row.discountValue ?? 0)}" placeholder="0,00"></td>
-            <td><span class="readonly-value">${formatCurrency(row.total || 0)}</span></td>
-            <td><span class="readonly-value subtle">${formatCurrency(row.unitFinalValue || 0)}</span></td>
-          </tr>
+          <div class="free-quote-item${row.active ? "" : " is-empty"}" data-free-quote-row-index="${index}">
+            <span class="free-quote-item-number">${String(index + 1).padStart(2, "0")}</span>
+            <div class="free-quote-item-fields">
+              <label><span>Nome do item</span><input name="itemName" value="${escapeHtml(row.itemName)}" placeholder="Ex.: Criação de arte"></label>
+              <label><span>Descrição</span><textarea name="description" rows="2" placeholder="Detalhes para o cliente">${escapeHtml(row.description)}</textarea></label>
+            </div>
+            <label class="free-quote-item-value"><span>Valor</span><input name="value" type="number" min="0" step="0.01" value="${row.value > 0 ? escapeHtml(row.value) : ""}" placeholder="0,00"></label>
+          </div>
         `
       )
       .join("");
@@ -7994,7 +7982,7 @@ async function initApp() {
     state.colorPrintItems = Array.from({ length: 5 }, (_, index) => createDefaultColorPrintRow(index));
     state.credentialItems = Array.from({ length: 5 }, (_, index) => createDefaultCredentialRow(index));
     state.readyProductItems = Array.from({ length: 5 }, (_, index) => createDefaultReadyProductRow(index));
-    state.freeQuoteItems = Array.from({ length: 5 }, (_, index) => createDefaultFreeQuoteRow(index));
+    state.freeQuoteItems = [createDefaultFreeQuoteRow(0)];
     state.businessCardItems = Array.from({ length: 5 }, (_, index) => createDefaultBusinessCardRow(index));
     state.flyerItems = Array.from({ length: 5 }, (_, index) => createDefaultFlyerRow(index));
     state.blockItems.sulfite = Array.from({ length: 5 }, (_, index) => createDefaultBlockRow(index, "sulfite"));
@@ -8013,7 +8001,7 @@ async function initApp() {
     state.colorPrintItems = Array.from({ length: 5 }, (_, index) => createDefaultColorPrintRow(index));
     state.credentialItems = Array.from({ length: 5 }, (_, index) => createDefaultCredentialRow(index));
     state.readyProductItems = Array.from({ length: 5 }, (_, index) => createDefaultReadyProductRow(index));
-    state.freeQuoteItems = Array.from({ length: 5 }, (_, index) => createDefaultFreeQuoteRow(index));
+    state.freeQuoteItems = [createDefaultFreeQuoteRow(0)];
     state.businessCardItems = Array.from({ length: 5 }, (_, index) => createDefaultBusinessCardRow(index));
     state.flyerItems = Array.from({ length: 5 }, (_, index) => createDefaultFlyerRow(index));
     state.blockItems.sulfite = Array.from({ length: 5 }, (_, index) => createDefaultBlockRow(index, "sulfite"));
@@ -8040,12 +8028,12 @@ async function initApp() {
   }
 
   function deleteBudgetItemFromQuote(source, index) {
-    const removeFrom = (items, factory) => {
+    const removeFrom = (items, factory, minimumCount = 5) => {
       if (!Array.isArray(items) || index < 0 || index >= items.length) {
         return;
       }
       items.splice(index, 1);
-      while (items.length < 5) {
+      while (items.length < minimumCount) {
         items.push(factory(items.length));
       }
     };
@@ -8064,7 +8052,7 @@ async function initApp() {
         removeFrom(state.readyProductItems, createDefaultReadyProductRow);
         break;
       case "freeQuote":
-        removeFrom(state.freeQuoteItems, createDefaultFreeQuoteRow);
+        removeFrom(state.freeQuoteItems, createDefaultFreeQuoteRow, 1);
         break;
       case "businessCard":
         removeFrom(state.businessCardItems, createDefaultBusinessCardRow);
@@ -9064,7 +9052,7 @@ async function initApp() {
     }
 
     const tableBody = target.closest(calculationTableBodySelector);
-    if (!(tableBody instanceof HTMLTableSectionElement)) {
+    if (!(tableBody instanceof HTMLTableSectionElement) && tableBody !== freeQuoteRowsTableBody) {
       return;
     }
 
@@ -9366,7 +9354,7 @@ async function initApp() {
 
   freeQuoteRowsTableBody.addEventListener("change", (event) => {
     const target = event.target;
-    const rowElement = target.closest("tr[data-free-quote-row-index]");
+    const rowElement = target.closest("[data-free-quote-row-index]");
     if (!rowElement) {
       return;
     }
@@ -9375,15 +9363,8 @@ async function initApp() {
     if (!field || !row) {
       return;
     }
-    if (field === "quantity") {
-      row[field] = toWholeNumber(target.value);
-    } else if (field === "unitValue" || field === "artCreationFee" || field === "discountValue") {
-      row[field] = toMoneyNumber(target.value);
-    } else if (field === "discountType") {
-      row[field] = normalizeDiscountType(target.value);
-    } else {
-      row[field] = target.value;
-    }
+    if (!["itemName", "description", "value"].includes(field)) return;
+    row[field] = field === "value" ? toMoneyNumber(target.value) : target.value;
     persistLocalOnly();
     renderRowsAndSummary();
   });
@@ -10310,7 +10291,9 @@ async function initApp() {
   const addFreeQuoteRowButton = document.getElementById("add-free-quote-row-button");
   if (addFreeQuoteRowButton) {
     addFreeQuoteRowButton.addEventListener("click", () => {
-      state.freeQuoteItems.push(createDefaultFreeQuoteRow(state.freeQuoteItems.length));
+      let nextIndex = state.freeQuoteItems.length;
+      while (state.freeQuoteItems.some((row) => row.id === `free-quote-row-${nextIndex + 1}`)) nextIndex += 1;
+      state.freeQuoteItems.push(createDefaultFreeQuoteRow(nextIndex));
       persistLocalOnly();
       renderRowsAndSummary();
     });
@@ -10329,7 +10312,7 @@ async function initApp() {
       if (!confirmed) {
         return;
       }
-      state.freeQuoteItems = Array.from({ length: 5 }, (_, index) => createDefaultFreeQuoteRow(index));
+      state.freeQuoteItems = [createDefaultFreeQuoteRow(0)];
       persistLocalOnly();
       renderRowsAndSummary();
     });

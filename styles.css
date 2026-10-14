@@ -875,12 +875,40 @@ textarea {
   color: var(--muted-strong);
 }
 
-.free-quote-table {
-  min-width: 1180px;
+.tab-panel[data-tab-panel="orcamento-livre"] .summary-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.free-quote-table .cell-input.description {
-  min-width: 320px;
+.free-quote-items {
+  display: grid;
+  gap: 12px;
+}
+
+.free-quote-item {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 170px;
+  gap: 16px;
+  align-items: start;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.free-quote-item-number {
+  padding-top: 25px;
+  font-weight: 700;
+  color: var(--brand);
+}
+
+.free-quote-item-fields {
+  display: grid;
+  gap: 12px;
+}
+
+.free-quote-item-value input {
+  font-weight: 700;
+  text-align: right;
 }
 
 .ready-products-table {
@@ -1843,6 +1871,18 @@ textarea {
 }
 
 @media (max-width: 640px) {
+  .tab-panel[data-tab-panel="orcamento-livre"] .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .free-quote-item {
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
+
+  .free-quote-item-value {
+    grid-column: 2;
+  }
+
   .resin-detail-row {
     flex-direction: column;
   }
