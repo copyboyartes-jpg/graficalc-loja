@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GrafiCalc | Orçamento Gráfico</title>
-  <link rel="stylesheet" href="./styles.css?v=9fc1099462ad">
+  <link rel="stylesheet" href="./styles.css?v=free-quote-products-20261015a">
 </head>
 <body>
   <div class="page-shell">
@@ -459,7 +459,7 @@
           <div class="panel-heading">
             <div>
               <h2>Produtos prontos</h2>
-              <p class="panel-copy">Use esta aba para orçar cordões, carimbos e outros produtos vendidos por unidade, separados da credencial.</p>
+              <p class="panel-copy">Use esta aba para orçar cordões, carimbos e os itens personalizados salvos no Orçamento livre.</p>
             </div>
           </div>
 
@@ -471,6 +471,8 @@
           <p class="helper-text status-note" id="ready-feedback">
             Os cordões seguem a base configurada no sistema e os carimbos entram pela tabela fixa cadastrada.
           </p>
+
+          <div class="ready-custom-catalog" id="ready-custom-catalog"></div>
 
           <div class="table-shell">
             <table class="budget-table ready-products-table">
@@ -904,7 +906,7 @@
           <div class="panel-heading">
             <div>
               <h2>Orçamento livre</h2>
-              <p class="panel-copy">Adicione itens avulsos com nome, descrição e valor final. Eles entram no orçamento enviado ao cliente junto com os demais serviços.</p>
+              <p class="panel-copy">Adicione itens avulsos com quantidade e valor unitário. Salve os itens recorrentes em Produtos prontos para reutilizar em outros orçamentos.</p>
             </div>
           </div>
 
@@ -914,7 +916,7 @@
           </div>
 
           <p class="helper-text status-note" id="free-quote-feedback">
-            Informe o valor final de cada item, sem precisar escolher quantidade ou tabela de preços.
+            Informe a quantidade e o valor unitário. O valor total é calculado automaticamente.
           </p>
 
           <div class="free-quote-items" id="free-quote-rows-table-body"></div>
@@ -1262,7 +1264,7 @@
       }
     })();
   </script>
-  <script src="./app.mjs?v=produtos-prontos-config-20260825a"></script>
+  <script src="./app.mjs?v=free-quote-products-20261015a"></script>
 </body>
 </html>
 

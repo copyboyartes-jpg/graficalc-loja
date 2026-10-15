@@ -950,6 +950,7 @@ function createDefaultConfig() {
       ],
     },
     readyProductPricing: createDefaultReadyProductPricing(),
+    customReadyProducts: [],
     cutPricing: {
       upToFiveSheets: [
         { minUp: 1, value: 2.0, label: "Ate 11 por folha" },
@@ -1322,20 +1323,24 @@ function createDefaultFreeQuoteRow(index) {
     id: `free-quote-row-${index + 1}`,
     itemName: "",
     description: "",
-    value: 0,
+    quantity: 1,
+    unitValue: 0,
   };
 }
 
 function normalizeFreeQuoteRow(row, index) {
   const modern = Object.prototype.hasOwnProperty.call(row, "itemName");
   const legacySubtotal = toWholeNumber(row.quantity) * toMoneyNumber(row.unitValue) + toMoneyNumber(row.artCreationFee);
+  const oldTotal = Object.prototype.hasOwnProperty.call(row, "value")
+    ? toMoneyNumber(row.value)
+    : calculateDiscount(legacySubtotal, row.discountType, row.discountValue).total;
+  const hasCurrentPrice = modern && Object.prototype.hasOwnProperty.call(row, "unitValue");
   return {
     id: row.id || `free-quote-row-${index + 1}`,
     itemName: modern ? String(row.itemName || "") : String(row.description || ""),
     description: modern ? String(row.description || "") : "",
-    value: Object.prototype.hasOwnProperty.call(row, "value")
-      ? toMoneyNumber(row.value)
-      : calculateDiscount(legacySubtotal, row.discountType, row.discountValue).total,
+    quantity: hasCurrentPrice ? toWholeNumber(row.quantity) : 1,
+    unitValue: hasCurrentPrice ? toMoneyNumber(row.unitValue) : oldTotal,
   };
 }
 
@@ -1604,6 +1609,52 @@ function normalizeM2Finishes(candidateFinishes, defaultFinishes) {
   return normalized;
 }
 
+function normalizeCustomReadyProducts(products) {
+  if (!Array.isArray(products)) return [];
+  const usedIds = new Set(READY_PRODUCT_CATALOG.map((product) => product.id));
+  return products.flatMap((product, index) => {
+    if (!product || typeof product !== "object") return [];
+    const label = String(product.label || "").trim();
+    const unitPrice = toMoneyNumber(product.unitPrice);
+    const id = String(product.id || `custom-ready-${index + 1}`).trim();
+    if (!label || unitPrice <= 0 || !id || usedIds.has(id)) return [];
+    usedIds.add(id);
+    return [{
+      id,
+      label,
+      category: "Itens personalizados",
+      unitPrice,
+      quoteDescription: String(product.quoteDescription || "").trim(),
+    }];
+  });
+}
+
+function saveFreeQuoteProduct(config, row) {
+  const label = String(row.itemName || "").trim();
+  const unitPrice = toMoneyNumber(row.unitValue);
+  if (!label || unitPrice <= 0) return null;
+  const products = normalizeCustomReadyProducts(config.customReadyProducts);
+  const existing = products.find((product) => product.label.toLocaleLowerCase("pt-BR") === label.toLocaleLowerCase("pt-BR"));
+  let id = existing?.id || "";
+  if (!id) {
+    let next = 1;
+    const usedIds = new Set([...READY_PRODUCT_CATALOG, ...products].map((product) => product.id));
+    while (usedIds.has(`custom-ready-${next}`)) next += 1;
+    id = `custom-ready-${next}`;
+  }
+  const product = {
+    id,
+    label,
+    category: "Itens personalizados",
+    unitPrice,
+    quoteDescription: String(row.description || "").trim(),
+  };
+  config.customReadyProducts = existing
+    ? products.map((item) => item.id === id ? product : item)
+    : [...products, product];
+  return { product, updated: Boolean(existing) };
+}
+
 function mergeConfig(candidate) {
   const defaults = createDefaultConfig();
   if (!candidate || typeof candidate !== "object") {
@@ -1626,6 +1677,9 @@ function mergeConfig(candidate) {
   };
 
   const merged = deepClone(defaults);
+  if (Array.isArray(candidate.customReadyProducts)) {
+    merged.customReadyProducts = normalizeCustomReadyProducts(candidate.customReadyProducts);
+  }
   if (candidate.printPricing) {
     merged.printPricing = {
       blackWhite: Array.isArray(candidate.printPricing.blackWhite) ? sanitizeValue(candidate.printPricing.blackWhite) : merged.printPricing.blackWhite,
@@ -3118,7 +3172,8 @@ function getReadyProductSelection(config, productType, quantity = 0) {
       ? printedPackageQuantity * (toMoneyNumber(packageTier.total) / tierQuantity)
       : toMoneyNumber(packageTier.total)
     : 0;
-  const options = READY_PRODUCT_CATALOG.map((item) => {
+  const catalog = [...READY_PRODUCT_CATALOG, ...normalizeCustomReadyProducts(config?.customReadyProducts)];
+  const options = catalog.map((item) => {
     const configuredPricing = config?.readyProductPricing?.[item.id] || {};
     const unitPriceConfigured = Object.prototype.hasOwnProperty.call(configuredPricing, "unitPrice")
       ? toMoneyNumber(configuredPricing.unitPrice)
@@ -3366,7 +3421,7 @@ function calculateReadyProductWorkbook(state, config) {
       valid: active ? quantity > 0 && (!minimumQuantity || quantity >= minimumQuantity) : false,
       quantity,
       billedQuantity: product.billedQuantity || quantity,
-      productType: product.label,
+      productType: product.id,
       productLabel: product.label,
       description: description || product.quoteDescription || product.label,
       artCreationFee,
@@ -3397,37 +3452,40 @@ function calculateReadyProductWorkbook(state, config) {
 }
 
 function isFreeQuoteRowActive(row) {
-  return Boolean((row.itemName || "").trim() || (row.description || "").trim() || Number(row.value) > 0);
+  return Boolean((row.itemName || "").trim() || (row.description || "").trim() || toMoneyNumber(row.unitValue) > 0);
 }
 
 function calculateFreeQuoteWorkbook(state) {
   const rows = state.freeQuoteItems.map((row, index) => {
     const itemName = (row.itemName || "").trim();
     const description = (row.description || "").trim();
-    const value = toMoneyNumber(row.value);
+    const quantity = toWholeNumber(row.quantity);
+    const unitValue = toMoneyNumber(row.unitValue);
     const active = isFreeQuoteRowActive(row);
     const warning = active && !itemName
       ? `Orçamento livre ${index + 1}: digite o nome do item.`
-      : active && value <= 0
-        ? `Orçamento livre ${index + 1}: informe um valor maior que zero.`
+      : active && quantity <= 0
+        ? `Orçamento livre ${index + 1}: informe uma quantidade maior que zero.`
+      : active && unitValue <= 0
+        ? `Orçamento livre ${index + 1}: informe um valor unitário maior que zero.`
         : "";
 
     return {
       ...row,
       active,
-      valid: active && Boolean(itemName) && value > 0,
+      valid: active && Boolean(itemName) && quantity > 0 && unitValue > 0,
       itemName,
       description,
-      value,
-      quantity: 1,
-      total: value,
+      quantity,
+      unitValue,
+      total: Math.round(quantity * unitValue * 100) / 100,
       warning,
     };
   });
 
   const activeRows = rows.filter((row) => row.active && row.valid);
   const warnings = rows.filter((row) => row.warning).map((row) => row.warning);
-  const totalQuantity = activeRows.length;
+  const totalQuantity = activeRows.reduce((sum, row) => sum + row.quantity, 0);
   const totalGeneral = activeRows.reduce((sum, row) => sum + row.total, 0);
 
   return {
@@ -4522,8 +4580,8 @@ function buildOptions(options, currentValue) {
     .join("");
 }
 
-function buildReadyProductOptions(currentValue) {
-  const grouped = READY_PRODUCT_CATALOG.reduce((accumulator, item) => {
+function buildReadyProductOptions(currentValue, config) {
+  const grouped = [...READY_PRODUCT_CATALOG, ...normalizeCustomReadyProducts(config?.customReadyProducts)].reduce((accumulator, item) => {
     if (!accumulator[item.category]) {
       accumulator[item.category] = [];
     }
@@ -5079,7 +5137,7 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
     createConfigCardMarkup(
       "Orçamento livre",
       "Esta aba não usa tabela fixa de preços.",
-      `<p class="helper-text">Digite nome do item, descrição e valor final na aba Orçamento livre. Itens sem nome ou sem valor não aparecem no orçamento do cliente.</p>`
+      `<p class="helper-text">Digite nome, descrição, quantidade e valor unitário na aba Orçamento livre. O total é calculado automaticamente. Use Salvar em Produtos prontos para reaproveitar o item.</p>`
     ),
   ];
 
@@ -6807,6 +6865,7 @@ async function initApp() {
   const colorRowsTableBody = document.getElementById("color-rows-table-body");
   const credentialRowsTableBody = document.getElementById("credential-rows-table-body");
   const readyRowsTableBody = document.getElementById("ready-rows-table-body");
+  const readyCustomCatalog = document.getElementById("ready-custom-catalog");
   const freeQuoteRowsTableBody = document.getElementById("free-quote-rows-table-body");
   const businessCardRowsTableBody = document.getElementById("business-card-rows-table-body");
   const flyerRowsTableBody = document.getElementById("flyer-rows-table-body");
@@ -7200,6 +7259,9 @@ async function initApp() {
   }
 
   function selectTab(tabName) {
+    if (tabName === "orcamento" || tabName === "produtos-prontos") {
+      renderRowsAndSummary();
+    }
     if (tabName === "configuracao") {
       activeConfigSection = normalizeConfigSection(lastConfigSourceTab);
       saveConfigSection(activeConfigSection);
@@ -7677,7 +7739,7 @@ async function initApp() {
         (row, index) => `
           <tr class="${row.active ? "" : "is-empty"}" data-ready-row-index="${index}">
             <td><strong>${String(index + 1).padStart(2, "0")}</strong></td>
-            <td><select class="cell-select" name="productType">${buildReadyProductOptions(row.productType)}</select></td>
+            <td><select class="cell-select" name="productType">${buildReadyProductOptions(row.productType, config)}</select></td>
             <td><input class="cell-input description" name="description" value="${escapeHtml(row.description === row.productLabel ? "" : row.description)}" placeholder="${escapeHtml(row.productLabel)}"></td>
             <td><input class="cell-input" name="quantity" type="text" inputmode="numeric" value="${row.quantity > 0 ? escapeHtml(row.quantity) : ""}" placeholder="0"></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.unitPrice)}</span></td>
@@ -7689,6 +7751,19 @@ async function initApp() {
         `
       )
       .join("");
+
+    const customReadyProducts = normalizeCustomReadyProducts(config.customReadyProducts);
+    readyCustomCatalog.innerHTML = customReadyProducts.length
+      ? `<details><summary>Itens personalizados salvos (${customReadyProducts.length})</summary>
+          <div class="ready-custom-catalog-list">${customReadyProducts.map((product) => `
+            <div class="ready-custom-catalog-item">
+              <span><strong>${escapeHtml(product.label)}</strong>${product.quoteDescription ? `<small>${escapeHtml(product.quoteDescription)}</small>` : ""}</span>
+              <strong>${formatCurrency(product.unitPrice)} / un.</strong>
+              <button class="button" type="button" data-use-custom-ready-product="${escapeHtml(product.id)}">Usar</button>
+            </div>
+          `).join("")}</div>
+        </details>`
+      : "";
 
     readyWarningList.innerHTML = readyWorkbook.warnings.length
       ? readyWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
@@ -7708,8 +7783,13 @@ async function initApp() {
             <div class="free-quote-item-fields">
               <label><span>Nome do item</span><input name="itemName" value="${escapeHtml(row.itemName)}" placeholder="Ex.: Criação de arte"></label>
               <label><span>Descrição</span><textarea name="description" rows="2" placeholder="Detalhes para o cliente">${escapeHtml(row.description)}</textarea></label>
+              <button class="button free-quote-save-product" type="button" data-save-free-quote-product="${index}">Salvar em Produtos prontos</button>
             </div>
-            <label class="free-quote-item-value"><span>Valor</span><input name="value" type="number" min="0" step="0.01" value="${row.value > 0 ? escapeHtml(row.value) : ""}" placeholder="0,00"></label>
+            <div class="free-quote-item-pricing">
+              <label><span>Quantidade</span><input name="quantity" type="number" min="1" step="1" value="${row.quantity > 0 ? escapeHtml(row.quantity) : ""}" placeholder="1"></label>
+              <label><span>Valor unitário</span><input name="unitValue" type="number" min="0" step="0.01" value="${row.unitValue > 0 ? escapeHtml(row.unitValue) : ""}" placeholder="0,00"></label>
+              <div class="free-quote-item-total"><span>Valor total</span><strong>${formatCurrency(row.total)}</strong></div>
+            </div>
           </div>
         `
       )
@@ -9352,8 +9432,27 @@ async function initApp() {
     updateReadyProductRowField(target);
   });
 
-  freeQuoteRowsTableBody.addEventListener("change", (event) => {
+  readyCustomCatalog.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-use-custom-ready-product]");
+    if (!button) return;
+    const product = normalizeCustomReadyProducts(config.customReadyProducts)
+      .find((item) => item.id === button.dataset.useCustomReadyProduct);
+    if (!product) return;
+    let row = state.readyProductItems.find((item) => !isReadyProductRowActive(item));
+    if (!row) {
+      ensureReadyProductRowCount(state, state.readyProductItems.length + 1);
+      row = state.readyProductItems.at(-1);
+    }
+    row.productType = product.id;
+    row.description = "";
+    row.quantity = 1;
+    persistLocalOnly();
+    renderRowsAndSummary();
+  });
+
+  function updateFreeQuoteRowField(event) {
     const target = event.target;
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) return;
     const rowElement = target.closest("[data-free-quote-row-index]");
     if (!rowElement) {
       return;
@@ -9363,10 +9462,40 @@ async function initApp() {
     if (!field || !row) {
       return;
     }
-    if (!["itemName", "description", "value"].includes(field)) return;
-    row[field] = field === "value" ? toMoneyNumber(target.value) : target.value;
+    if (!["itemName", "description", "quantity", "unitValue"].includes(field)) return;
+    row[field] = field === "quantity" ? toWholeNumber(target.value)
+      : field === "unitValue" ? toMoneyNumber(target.value) : target.value;
     persistLocalOnly();
+    const workbook = calculateFreeQuoteWorkbook(state);
+    const total = rowElement.querySelector(".free-quote-item-total strong");
+    if (total) total.textContent = formatCurrency(workbook.rows[Number(rowElement.dataset.freeQuoteRowIndex)].total);
+    document.getElementById("free-quote-summary-active").textContent = formatInteger(workbook.totals.activeLines);
+    document.getElementById("free-quote-summary-total").textContent = formatCurrency(workbook.totals.totalGeneral);
+    freeQuoteWarningList.innerHTML = workbook.warnings.length
+      ? workbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
+      : `<div class="warning-item is-success">Sem alertas no momento.</div>`;
+  }
+
+  freeQuoteRowsTableBody.addEventListener("input", updateFreeQuoteRowField);
+  freeQuoteRowsTableBody.addEventListener("change", updateFreeQuoteRowField);
+
+  freeQuoteRowsTableBody.addEventListener("click", (event) => {
+    const saveButton = event.target.closest("[data-save-free-quote-product]");
+    if (!saveButton) return;
+    const index = Number(saveButton.dataset.saveFreeQuoteProduct);
+    const row = state.freeQuoteItems[index];
+    const saved = row && saveFreeQuoteProduct(config, row);
+    if (!saved) {
+      setStatusMessage(freeQuoteFeedback, "Para salvar, informe o nome do item e um valor unitário maior que zero.", "warning");
+      return;
+    }
+    persist();
     renderRowsAndSummary();
+    setStatusMessage(
+      freeQuoteFeedback,
+      `${saved.product.label} ${saved.updated ? "atualizado" : "salvo"} em Produtos prontos. Selecione-o nessa aba e informe a quantidade para reutilizar.`,
+      "success"
+    );
   });
 
   businessCardRowsTableBody.addEventListener("change", (event) => {
