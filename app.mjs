@@ -721,6 +721,7 @@ function createDefaultLinearMeterPricing() {
     },
     products: {
       canvas: { rate: 110, minimumOrder: 45 },
+      "tecido-microfibra-extra": { rateUpTo3m: 71.5, rateAbove3m: 60.5, minimumOrder: 25 },
       "papel-glossy": { rate: 90, minimumOrder: 32 },
       "couche-210g": { rate: 39, minimumOrder: 39 },
       "couche-170g": { rate: 34, minimumOrder: 34 },
@@ -1257,6 +1258,14 @@ const LINEAR_METER_CATALOG = [
     widthLabel: "1,24 m",
     rate: 110,
     minimumOrder: 45,
+  },
+  {
+    id: "tecido-microfibra-extra",
+    label: "Tecido microfibra extra 155g/m",
+    widthLabel: "1,55 m",
+    rateUpTo3m: 71.5,
+    rateAbove3m: 60.5,
+    minimumOrder: 25,
   },
   {
     id: "papel-glossy",
@@ -4564,6 +4573,9 @@ function calculateLinearMeterRow(source, index, config) {
     } else {
       baseTotal = linearMeters * toMoneyNumber(variant?.rateAbove3m);
     }
+  } else if (product?.rateUpTo3m !== undefined && product?.rateAbove3m !== undefined) {
+    const rate = linearMeters <= 3 ? product.rateUpTo3m : product.rateAbove3m;
+    baseTotal = Math.max(toMoneyNumber(product.minimumOrder), linearMeters * toMoneyNumber(rate));
   } else {
     baseTotal = Math.max(toMoneyNumber(product?.minimumOrder), linearMeters * toMoneyNumber(product?.rate));
   }
@@ -5250,6 +5262,17 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
         </div>
       `
     ),
+    createConfigCardMarkup(
+      "Tecido microfibra extra 155g/m",
+      "Largura fixa de 1,55 m. A faixa é escolhida pela metragem calculada após o aproveitamento das peças.",
+      `
+        <div class="config-grid compact-grid">
+          <label><span>Valor mínimo (R$)</span><input data-config-prefix="linear-meter" data-config-key="products.tecido-microfibra-extra.minimumOrder" type="number" min="0" step="0.01" value="${escapeHtml(linearPricing.products["tecido-microfibra-extra"].minimumOrder)}"></label>
+          <label><span>Até 3 m (R$/m)</span><input data-config-prefix="linear-meter" data-config-key="products.tecido-microfibra-extra.rateUpTo3m" type="number" min="0" step="0.01" value="${escapeHtml(linearPricing.products["tecido-microfibra-extra"].rateUpTo3m)}"></label>
+          <label><span>Acima de 3 m (R$/m)</span><input data-config-prefix="linear-meter" data-config-key="products.tecido-microfibra-extra.rateAbove3m" type="number" min="0" step="0.01" value="${escapeHtml(linearPricing.products["tecido-microfibra-extra"].rateAbove3m)}"></label>
+        </div>
+      `
+    ),
   ];
 
   const safeSection = normalizeConfigSection(activeSection);
@@ -5311,7 +5334,7 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
     "metro-linear": createConfigGroupMarkup(
       "metro-linear",
       "Aba: Metro linear",
-      "Consulte aqui a tabela usada para DTF, UV, canvas e papéis vendidos por metro.",
+      "Consulte aqui a tabela usada para DTF, UV, canvas, tecido e papéis vendidos por metro.",
       linearMeterCards,
       safeSection
     ),
@@ -7982,7 +8005,7 @@ async function initApp() {
 
     linearMeterWarningList.innerHTML = linearMeterWorkbook.warnings.length
       ? linearMeterWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
-      : `<div class="warning-item is-success">Sem alertas no momento. Use esta aba para DTF têxtil, DTF UV, canvas e papéis por metro linear.</div>`;
+      : `<div class="warning-item is-success">Sem alertas no momento. Use esta aba para DTF têxtil, DTF UV, canvas, tecido e papéis por metro linear.</div>`;
     setLinearMeterFeedback(
       linearMeterWorkbook.activeRows.length > 0
         ? "Cálculo de metro linear atualizado com sucesso."
