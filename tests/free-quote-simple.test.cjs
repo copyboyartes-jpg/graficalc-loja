@@ -39,6 +39,63 @@ test("orçamento livre multiplica quantidade pelo valor unitário sem alterar a 
   assert.doesNotMatch(html, /Orçamento livre \|/);
 });
 
+test("valor total digitado calcula o unitário e permanece exato ao mudar a quantidade", () => {
+  const state = app.createDefaultState();
+  const row = state.freeQuoteItems[0];
+  row.itemName = "Pacote especial";
+  row.quantity = 3;
+  row.totalValue = 100;
+  row.priceMode = "total";
+  Object.assign(row, app.calculateFreeQuotePricing(row));
+  assert.equal(row.unitValue, 100 / 3);
+  assert.equal(quote(state).workbook.totals.totalGeneral, 100);
+
+  row.quantity = 4;
+  Object.assign(row, app.calculateFreeQuotePricing(row));
+  assert.equal(row.unitValue, 25);
+  assert.equal(quote(state).workbook.totals.totalGeneral, 100);
+
+  const restored = app.createDefaultState();
+  assert.equal(app.applyQuoteHistorySnapshot(restored, app.createQuoteHistorySnapshot(state)), true);
+  assert.equal(restored.freeQuoteItems[0].priceMode, "total");
+  assert.equal(restored.freeQuoteItems[0].unitValue, 25);
+  assert.equal(quote(restored).workbook.totals.totalGeneral, 100);
+});
+
+test("editar o unitário passa a recalcular o total pela quantidade", () => {
+  const state = app.createDefaultState();
+  const row = state.freeQuoteItems[0];
+  row.itemName = "Produto avulso";
+  row.quantity = 3;
+  row.totalValue = 100;
+  row.priceMode = "total";
+  Object.assign(row, app.calculateFreeQuotePricing(row));
+  row.unitValue = 12.5;
+  row.priceMode = "unit";
+  Object.assign(row, app.calculateFreeQuotePricing(row));
+  assert.equal(row.totalValue, 37.5);
+  assert.equal(quote(state).workbook.totals.totalGeneral, 37.5);
+});
+
+test("item criado pelo total pode ser salvo e reutilizado pelo preço unitário calculado", () => {
+  const config = app.createDefaultConfig();
+  const row = {
+    itemName: "Pacote de etiquetas",
+    description: "Modelo padrão",
+    quantity: 3,
+    unitValue: 0,
+    totalValue: 100,
+    priceMode: "total",
+  };
+  Object.assign(row, app.calculateFreeQuotePricing(row));
+  const saved = app.saveFreeQuoteProduct(config, row);
+  assert.equal(saved.product.unitPrice, 100 / 3);
+  const state = app.createDefaultState();
+  state.readyProductItems[0].productType = saved.product.id;
+  state.readyProductItems[0].quantity = 3;
+  assert.equal(app.calculateReadyProductWorkbook(state, app.mergeConfig(config)).totals.totalGeneral, 100);
+});
+
 test("descrição é opcional, mas nome, quantidade e valor unitário são necessários", () => {
   const state = app.createDefaultState();
   state.freeQuoteItems[0] = { ...state.freeQuoteItems[0], itemName: "Arte final", unitValue: 80 };

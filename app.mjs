@@ -1325,6 +1325,23 @@ function createDefaultFreeQuoteRow(index) {
     description: "",
     quantity: 1,
     unitValue: 0,
+    totalValue: 0,
+    priceMode: "unit",
+  };
+}
+
+function calculateFreeQuotePricing(row) {
+  const quantity = toWholeNumber(row.quantity);
+  const priceMode = row.priceMode === "total" ? "total" : "unit";
+  const unitValue = toMoneyNumber(row.unitValue);
+  const totalValue = priceMode === "total"
+    ? Math.round(toMoneyNumber(row.totalValue) * 100) / 100
+    : Math.round(quantity * unitValue * 100) / 100;
+  return {
+    quantity,
+    unitValue: priceMode === "total" ? (quantity > 0 ? totalValue / quantity : 0) : unitValue,
+    totalValue,
+    priceMode,
   };
 }
 
@@ -1335,12 +1352,17 @@ function normalizeFreeQuoteRow(row, index) {
     ? toMoneyNumber(row.value)
     : calculateDiscount(legacySubtotal, row.discountType, row.discountValue).total;
   const hasCurrentPrice = modern && Object.prototype.hasOwnProperty.call(row, "unitValue");
+  const pricing = calculateFreeQuotePricing({
+    quantity: hasCurrentPrice ? row.quantity : 1,
+    unitValue: hasCurrentPrice ? row.unitValue : oldTotal,
+    totalValue: row.totalValue,
+    priceMode: hasCurrentPrice && Object.prototype.hasOwnProperty.call(row, "totalValue") ? row.priceMode : "unit",
+  });
   return {
     id: row.id || `free-quote-row-${index + 1}`,
     itemName: modern ? String(row.itemName || "") : String(row.description || ""),
     description: modern ? String(row.description || "") : "",
-    quantity: hasCurrentPrice ? toWholeNumber(row.quantity) : 1,
-    unitValue: hasCurrentPrice ? toMoneyNumber(row.unitValue) : oldTotal,
+    ...pricing,
   };
 }
 
@@ -2312,6 +2334,19 @@ function formatCurrency(value) {
     style: "currency",
     currency: "BRL",
   }).format(Number(value || 0));
+}
+
+function formatUnitCurrency(value) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  }).format(Number(value || 0));
+}
+
+function formatUnitInput(value) {
+  return value > 0 ? String(Number(value.toFixed(4))) : "";
 }
 
 function formatInteger(value) {
@@ -3452,33 +3487,33 @@ function calculateReadyProductWorkbook(state, config) {
 }
 
 function isFreeQuoteRowActive(row) {
-  return Boolean((row.itemName || "").trim() || (row.description || "").trim() || toMoneyNumber(row.unitValue) > 0);
+  const pricing = calculateFreeQuotePricing(row);
+  return Boolean((row.itemName || "").trim() || (row.description || "").trim() || pricing.unitValue > 0 || pricing.totalValue > 0);
 }
 
 function calculateFreeQuoteWorkbook(state) {
   const rows = state.freeQuoteItems.map((row, index) => {
     const itemName = (row.itemName || "").trim();
     const description = (row.description || "").trim();
-    const quantity = toWholeNumber(row.quantity);
-    const unitValue = toMoneyNumber(row.unitValue);
+    const pricing = calculateFreeQuotePricing(row);
+    const { quantity, totalValue } = pricing;
     const active = isFreeQuoteRowActive(row);
     const warning = active && !itemName
       ? `Orçamento livre ${index + 1}: digite o nome do item.`
       : active && quantity <= 0
         ? `Orçamento livre ${index + 1}: informe uma quantidade maior que zero.`
-      : active && unitValue <= 0
-        ? `Orçamento livre ${index + 1}: informe um valor unitário maior que zero.`
+      : active && totalValue <= 0
+        ? `Orçamento livre ${index + 1}: informe um valor unitário ou total maior que zero.`
         : "";
 
     return {
       ...row,
       active,
-      valid: active && Boolean(itemName) && quantity > 0 && unitValue > 0,
+      valid: active && Boolean(itemName) && quantity > 0 && totalValue > 0,
       itemName,
       description,
-      quantity,
-      unitValue,
-      total: Math.round(quantity * unitValue * 100) / 100,
+      ...pricing,
+      total: totalValue,
       warning,
     };
   });
@@ -5137,7 +5172,7 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
     createConfigCardMarkup(
       "Orçamento livre",
       "Esta aba não usa tabela fixa de preços.",
-      `<p class="helper-text">Digite nome, descrição, quantidade e valor unitário na aba Orçamento livre. O total é calculado automaticamente. Use Salvar em Produtos prontos para reaproveitar o item.</p>`
+      `<p class="helper-text">Digite nome, descrição e quantidade na aba Orçamento livre. Preencha o valor unitário ou o total; o outro campo será calculado automaticamente. Use Salvar em Produtos prontos para reaproveitar o item.</p>`
     ),
   ];
 
@@ -7742,7 +7777,7 @@ async function initApp() {
             <td><select class="cell-select" name="productType">${buildReadyProductOptions(row.productType, config)}</select></td>
             <td><input class="cell-input description" name="description" value="${escapeHtml(row.description === row.productLabel ? "" : row.description)}" placeholder="${escapeHtml(row.productLabel)}"></td>
             <td><input class="cell-input" name="quantity" type="text" inputmode="numeric" value="${row.quantity > 0 ? escapeHtml(row.quantity) : ""}" placeholder="0"></td>
-            <td><span class="readonly-value subtle">${formatCurrency(row.unitPrice)}</span></td>
+            <td><span class="readonly-value subtle">${formatUnitCurrency(row.unitPrice)}</span></td>
             <td><input class="cell-input" name="artCreationFee" type="text" inputmode="decimal" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
             <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
             <td><input class="cell-input" name="discountValue" type="text" inputmode="decimal" value="${escapeHtml(row.discountValue ?? 0)}" placeholder="0,00"></td>
@@ -7758,7 +7793,7 @@ async function initApp() {
           <div class="ready-custom-catalog-list">${customReadyProducts.map((product) => `
             <div class="ready-custom-catalog-item">
               <span><strong>${escapeHtml(product.label)}</strong>${product.quoteDescription ? `<small>${escapeHtml(product.quoteDescription)}</small>` : ""}</span>
-              <strong>${formatCurrency(product.unitPrice)} / un.</strong>
+              <strong>${formatUnitCurrency(product.unitPrice)} / un.</strong>
               <button class="button" type="button" data-use-custom-ready-product="${escapeHtml(product.id)}">Usar</button>
             </div>
           `).join("")}</div>
@@ -7787,8 +7822,8 @@ async function initApp() {
             </div>
             <div class="free-quote-item-pricing">
               <label><span>Quantidade</span><input name="quantity" type="number" min="1" step="1" value="${row.quantity > 0 ? escapeHtml(row.quantity) : ""}" placeholder="1"></label>
-              <label><span>Valor unitário</span><input name="unitValue" type="number" min="0" step="0.01" value="${row.unitValue > 0 ? escapeHtml(row.unitValue) : ""}" placeholder="0,00"></label>
-              <div class="free-quote-item-total"><span>Valor total</span><strong>${formatCurrency(row.total)}</strong></div>
+              <label><span>Valor unitário</span><input name="unitValue" type="number" min="0" step="any" value="${formatUnitInput(row.unitValue)}" placeholder="0,00"></label>
+              <label class="free-quote-item-total"><span>Valor total</span><input name="totalValue" type="number" min="0" step="0.01" value="${row.totalValue > 0 ? escapeHtml(row.totalValue) : ""}" placeholder="0,00"></label>
             </div>
           </div>
         `
@@ -9462,13 +9497,19 @@ async function initApp() {
     if (!field || !row) {
       return;
     }
-    if (!["itemName", "description", "quantity", "unitValue"].includes(field)) return;
+    if (!["itemName", "description", "quantity", "unitValue", "totalValue"].includes(field)) return;
     row[field] = field === "quantity" ? toWholeNumber(target.value)
-      : field === "unitValue" ? toMoneyNumber(target.value) : target.value;
+      : field === "unitValue" || field === "totalValue" ? toMoneyNumber(target.value) : target.value;
+    if (field === "unitValue") row.priceMode = "unit";
+    if (field === "totalValue") row.priceMode = "total";
+    Object.assign(row, calculateFreeQuotePricing(row));
     persistLocalOnly();
     const workbook = calculateFreeQuoteWorkbook(state);
-    const total = rowElement.querySelector(".free-quote-item-total strong");
-    if (total) total.textContent = formatCurrency(workbook.rows[Number(rowElement.dataset.freeQuoteRowIndex)].total);
+    const unitInput = rowElement.querySelector('input[name="unitValue"]');
+    const totalInput = rowElement.querySelector('input[name="totalValue"]');
+    if (field !== "unitValue" && unitInput) unitInput.value = formatUnitInput(row.unitValue);
+    if (field !== "totalValue" && totalInput) totalInput.value = row.totalValue > 0 ? String(row.totalValue) : "";
+    if (field === "totalValue" && event.type === "change") target.value = row.totalValue > 0 ? String(row.totalValue) : "";
     document.getElementById("free-quote-summary-active").textContent = formatInteger(workbook.totals.activeLines);
     document.getElementById("free-quote-summary-total").textContent = formatCurrency(workbook.totals.totalGeneral);
     freeQuoteWarningList.innerHTML = workbook.warnings.length
