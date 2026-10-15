@@ -4621,6 +4621,61 @@ function calculateLinearMeterWorkbook(state, config) {
   };
 }
 
+function createLinearMeterLayoutMarkup(row, index) {
+  const title = escapeHtml(row.description?.trim() || row.productLabel);
+  const heading = `
+    <div class="linear-layout-card-heading">
+      <span>Item ${String(index + 1).padStart(2, "0")}</span>
+      <strong>${title}</strong>
+      <small>Largura do material: ${escapeHtml(row.fixedWidthLabel)}</small>
+    </div>`;
+
+  if (!row.valid || row.columns <= 0 || row.rows <= 0) {
+    return `<article class="linear-layout-card">${heading}<p class="linear-layout-prompt">${escapeHtml(row.warning || "Informe largura, altura e quantidade para visualizar o encaixe.")}</p></article>`;
+  }
+
+  const pieceWidth = row.rotated ? row.heightCm : row.widthCm;
+  const pieceHeight = row.rotated ? row.widthCm : row.heightCm;
+  const previewRows = Math.min(row.rows, 4);
+  const fullRows = row.rows > previewRows ? previewRows : previewRows - 1;
+  const lastRowPieces = row.rows > previewRows ? 0 : row.quantity - fullRows * row.columns;
+  const previewHeight = previewRows * pieceHeight;
+  const svgHeight = Math.max(90, Math.min(260, Math.round(560 * previewHeight / row.materialWidthCm)));
+  const gap = Math.min(0.8, pieceWidth * 0.06, pieceHeight * 0.06);
+  const patternId = `linear-layout-piece-${index}`;
+  const remainingWidth = Math.max(0, row.materialWidthCm - row.columns * pieceWidth);
+  const ariaLabel = `${row.quantity} peças de ${formatMeasure(row.widthCm)} por ${formatMeasure(row.heightCm)} centímetros em material de ${row.fixedWidthLabel}: ${row.columns} colunas e ${row.rows} fileiras${row.rotated ? ", giradas" : ""}.`;
+
+  return `
+    <article class="linear-layout-card">
+      ${heading}
+      <div class="linear-layout-facts">
+        <span>${formatMeasure(row.widthCm)} × ${formatMeasure(row.heightCm)} cm · ${formatInteger(row.quantity)} ${row.quantity === 1 ? "peça" : "peças"}</span>
+        <span>${row.columns} por fileira · ${row.rows} ${row.rows === 1 ? "fileira" : "fileiras"}${row.rotated ? " · girado 90°" : ""}</span>
+      </div>
+      <figure class="linear-layout-figure">
+        <svg class="linear-layout-svg" viewBox="0 0 ${row.materialWidthCm} ${previewHeight}" style="height: ${svgHeight}px" role="img" aria-label="${escapeHtml(ariaLabel)}">
+          <defs>
+            <pattern id="${patternId}" patternUnits="userSpaceOnUse" width="${pieceWidth}" height="${pieceHeight}">
+              <rect x="${gap / 2}" y="${gap / 2}" width="${pieceWidth - gap}" height="${pieceHeight - gap}" rx="${Math.min(0.7, pieceWidth * 0.05, pieceHeight * 0.05)}" fill="#176b6b" />
+            </pattern>
+          </defs>
+          <rect width="${row.materialWidthCm}" height="${previewHeight}" fill="#e9dfd0" />
+          ${fullRows > 0 ? `<rect width="${row.columns * pieceWidth}" height="${fullRows * pieceHeight}" fill="url(#${patternId})" />` : ""}
+          ${lastRowPieces > 0 ? `<rect y="${fullRows * pieceHeight}" width="${lastRowPieces * pieceWidth}" height="${pieceHeight}" fill="url(#${patternId})" />` : ""}
+        </svg>
+        <figcaption>${row.rows > previewRows ? `Primeiras ${previewRows} de ${formatInteger(row.rows)} fileiras` : "Encaixe completo"} · sobra lateral de ${formatMeasure(remainingWidth)} cm · ${formatMeasure(row.linearMeters)} m usados</figcaption>
+      </figure>
+    </article>`;
+}
+
+function createLinearMeterLayoutsMarkup(rows) {
+  const activeRows = rows.map((row, index) => ({ row, index })).filter(({ row }) => row.active);
+  return activeRows.length
+    ? activeRows.map(({ row, index }) => createLinearMeterLayoutMarkup(row, index)).join("")
+    : `<p class="linear-layout-empty">Preencha uma linha na tabela para ver o encaixe das peças no material.</p>`;
+}
+
 function buildOptions(options, currentValue) {
   return options
     .map((option) => `<option value="${escapeHtml(option)}"${option === currentValue ? " selected" : ""}>${escapeHtml(option)}</option>`)
@@ -6940,6 +6995,7 @@ async function initApp() {
   const blockAutocopiativoRowsTableBody = document.getElementById("block-autocopiativo-rows-table-body");
   const resinRowsTableBody = document.getElementById("resin-rows-table-body");
   const linearMeterRowsTableBody = document.getElementById("linear-meter-rows-table-body");
+  const linearMeterLayouts = document.getElementById("linear-meter-layouts");
   const warningList = document.getElementById("warning-list");
   const colorWarningList = document.getElementById("color-warning-list");
   const credentialWarningList = document.getElementById("credential-warning-list");
@@ -8002,6 +8058,8 @@ async function initApp() {
         `
       )
       .join("");
+
+    linearMeterLayouts.innerHTML = createLinearMeterLayoutsMarkup(linearMeterWorkbook.rows);
 
     linearMeterWarningList.innerHTML = linearMeterWorkbook.warnings.length
       ? linearMeterWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")

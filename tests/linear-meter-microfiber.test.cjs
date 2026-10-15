@@ -65,3 +65,33 @@ test("configuração antiga recebe a microfibra e preços editados entram no cá
   config.linearMeterPricing.products["tecido-microfibra-extra"].rateAbove3m = 65;
   assert.equal(quote({ meters: 4, config }).totals.totalGeneral, 260);
 });
+
+test("visualização mostra peças, sobra lateral e última fileira parcial", () => {
+  const row = quote({ widthCm: 50, heightCm: 100, quantity: 4 }).activeRows[0];
+  const html = app.createLinearMeterLayoutMarkup(row, 0);
+  assert.equal(row.columns, 3);
+  assert.equal(row.rows, 2);
+  assert.match(html, /viewBox="0 0 155 200"/);
+  assert.match(html, /<rect width="150" height="100" fill="url\(#linear-layout-piece-0\)"/);
+  assert.match(html, /<rect y="100" width="50" height="100" fill="url\(#linear-layout-piece-0\)"/);
+  assert.match(html, /sobra lateral de 5 cm/);
+  assert.match(html, /Encaixe completo/);
+});
+
+test("visualização acompanha rotação e limita desenhos muito longos", () => {
+  const rotated = quote({ widthCm: 100, heightCm: 50, quantity: 3 }).activeRows[0];
+  assert.equal(rotated.rotated, true);
+  assert.match(app.createLinearMeterLayoutMarkup(rotated, 0), /3 por fileira · 1 fileira · girado 90°/);
+
+  const longRow = quote({ widthCm: 50, heightCm: 100, quantity: 100 }).activeRows[0];
+  const html = app.createLinearMeterLayoutMarkup(longRow, 0);
+  assert.match(html, /Primeiras 4 de 34 fileiras/);
+  assert.match(html, /<rect width="150" height="400" fill="url\(#linear-layout-piece-0\)"/);
+});
+
+test("visualização orienta quando faltam medidas e não exibe itens vazios", () => {
+  const row = quote({ widthCm: 160, heightCm: 200, quantity: 1 }).rows[0];
+  assert.match(app.createLinearMeterLayoutMarkup(row, 0), /a peça não cabe na largura/);
+  assert.match(app.createLinearMeterLayoutsMarkup([row]), /Item 01/);
+  assert.match(app.createLinearMeterLayoutsMarkup([]), /Preencha uma linha na tabela/);
+});

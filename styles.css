@@ -713,6 +713,137 @@ textarea {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
+.linear-layout-section {
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid rgba(23, 107, 107, 0.17);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(145deg, #f4eee3, #eff5ee);
+}
+
+.linear-layout-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.linear-layout-eyebrow {
+  color: var(--accent);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.linear-layout-heading h3 {
+  margin: 4px 0 0;
+  font: 700 1.35rem var(--font-display);
+}
+
+.linear-layout-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.linear-layout-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 14px;
+}
+
+.linear-layout-card,
+.linear-layout-empty {
+  min-width: 0;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid rgba(31, 42, 47, 0.1);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.linear-layout-card-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 5px 10px;
+}
+
+.linear-layout-card-heading span {
+  color: var(--brand-dark);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.linear-layout-card-heading strong {
+  font-size: 1rem;
+}
+
+.linear-layout-card-heading small {
+  width: 100%;
+  color: var(--muted);
+}
+
+.linear-layout-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.linear-layout-facts span {
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: #175b5b;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.linear-layout-figure {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid rgba(23, 107, 107, 0.14);
+  border-radius: 12px;
+  background: #f8f5ee;
+  text-align: center;
+}
+
+.linear-layout-svg {
+  display: block;
+  width: 100%;
+  max-height: 260px;
+  margin: 0 auto;
+}
+
+.linear-layout-figure figcaption {
+  margin-top: 10px;
+  color: var(--muted-strong);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.linear-layout-prompt,
+.linear-layout-empty {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .linear-layout-section {
+    padding: 14px;
+  }
+
+  .linear-layout-heading {
+    align-items: start;
+    flex-direction: column;
+  }
+}
+
 .budget-table,
 .config-table {
   width: 100%;
