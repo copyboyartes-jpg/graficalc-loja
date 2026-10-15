@@ -184,3 +184,32 @@ test("produto livre salvo pode ser selecionado com outra quantidade em Produtos 
   assert.equal(restoredConfig.customReadyProducts[0].id, saved.product.id);
   assert.equal(app.calculateReadyProductWorkbook(state, restoredConfig).totals.totalGeneral, 60);
 });
+
+test("item reutilizado em Produtos prontos mantém nome no título e descrição abaixo", () => {
+  const config = app.createDefaultConfig();
+  const itemName = "Caderneta tamanho 10x14 cm";
+  const description = "Capa couche 250g e miolo com folhas brancas";
+  const saved = app.saveFreeQuoteProduct(config, { itemName, description, unitValue: 7.25 });
+  const state = app.createDefaultState();
+  state.readyProductItems[0].productType = saved.product.id;
+  state.readyProductItems[0].quantity = 15;
+  state.freeQuoteItems[0] = {
+    ...state.freeQuoteItems[0],
+    itemName,
+    description,
+    quantity: 1,
+    unitValue: 58,
+  };
+
+  const workbooks = Array.from({ length: 12 }, () => ({ activeRows: [], totals: { totalGeneral: 0, totalQuantity: 0 } }));
+  workbooks[3] = app.calculateReadyProductWorkbook(state, config);
+  workbooks[4] = app.calculateFreeQuoteWorkbook(state);
+  const html = app.createQuoteHtml(state, ...workbooks);
+  const text = app.createQuoteText(state, ...workbooks);
+  assert.equal((html.match(/<strong>Caderneta tamanho 10x14 cm<\/strong>\s*<small>Capa couche 250g e miolo com folhas brancas<\/small>/g) || []).length, 2);
+  assert.doesNotMatch(html, /<strong>Capa couche 250g e miolo com folhas brancas<\/strong>|Produto pronto \| 15 unidades/);
+  assert.match(html, /<small class="quote-extra-detail">15 unidades<\/small>/);
+  assert.match(text, /- Caderneta tamanho 10x14 cm \| Capa couche 250g e miolo com folhas brancas \| 15 unidades \| R\$/);
+  assert.equal(app.collectQuoteUrgencyItems(workbooks)[0].description, itemName);
+  assert.equal(app.getReadyProductQuoteDescription({ productLabel: "Caneca", description: "Caneca" }), "");
+});

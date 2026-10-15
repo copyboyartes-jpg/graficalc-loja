@@ -6493,9 +6493,16 @@ function collectQuoteUrgencyItems(workbooks) {
   const sources = ["apostila", "color", "credential", "ready", "freeQuote", "businessCard", "flyer", "blockSulfite", "blockAutocopiativo", "linearMeter", "m2", "resin"];
   return workbooks.flatMap((workbook, sourceIndex) => workbook.activeRows.map((row, index) => ({
     key: `${sources[sourceIndex]}:${row.id || index}`,
-    description: (sources[sourceIndex] === "m2" ? getM2RowDescription(row) : sources[sourceIndex] === "freeQuote" ? row.itemName : row.description) || row.productLabel || `Item ${index + 1}`,
+    description: (sources[sourceIndex] === "m2" ? getM2RowDescription(row) : sources[sourceIndex] === "freeQuote" ? row.itemName : sources[sourceIndex] === "ready" ? row.productLabel : row.description) || row.productLabel || `Item ${index + 1}`,
     total: Math.max(0, toMoneyNumber(row.total)),
   })));
+}
+
+function getReadyProductQuoteDescription(row) {
+  const description = String(row.description || "").trim();
+  return description.toLocaleLowerCase("pt-BR") === String(row.productLabel || "").trim().toLocaleLowerCase("pt-BR")
+    ? ""
+    : description;
 }
 
 function calculateQuoteUrgency(state, items, quoteDiscount) {
@@ -6564,9 +6571,10 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
     ...readyWorkbook.activeRows.map((row, index) => ({
       source: "ready",
       sourceIndex: index,
-      kind: "Produto pronto",
-      description: row.description || row.productLabel,
-      detail: `${formatInteger(row.quantity)} unidades | ${row.productLabel}`,
+      kind: "",
+      description: row.productLabel || `Produto pronto ${index + 1}`,
+      detail: getReadyProductQuoteDescription(row),
+      extraDetail: `${formatInteger(row.quantity)} unidade${row.quantity === 1 ? "" : "s"}`,
       artDetail: formatArtCreationDetail(row),
       discountDetail: row.discountDescription,
       total: row.total,
@@ -6792,7 +6800,7 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
       text: `- ${row.description || `Credencial ${index + 1}`} | ${row.quantityValue} unidades | ${formatMeasure(row.widthCm)} x ${formatMeasure(row.heightCm)} cm | ${row.materialLabel} | ${row.printMode}${row.lamination === "Com laminação" ? " | Com laminação" : ""}${row.lanyardType !== "none" ? ` | ${row.lanyardLabel}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...readyWorkbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || `Produto pronto ${index + 1}`} | ${row.quantity} unidades | ${row.productLabel}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
+      text: `- ${row.productLabel || `Produto pronto ${index + 1}`}${getReadyProductQuoteDescription(row) ? ` | ${getReadyProductQuoteDescription(row)}` : ""} | ${row.quantity} unidade${row.quantity === 1 ? "" : "s"}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...freeQuoteWorkbook.activeRows.map((row, index) => ({
       text: `- ${row.itemName || `Item ${index + 1}`}${row.description ? ` | ${row.description}` : ""} | ${formatCurrency(row.total)}`,
