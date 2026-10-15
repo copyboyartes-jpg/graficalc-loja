@@ -34,7 +34,8 @@ test("orçamento livre multiplica quantidade pelo valor unitário sem alterar a 
   assert.equal(workbook.totals.totalQuantity, 2);
   assert.equal(workbook.activeRows[0].total, 250);
   assert.match(html, /<strong>Identidade visual<\/strong>\s*<small>Criação de logotipo e manual<\/small>/);
-  assert.match(text, /- Identidade visual \| Criação de logotipo e manual \| R\$\s+250,00/);
+  assert.match(html, /<small class="quote-extra-detail">2 unidades<\/small>/);
+  assert.match(text, /- Identidade visual \| Criação de logotipo e manual \| 2 unidades \| R\$\s+250,00/);
   assert.doesNotMatch(text, /\d+ un\. \|.*por un\.|Criação de arte:| base \|/);
   assert.doesNotMatch(html, /Orçamento livre \|/);
 });
@@ -100,7 +101,8 @@ test("descrição é opcional, mas nome, quantidade e valor unitário são neces
   const state = app.createDefaultState();
   state.freeQuoteItems[0] = { ...state.freeQuoteItems[0], itemName: "Arte final", unitValue: 80 };
   assert.equal(quote(state).workbook.activeRows.length, 1);
-  assert.match(quote(state).text, /- Arte final \| R\$\s+80,00/);
+  assert.match(quote(state).html, /<strong>Arte final<\/strong>\s*<small class="quote-extra-detail">1 unidade<\/small>/);
+  assert.match(quote(state).text, /- Arte final \| 1 unidade \| R\$\s+80,00/);
   state.freeQuoteItems[0].itemName = "";
   assert.equal(quote(state).workbook.activeRows.length, 0);
   assert.match(quote(state).workbook.warnings[0], /nome do item/);

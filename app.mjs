@@ -6585,6 +6585,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       kind: "",
       description: row.itemName || `Item ${index + 1}`,
       detail: row.description,
+      extraDetail: `${formatInteger(row.quantity)} unidade${row.quantity === 1 ? "" : "s"}`,
       total: row.total,
     })),
     ...businessCardWorkbook.activeRows.map((row, index) => ({
@@ -6803,7 +6804,7 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
       text: `- ${row.productLabel || `Produto pronto ${index + 1}`}${getReadyProductQuoteDescription(row) ? ` | ${getReadyProductQuoteDescription(row)}` : ""} | ${row.quantity} unidade${row.quantity === 1 ? "" : "s"}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...freeQuoteWorkbook.activeRows.map((row, index) => ({
-      text: `- ${row.itemName || `Item ${index + 1}`}${row.description ? ` | ${row.description}` : ""} | ${formatCurrency(row.total)}`,
+      text: `- ${row.itemName || `Item ${index + 1}`}${row.description ? ` | ${row.description}` : ""} | ${row.quantity} unidade${row.quantity === 1 ? "" : "s"} | ${formatCurrency(row.total)}`,
     })),
     ...businessCardWorkbook.activeRows.map((row, index) => ({
       text: `- ${row.description || `Cartão de visita ${index + 1}`} | ${row.quantity} cartões | ${row.productionType} | ${row.materialLabel} | ${row.printMode} | Pacote: ${row.packageLabel}${row.extraFinishTotal > 0 ? ` | Acabamento adicional: ${formatCurrency(row.extraFinishTotal)}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
