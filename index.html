@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GrafiCalc | Orçamento Gráfico</title>
-  <link rel="stylesheet" href="./styles.css?v=budget-cards-20261021a">
+  <link rel="stylesheet" href="./styles.css?v=budget-rows-20261021a">
 </head>
 <body>
   <div class="page-shell">
@@ -75,7 +75,6 @@
 
             <div class="toolbar">
               <button id="import-button" class="button button-primary" type="button">Escolher PDFs</button>
-              <button id="add-row-button" class="button" type="button">Adicionar linha</button>
               <button id="clear-all-button" class="button button-danger" type="button">Limpar linhas</button>
             </div>
 
@@ -208,6 +207,8 @@
             </table>
           </div>
 
+          <div class="add-row-footer"><button id="add-row-button" class="button button-primary" type="button">Adicionar linha</button></div>
+
           <div class="warning-list" id="warning-list"></div>
         </article>
       </section>
@@ -241,7 +242,6 @@
           </div>
 
           <div class="toolbar">
-            <button id="add-color-row-button" class="button button-primary" type="button">Adicionar linha</button>
             <button id="clear-color-rows-button" class="button button-danger" type="button">Limpar linhas</button>
           </div>
 
@@ -282,6 +282,8 @@
             </table>
           </div>
 
+          <div class="add-row-footer"><button id="add-color-row-button" class="button button-primary" type="button">Adicionar linha</button></div>
+
           <div class="warning-list" id="color-warning-list"></div>
         </article>
       </section>
@@ -315,7 +317,6 @@
           </div>
 
           <div class="toolbar m2-toolbar">
-            <button id="add-m2-row-button" class="button button-primary" type="button">Adicionar linha</button>
             <button id="clear-m2-rows-button" class="button button-danger" type="button">Limpar linhas</button>
             <label class="toolbar-field">
               <span>Modo de cálculo</span>
@@ -361,6 +362,8 @@
             </table>
           </div>
 
+          <div class="add-row-footer"><button id="add-m2-row-button" class="button button-primary" type="button">Adicionar linha</button></div>
+
           <div class="warning-list" id="m2-warning-list"></div>
         </article>
       </section>
@@ -394,7 +397,6 @@
           </div>
 
           <div class="toolbar">
-            <button id="add-credential-row-button" class="button button-primary" type="button">Adicionar linha</button>
             <button id="clear-credential-rows-button" class="button button-danger" type="button">Limpar linhas</button>
           </div>
 
@@ -432,6 +434,8 @@
             </table>
           </div>
 
+          <div class="add-row-footer"><button id="add-credential-row-button" class="button button-primary" type="button">Adicionar linha</button></div>
+
           <div class="warning-list" id="credential-warning-list"></div>
         </article>
       </section>
@@ -465,7 +469,6 @@
           </div>
 
           <div class="toolbar">
-            <button id="add-ready-row-button" class="button button-primary" type="button">Adicionar linha</button>
             <button id="clear-ready-rows-button" class="button button-danger" type="button">Limpar linhas</button>
           </div>
 
@@ -493,6 +496,8 @@
               <tbody id="ready-rows-table-body"></tbody>
             </table>
           </div>
+
+          <div class="add-row-footer"><button id="add-ready-row-button" class="button button-primary" type="button">Adicionar linha</button></div>
 
           <div class="warning-list" id="ready-warning-list"></div>
         </article>
@@ -527,7 +532,6 @@
           </div>
 
           <div class="toolbar">
-            <button id="add-business-card-row-button" class="button button-primary" type="button">Adicionar linha</button>
             <button id="clear-business-card-rows-button" class="button button-danger" type="button">Limpar linhas</button>
           </div>
 
@@ -559,6 +563,8 @@
               <tbody id="business-card-rows-table-body"></tbody>
             </table>
           </div>
+
+          <div class="add-row-footer"><button id="add-business-card-row-button" class="button button-primary" type="button">Adicionar linha</button></div>
 
           <div class="warning-list" id="business-card-warning-list"></div>
         </article>
@@ -593,7 +599,6 @@
           </div>
 
           <div class="toolbar">
-            <button id="add-flyer-row-button" class="button button-primary" type="button">Adicionar linha</button>
             <button id="clear-flyer-rows-button" class="button button-danger" type="button">Limpar linhas</button>
           </div>
 
@@ -625,6 +630,8 @@
               <tbody id="flyer-rows-table-body"></tbody>
             </table>
           </div>
+
+          <div class="add-row-footer"><button id="add-flyer-row-button" class="button button-primary" type="button">Adicionar linha</button></div>
 
           <div class="warning-list" id="flyer-warning-list"></div>
         </article>
@@ -659,7 +666,6 @@
           </div>
 
           <div class="toolbar">
-            <button id="add-block-sulfite-row-button" class="button button-primary" type="button">Adicionar linha</button>
             <button id="clear-block-sulfite-rows-button" class="button button-danger" type="button">Limpar linhas</button>
           </div>
 
@@ -688,6 +694,8 @@
               <tbody id="block-sulfite-rows-table-body"></tbody>
             </table>
           </div>
+
+          <div class="add-row-footer"><button id="add-block-sulfite-row-button" class="button button-primary" type="button">Adicionar linha</button></div>
 
           <div class="warning-list" id="block-sulfite-warning-list"></div>
         </article>
@@ -722,7 +730,6 @@
           </div>
 
           <div class="toolbar">
-            <button id="add-block-autocopiativo-row-button" class="button button-primary" type="button">Adicionar linha</button>
             <button id="clear-block-autocopiativo-rows-button" class="button button-danger" type="button">Limpar linhas</button>
           </div>
 
@@ -751,6 +758,8 @@
               <tbody id="block-autocopiativo-rows-table-body"></tbody>
             </table>
           </div>
+
+          <div class="add-row-footer"><button id="add-block-autocopiativo-row-button" class="button button-primary" type="button">Adicionar linha</button></div>
 
           <div class="warning-list" id="block-autocopiativo-warning-list"></div>
         </article>
@@ -785,7 +794,6 @@
           </div>
 
           <div class="toolbar">
-            <button id="add-resin-row-button" class="button button-primary" type="button">Adicionar linha</button>
             <button id="clear-resin-rows-button" class="button button-danger" type="button">Limpar linhas</button>
           </div>
 
@@ -820,6 +828,8 @@
             </table>
           </div>
 
+          <div class="add-row-footer"><button id="add-resin-row-button" class="button button-primary" type="button">Adicionar linha</button></div>
+
           <div class="warning-list" id="resin-warning-list"></div>
         </article>
       </section>
@@ -853,7 +863,6 @@
           </div>
 
           <div class="toolbar">
-            <button id="add-linear-meter-row-button" class="button button-primary" type="button">Adicionar linha</button>
             <button id="clear-linear-meter-rows-button" class="button button-danger" type="button">Limpar linhas</button>
           </div>
 
@@ -886,6 +895,8 @@
               <tbody id="linear-meter-rows-table-body"></tbody>
             </table>
           </div>
+
+          <div class="add-row-footer"><button id="add-linear-meter-row-button" class="button button-primary" type="button">Adicionar linha</button></div>
 
           <section class="linear-layout-section" aria-labelledby="linear-layout-title">
             <div class="linear-layout-heading">
@@ -923,7 +934,6 @@
           </div>
 
           <div class="toolbar">
-            <button id="add-free-quote-row-button" class="button button-primary" type="button">Adicionar linha</button>
             <button id="clear-free-quote-rows-button" class="button button-danger" type="button">Limpar linhas</button>
           </div>
 
@@ -932,6 +942,8 @@
           </p>
 
           <div class="free-quote-items" id="free-quote-rows-table-body"></div>
+
+          <div class="add-row-footer"><button id="add-free-quote-row-button" class="button button-primary" type="button">Adicionar linha</button></div>
 
           <div class="warning-list" id="free-quote-warning-list"></div>
         </article>
@@ -1276,7 +1288,7 @@
       }
     })();
   </script>
-  <script src="./app.mjs?v=budget-cards-20261021a"></script>
+  <script src="./app.mjs?v=budget-rows-20261021a"></script>
 </body>
 </html>
 

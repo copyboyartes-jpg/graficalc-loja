@@ -1270,6 +1270,16 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+.add-row-footer {
+  display: flex;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.add-row-footer .button {
+  min-width: min(100%, 220px);
+}
+
 @media (max-width: 520px) {
   .budget-card-shell .budget-table tbody tr {
     gap: 12px;
@@ -1278,6 +1288,10 @@ textarea {
 
   .budget-card-shell .budget-table td.budget-card-description {
     grid-column: auto;
+  }
+
+  .add-row-footer .button {
+    width: 100%;
   }
 }
 

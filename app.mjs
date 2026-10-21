@@ -14,6 +14,7 @@ const SESSION_KEYS = {
 const SHARED_API_PATH = "/api/shared-state";
 const SHARED_SYNC_INTERVAL_MS = 20000;
 const M2_LASER_CUT_FINISH_ID = "corte-lazer";
+const INITIAL_BUDGET_ROWS = 2;
 
 const OPTIONS = {
   printTypes: ["Preto e branco", "Colorido jato de tinta", "Colorido laser"],
@@ -1411,6 +1412,7 @@ function getM2RowDescription(row) {
 
 function createDefaultState() {
   return {
+    budgetRowsVersion: 2,
     calcMode: "Independente",
     m2CalcMode: "Independente",
     presets: {
@@ -1425,19 +1427,19 @@ function createDefaultState() {
       backCoverPaper: "Sulfite 75g",
       spiralOption: "Completa",
     },
-    rows: Array.from({ length: 5 }, (_, index) => createDefaultRow(index)),
-    colorPrintItems: Array.from({ length: 5 }, (_, index) => createDefaultColorPrintRow(index)),
-    credentialItems: Array.from({ length: 5 }, (_, index) => createDefaultCredentialRow(index)),
-    readyProductItems: Array.from({ length: 5 }, (_, index) => createDefaultReadyProductRow(index)),
-    freeQuoteItems: [createDefaultFreeQuoteRow(0)],
-    m2Items: Array.from({ length: 5 }, (_, index) => createDefaultM2Row(index)),
-    resinItems: Array.from({ length: 5 }, (_, index) => createDefaultResinRow(index)),
-    linearMeterItems: Array.from({ length: 5 }, (_, index) => createDefaultLinearMeterRow(index)),
-    businessCardItems: Array.from({ length: 5 }, (_, index) => createDefaultBusinessCardRow(index)),
-    flyerItems: Array.from({ length: 5 }, (_, index) => createDefaultFlyerRow(index)),
+    rows: Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultRow(index)),
+    colorPrintItems: Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultColorPrintRow(index)),
+    credentialItems: Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultCredentialRow(index)),
+    readyProductItems: Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultReadyProductRow(index)),
+    freeQuoteItems: Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultFreeQuoteRow(index)),
+    m2Items: Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultM2Row(index)),
+    resinItems: Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultResinRow(index)),
+    linearMeterItems: Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultLinearMeterRow(index)),
+    businessCardItems: Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultBusinessCardRow(index)),
+    flyerItems: Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultFlyerRow(index)),
     blockItems: {
-      sulfite: Array.from({ length: 5 }, (_, index) => createDefaultBlockRow(index, "sulfite")),
-      autocopiativo: Array.from({ length: 5 }, (_, index) => createDefaultBlockRow(index, "autocopiativo")),
+      sulfite: Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultBlockRow(index, "sulfite")),
+      autocopiativo: Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultBlockRow(index, "autocopiativo")),
     },
     client: {
       name: "",
@@ -1474,6 +1476,7 @@ function deepClone(value) {
 
 function createQuoteHistorySnapshot(state) {
   return deepClone({
+    budgetRowsVersion: state.budgetRowsVersion,
     calcMode: state.calcMode,
     m2CalcMode: state.m2CalcMode,
     presets: state.presets,
@@ -2063,7 +2066,7 @@ function mergeState(candidate) {
     state.freeQuoteItems = candidate.freeQuoteItems
       .filter((row) => row && typeof row === "object")
       .map(normalizeFreeQuoteRow);
-    if (state.freeQuoteItems.length === 0) state.freeQuoteItems = [createDefaultFreeQuoteRow(0)];
+    if (state.freeQuoteItems.length === 0) state.freeQuoteItems = Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultFreeQuoteRow(index));
   }
 
   if (Array.isArray(candidate.m2Items) && candidate.m2Items.length > 0) {
@@ -2111,7 +2114,7 @@ function mergeState(candidate) {
       id: row?.id || `resin-row-${index + 1}`,
     }));
   } else if (candidate.resinItem && typeof candidate.resinItem === "object") {
-    state.resinItems = Array.from({ length: 5 }, (_, index) => createDefaultResinRow(index));
+    state.resinItems = Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultResinRow(index));
     state.resinItems[0] = {
       ...state.resinItems[0],
       ...candidate.resinItem,
@@ -2199,6 +2202,7 @@ function mergeState(candidate) {
     };
   }
 
+  compactBudgetRows(state, candidate.budgetRowsVersion !== 2);
   return state;
 }
 
@@ -4911,12 +4915,51 @@ function ensureBlockRowCount(state, tab, minimumCount) {
   }
 }
 
-function trimEmptyRows(rows, minimumCount, isActive) {
-  const trimmed = [...rows];
-  while (trimmed.length > minimumCount && !isActive(trimmed[trimmed.length - 1])) {
-    trimmed.pop();
+function compactBudgetRowList(rows, createDefault, trimLegacy) {
+  const compacted = Array.isArray(rows) ? [...rows] : [];
+  while (trimLegacy && compacted.length > INITIAL_BUDGET_ROWS) {
+    const index = compacted.length - 1;
+    const row = compacted[index];
+    const fallback = createDefault(index);
+    const fields = Object.keys(row || {}).filter((key) => key !== "id");
+    const defaultFields = Object.keys(fallback).filter((key) => key !== "id");
+    if (fields.length !== defaultFields.length || !fields.every((key) => JSON.stringify(row[key]) === JSON.stringify(fallback[key]))) {
+      break;
+    }
+    compacted.pop();
   }
-  return trimmed;
+  while (compacted.length < INITIAL_BUDGET_ROWS) {
+    compacted.push(createDefault(compacted.length));
+  }
+  return compacted;
+}
+
+function compactBudgetRows(state, trimLegacy = true) {
+  const rowTypes = [
+    ["rows", createDefaultRow],
+    ["colorPrintItems", createDefaultColorPrintRow],
+    ["credentialItems", createDefaultCredentialRow],
+    ["readyProductItems", createDefaultReadyProductRow],
+    ["freeQuoteItems", createDefaultFreeQuoteRow],
+    ["businessCardItems", createDefaultBusinessCardRow],
+    ["flyerItems", createDefaultFlyerRow],
+    ["linearMeterItems", createDefaultLinearMeterRow],
+    ["m2Items", createDefaultM2Row],
+    ["resinItems", createDefaultResinRow],
+  ];
+  for (const [key, createDefault] of rowTypes) {
+    state[key] = compactBudgetRowList(state[key], createDefault, trimLegacy);
+  }
+  state.blockItems.sulfite = compactBudgetRowList(state.blockItems.sulfite, (index) => createDefaultBlockRow(index, "sulfite"), trimLegacy);
+  state.blockItems.autocopiativo = compactBudgetRowList(state.blockItems.autocopiativo, (index) => createDefaultBlockRow(index, "autocopiativo"), trimLegacy);
+}
+
+function resetBudgetRowsToDefaults(state) {
+  const defaults = createDefaultState();
+  for (const key of ["rows", "colorPrintItems", "credentialItems", "readyProductItems", "freeQuoteItems", "businessCardItems", "flyerItems", "linearMeterItems", "m2Items", "resinItems"]) {
+    state[key] = defaults[key];
+  }
+  state.blockItems = defaults.blockItems;
 }
 
 function applyPresetToRow(row, preset) {
@@ -7043,30 +7086,6 @@ async function initApp() {
   let lastSharedSnapshot = "";
   let sharedRefreshHandle = null;
   const selectedRowIds = new Set();
-  ensureRowCount(state, 5);
-  ensureColorRowCount(state, 5);
-  ensureCredentialRowCount(state, 5);
-  ensureReadyProductRowCount(state, 5);
-  ensureBusinessCardRowCount(state, 5);
-  ensureFlyerRowCount(state, 5);
-  ensureBlockRowCount(state, "sulfite", 5);
-  ensureBlockRowCount(state, "autocopiativo", 5);
-  ensureM2RowCount(state, 5);
-  ensureResinRowCount(state, 5);
-  ensureLinearMeterRowCount(state, 5);
-  state.rows = trimEmptyRows(state.rows, 5, isRowActive);
-  state.colorPrintItems = trimEmptyRows(state.colorPrintItems, 5, isColorPrintRowActive);
-  state.credentialItems = trimEmptyRows(state.credentialItems, 5, isCredentialRowActive);
-  state.readyProductItems = trimEmptyRows(state.readyProductItems, 5, isReadyProductRowActive);
-  state.freeQuoteItems = trimEmptyRows(state.freeQuoteItems, 1, isFreeQuoteRowActive);
-  state.businessCardItems = trimEmptyRows(state.businessCardItems, 5, isBusinessCardRowActive);
-  state.flyerItems = trimEmptyRows(state.flyerItems, 5, isFlyerRowActive);
-  state.blockItems.sulfite = trimEmptyRows(state.blockItems.sulfite, 5, isBlockRowActive);
-  state.blockItems.autocopiativo = trimEmptyRows(state.blockItems.autocopiativo, 5, isBlockRowActive);
-  state.m2Items = trimEmptyRows(state.m2Items, 5, (row) => Boolean(row.description?.trim() || Number(row.quantity) > 0 || Number(row.widthMm) > 0 || Number(row.heightMm) > 0));
-  state.resinItems = trimEmptyRows(state.resinItems, 5, isResinRowActive);
-  state.linearMeterItems = trimEmptyRows(state.linearMeterItems, 5, isLinearMeterRowActive);
-
   const rowsTableBody = document.getElementById("rows-table-body");
   const colorRowsTableBody = document.getElementById("color-rows-table-body");
   const credentialRowsTableBody = document.getElementById("credential-rows-table-body");
@@ -8270,18 +8289,7 @@ async function initApp() {
   }
 
   function resetAllBudgetItems() {
-    state.rows = Array.from({ length: 5 }, (_, index) => createDefaultRow(index));
-    state.colorPrintItems = Array.from({ length: 5 }, (_, index) => createDefaultColorPrintRow(index));
-    state.credentialItems = Array.from({ length: 5 }, (_, index) => createDefaultCredentialRow(index));
-    state.readyProductItems = Array.from({ length: 5 }, (_, index) => createDefaultReadyProductRow(index));
-    state.freeQuoteItems = [createDefaultFreeQuoteRow(0)];
-    state.businessCardItems = Array.from({ length: 5 }, (_, index) => createDefaultBusinessCardRow(index));
-    state.flyerItems = Array.from({ length: 5 }, (_, index) => createDefaultFlyerRow(index));
-    state.blockItems.sulfite = Array.from({ length: 5 }, (_, index) => createDefaultBlockRow(index, "sulfite"));
-    state.blockItems.autocopiativo = Array.from({ length: 5 }, (_, index) => createDefaultBlockRow(index, "autocopiativo"));
-    state.linearMeterItems = Array.from({ length: 5 }, (_, index) => createDefaultLinearMeterRow(index));
-    state.m2Items = Array.from({ length: 5 }, (_, index) => createDefaultM2Row(index));
-    state.resinItems = Array.from({ length: 5 }, (_, index) => createDefaultResinRow(index));
+    resetBudgetRowsToDefaults(state);
     selectedRowIds.clear();
     state.quoteUrgency.selectedItemKeys = [];
     persistLocalOnly();
@@ -8289,38 +8297,13 @@ async function initApp() {
   }
 
   function resetLocalCalculationAreas() {
-    state.rows = Array.from({ length: 5 }, (_, index) => createDefaultRow(index));
-    state.colorPrintItems = Array.from({ length: 5 }, (_, index) => createDefaultColorPrintRow(index));
-    state.credentialItems = Array.from({ length: 5 }, (_, index) => createDefaultCredentialRow(index));
-    state.readyProductItems = Array.from({ length: 5 }, (_, index) => createDefaultReadyProductRow(index));
-    state.freeQuoteItems = [createDefaultFreeQuoteRow(0)];
-    state.businessCardItems = Array.from({ length: 5 }, (_, index) => createDefaultBusinessCardRow(index));
-    state.flyerItems = Array.from({ length: 5 }, (_, index) => createDefaultFlyerRow(index));
-    state.blockItems.sulfite = Array.from({ length: 5 }, (_, index) => createDefaultBlockRow(index, "sulfite"));
-    state.blockItems.autocopiativo = Array.from({ length: 5 }, (_, index) => createDefaultBlockRow(index, "autocopiativo"));
-    state.linearMeterItems = Array.from({ length: 5 }, (_, index) => createDefaultLinearMeterRow(index));
-    state.m2Items = Array.from({ length: 5 }, (_, index) => createDefaultM2Row(index));
-    state.resinItems = Array.from({ length: 5 }, (_, index) => createDefaultResinRow(index));
+    resetBudgetRowsToDefaults(state);
     selectedRowIds.clear();
     persistLocalOnly();
   }
 
-  function refillBudgetRows() {
-    ensureRowCount(state, 5);
-    ensureColorRowCount(state, 5);
-    ensureCredentialRowCount(state, 5);
-    ensureReadyProductRowCount(state, 5);
-    ensureBusinessCardRowCount(state, 5);
-    ensureFlyerRowCount(state, 5);
-    ensureBlockRowCount(state, "sulfite", 5);
-    ensureBlockRowCount(state, "autocopiativo", 5);
-    ensureLinearMeterRowCount(state, 5);
-    ensureM2RowCount(state, 5);
-    ensureResinRowCount(state, 5);
-  }
-
   function deleteBudgetItemFromQuote(source, index) {
-    const removeFrom = (items, factory, minimumCount = 5) => {
+    const removeFrom = (items, factory, minimumCount = INITIAL_BUDGET_ROWS) => {
       if (!Array.isArray(items) || index < 0 || index >= items.length) {
         return;
       }
@@ -8344,7 +8327,7 @@ async function initApp() {
         removeFrom(state.readyProductItems, createDefaultReadyProductRow);
         break;
       case "freeQuote":
-        removeFrom(state.freeQuoteItems, createDefaultFreeQuoteRow, 1);
+        removeFrom(state.freeQuoteItems, createDefaultFreeQuoteRow);
         break;
       case "businessCard":
         removeFrom(state.businessCardItems, createDefaultBusinessCardRow);
@@ -9080,7 +9063,7 @@ async function initApp() {
       return;
     }
     selectedRowIds.clear();
-    state.rows = Array.from({ length: 5 }, (_, index) => createDefaultRow(index));
+    state.rows = Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultRow(index));
     persist();
     renderRowsAndSummary();
     setMainFeedback("As linhas de cálculo de apostila foram limpas.", "warning");
@@ -9097,7 +9080,7 @@ async function initApp() {
       setColorFeedback("A limpeza dos impressos coloridos foi cancelada.", "warning");
       return;
     }
-    state.colorPrintItems = Array.from({ length: 5 }, (_, index) => createDefaultColorPrintRow(index));
+    state.colorPrintItems = Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultColorPrintRow(index));
     persist();
     renderRowsAndSummary();
     setColorFeedback("As linhas de impressos coloridos foram limpas.", "warning");
@@ -9114,7 +9097,7 @@ async function initApp() {
       setCredentialFeedback("A limpeza das credenciais foi cancelada.", "warning");
       return;
     }
-    state.credentialItems = Array.from({ length: 5 }, (_, index) => createDefaultCredentialRow(index));
+    state.credentialItems = Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultCredentialRow(index));
     persistLocalOnly();
     renderRowsAndSummary();
     setCredentialFeedback("As linhas de credenciais foram limpas.", "warning");
@@ -9131,7 +9114,7 @@ async function initApp() {
       setReadyFeedback("A limpeza dos produtos prontos foi cancelada.", "warning");
       return;
     }
-    state.readyProductItems = Array.from({ length: 5 }, (_, index) => createDefaultReadyProductRow(index));
+    state.readyProductItems = Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultReadyProductRow(index));
     persistLocalOnly();
     renderRowsAndSummary();
     setReadyFeedback("As linhas de produtos prontos foram limpas.", "warning");
@@ -9148,7 +9131,7 @@ async function initApp() {
       setBusinessCardFeedback("A limpeza dos cartões foi cancelada.", "warning");
       return;
     }
-    state.businessCardItems = Array.from({ length: 5 }, (_, index) => createDefaultBusinessCardRow(index));
+    state.businessCardItems = Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultBusinessCardRow(index));
     persistLocalOnly();
     renderRowsAndSummary();
     setBusinessCardFeedback("As linhas de cartões de visitas foram limpas.", "warning");
@@ -9165,7 +9148,7 @@ async function initApp() {
       setFlyerFeedback("A limpeza dos panfletos e folders foi cancelada.", "warning");
       return;
     }
-    state.flyerItems = Array.from({ length: 5 }, (_, index) => createDefaultFlyerRow(index));
+    state.flyerItems = Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultFlyerRow(index));
     persistLocalOnly();
     renderRowsAndSummary();
     setFlyerFeedback("As linhas de panfletos e folders foram limpas.", "warning");
@@ -9182,7 +9165,7 @@ async function initApp() {
       setBlockFeedback("sulfite", "A limpeza dos blocos sulfite foi cancelada.", "warning");
       return;
     }
-    state.blockItems.sulfite = Array.from({ length: 5 }, (_, index) => createDefaultBlockRow(index, "sulfite"));
+    state.blockItems.sulfite = Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultBlockRow(index, "sulfite"));
     persist();
     renderRowsAndSummary();
     setBlockFeedback("sulfite", "As linhas de blocos sulfite foram limpas.", "warning");
@@ -9199,7 +9182,7 @@ async function initApp() {
       setBlockFeedback("autocopiativo", "A limpeza dos blocos autocopiativos foi cancelada.", "warning");
       return;
     }
-    state.blockItems.autocopiativo = Array.from({ length: 5 }, (_, index) => createDefaultBlockRow(index, "autocopiativo"));
+    state.blockItems.autocopiativo = Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultBlockRow(index, "autocopiativo"));
     persist();
     renderRowsAndSummary();
     setBlockFeedback("autocopiativo", "As linhas de blocos autocopiativos foram limpas.", "warning");
@@ -9216,7 +9199,7 @@ async function initApp() {
       setConfigStatus("Limpeza cancelada.", "warning");
       return;
     }
-    state.m2Items = Array.from({ length: 5 }, (_, index) => createDefaultM2Row(index));
+    state.m2Items = Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultM2Row(index));
     persist();
     renderRowsAndSummary();
     setConfigStatus("Linhas de cálculo de m² limpas.", "warning");
@@ -9233,7 +9216,7 @@ async function initApp() {
       setResinFeedback("A limpeza dos resinados foi cancelada.", "warning");
       return;
     }
-    state.resinItems = Array.from({ length: 5 }, (_, index) => createDefaultResinRow(index));
+    state.resinItems = Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultResinRow(index));
     persistLocalOnly();
     renderRowsAndSummary();
     setResinFeedback("As linhas de resinados foram limpas.", "warning");
@@ -9850,7 +9833,7 @@ async function initApp() {
       return;
     }
 
-    state.linearMeterItems = Array.from({ length: 5 }, (_, index) => createDefaultLinearMeterRow(index));
+    state.linearMeterItems = Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultLinearMeterRow(index));
     persistLocalOnly();
     renderRowsAndSummary();
     setLinearMeterFeedback("As linhas de metro linear foram limpas.", "warning");
@@ -10709,7 +10692,7 @@ async function initApp() {
       if (!confirmed) {
         return;
       }
-      state.freeQuoteItems = [createDefaultFreeQuoteRow(0)];
+      state.freeQuoteItems = Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultFreeQuoteRow(index));
       persistLocalOnly();
       renderRowsAndSummary();
     });
