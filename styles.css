@@ -1157,6 +1157,130 @@ textarea {
   color: var(--muted-strong);
 }
 
+.budget-card-shell {
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+.budget-card-shell .budget-table {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  transform: none;
+}
+
+.budget-card-shell .budget-table thead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.budget-card-shell .budget-table tbody {
+  display: grid;
+  gap: 14px;
+}
+
+.budget-card-shell .budget-table tbody tr {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+  align-items: start;
+  gap: 14px 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid rgba(31, 42, 47, 0.11);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(242, 248, 244, 0.84));
+  box-shadow: var(--shadow-soft);
+}
+
+.budget-card-shell .budget-table tbody tr:hover {
+  background: linear-gradient(135deg, #fffdfa, #edf5ef);
+  border-color: rgba(23, 107, 107, 0.24);
+}
+
+.budget-card-shell .budget-table tbody tr.is-empty {
+  opacity: 0.82;
+}
+
+.budget-card-shell .budget-table td {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  position: static;
+  background: transparent;
+}
+
+.budget-card-shell .budget-table td::before {
+  content: attr(data-card-label);
+  min-height: 1.8em;
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+.budget-card-shell .budget-table td.budget-card-description {
+  grid-column: span 2;
+}
+
+.budget-card-shell .budget-table td.budget-card-item strong {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-width: 40px;
+  min-height: 38px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.budget-card-shell .budget-table td.budget-card-total {
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(23, 107, 107, 0.08);
+}
+
+.budget-card-shell .budget-table .cell-input,
+.budget-card-shell .budget-table .cell-select,
+.budget-card-shell .budget-table .finish-picker,
+.budget-card-shell .budget-table .finish-picker-button {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.budget-card-shell .budget-table .readonly-value {
+  width: 100%;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 520px) {
+  .budget-card-shell .budget-table tbody tr {
+    gap: 12px;
+    padding: 13px;
+  }
+
+  .budget-card-shell .budget-table td.budget-card-description {
+    grid-column: auto;
+  }
+}
+
 .config-top-grid {
   margin-bottom: 18px;
 }

@@ -7007,6 +7007,27 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
   return lines.join("\n");
 }
 
+function labelBudgetCardFields(root = document) {
+  root.querySelectorAll(".budget-card-shell .budget-table").forEach((table) => {
+    const labels = Array.from(table.querySelectorAll("thead th"), (heading) => heading.textContent.trim());
+    table.querySelectorAll("tbody tr").forEach((row, rowIndex) => {
+      Array.from(row.children).forEach((cell, columnIndex) => {
+        const label = labels[columnIndex];
+        if (!label) return;
+        cell.dataset.cardLabel = label;
+        if (label === "Item") cell.classList.add("budget-card-item");
+        if (label === "Descrição") cell.classList.add("budget-card-description");
+        if (label === "Total item") cell.classList.add("budget-card-total");
+        cell.querySelectorAll("input, select, textarea").forEach((control) => {
+          if (!control.hasAttribute("aria-label") && !control.closest("label")) {
+            control.setAttribute("aria-label", `${label} do item ${rowIndex + 1}`);
+          }
+        });
+      });
+    });
+  });
+}
+
 async function initApp() {
   const state = loadFromStorage(STORAGE_KEYS.state, mergeState);
   const config = loadFromStorage(STORAGE_KEYS.config, mergeConfig);
@@ -8212,6 +8233,8 @@ async function initApp() {
     resinWarningList.innerHTML = resinWorkbook.warnings.length
       ? resinWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
       : `<div class="warning-item is-success">Sem alertas no momento. Você pode montar várias medidas de resinados no mesmo orçamento por aqui.</div>`;
+
+    labelBudgetCardFields();
 
     const urgencyItems = collectQuoteUrgencyItems([workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, linearMeterWorkbook, m2Workbook, resinWorkbook]);
     document.getElementById("quote-urgency-item-picker").hidden = state.quoteUrgency.scope !== "selected";
