@@ -38,14 +38,17 @@ test("cinco linhas antigas inteiramente padrão são reduzidas a duas", () => {
   }
   const restored = app.mergeState(oldState);
   assert.ok(allRowLists(restored).every((rows) => rows.length === 2));
-  assert.equal(restored.budgetRowsVersion, 3);
+  assert.equal(restored.budgetRowsVersion, 4);
 });
 
 test("campos obsoletos não mantêm cartões antigos vazios", () => {
   const oldState = app.createDefaultState();
   delete oldState.budgetRowsVersion;
   for (let index = 2; index < 5; index += 1) {
-    oldState.credentialItems.push({ ...oldState.credentialItems[0], id: `credential-row-${index + 1}`, oldField: "valor antigo" });
+    oldState.credentialItems.push({
+      ...oldState.credentialItems[0], id: `credential-row-${index + 1}`,
+      widthCm: "0", heightCm: "0,0", quantity: "0", oldField: "valor antigo",
+    });
   }
   assert.equal(app.mergeState(oldState).credentialItems.length, 2);
 });
@@ -71,7 +74,7 @@ test("cartão vazio adicionado após a migração permanece ao reabrir", () => {
   state.rows.push({ ...state.rows[0], id: "row-3" });
   const restored = app.mergeState(state);
   assert.equal(restored.rows.length, 3);
-  assert.equal(restored.budgetRowsVersion, 3);
+  assert.equal(restored.budgetRowsVersion, 4);
 });
 
 test("orçamento livre antigo com uma linha recebe a segunda sem alterar a primeira", () => {

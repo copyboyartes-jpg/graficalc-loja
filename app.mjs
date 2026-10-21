@@ -1412,7 +1412,7 @@ function getM2RowDescription(row) {
 
 function createDefaultState() {
   return {
-    budgetRowsVersion: 3,
+    budgetRowsVersion: 4,
     calcMode: "Independente",
     m2CalcMode: "Independente",
     presets: {
@@ -2202,7 +2202,7 @@ function mergeState(candidate) {
     };
   }
 
-  compactBudgetRows(state, candidate.budgetRowsVersion !== 3);
+  compactBudgetRows(state, candidate.budgetRowsVersion !== 4);
   return state;
 }
 
@@ -4922,7 +4922,12 @@ function compactBudgetRowList(rows, createDefault, trimLegacy) {
     const row = compacted[index];
     const fallback = createDefault(index);
     const defaultFields = Object.keys(fallback).filter((key) => key !== "id");
-    if (!row || !defaultFields.every((key) => JSON.stringify(row[key]) === JSON.stringify(fallback[key]))) {
+    if (!row || !defaultFields.every((key) => {
+      if (fallback[key] === "" && ["widthCm", "heightCm", "quantity"].includes(key) && /^0+(?:[.,]0+)?$/.test(String(row[key]).trim())) {
+        return true;
+      }
+      return JSON.stringify(row[key]) === JSON.stringify(fallback[key]);
+    })) {
       break;
     }
     compacted.pop();
