@@ -30,7 +30,7 @@ test("todas as abas começam e reiniciam com dois cartões", () => {
 
 test("cinco linhas antigas inteiramente padrão são reduzidas a duas", () => {
   const oldState = app.createDefaultState();
-  delete oldState.budgetRowsVersion;
+  oldState.budgetRowsVersion = 2;
   for (const rows of allRowLists(oldState)) {
     for (let index = 2; index < 5; index += 1) {
       rows.push({ ...rows[0], id: `legacy-row-${index + 1}` });
@@ -38,6 +38,16 @@ test("cinco linhas antigas inteiramente padrão são reduzidas a duas", () => {
   }
   const restored = app.mergeState(oldState);
   assert.ok(allRowLists(restored).every((rows) => rows.length === 2));
+  assert.equal(restored.budgetRowsVersion, 3);
+});
+
+test("campos obsoletos não mantêm cartões antigos vazios", () => {
+  const oldState = app.createDefaultState();
+  delete oldState.budgetRowsVersion;
+  for (let index = 2; index < 5; index += 1) {
+    oldState.credentialItems.push({ ...oldState.credentialItems[0], id: `credential-row-${index + 1}`, oldField: "valor antigo" });
+  }
+  assert.equal(app.mergeState(oldState).credentialItems.length, 2);
 });
 
 test("migração preserva um cartão parcialmente configurado e os itens anteriores", () => {
@@ -61,7 +71,7 @@ test("cartão vazio adicionado após a migração permanece ao reabrir", () => {
   state.rows.push({ ...state.rows[0], id: "row-3" });
   const restored = app.mergeState(state);
   assert.equal(restored.rows.length, 3);
-  assert.equal(restored.budgetRowsVersion, 2);
+  assert.equal(restored.budgetRowsVersion, 3);
 });
 
 test("orçamento livre antigo com uma linha recebe a segunda sem alterar a primeira", () => {
