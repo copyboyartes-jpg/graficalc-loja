@@ -180,6 +180,15 @@ const M2_CATALOG = [
   { id: "ps2mm", label: "Chapa PS 2mm", configKey: "ps2mm" },
 ];
 
+const DEFAULT_M2_MEDIA = [
+  { id: "lona-brilho", label: "Lona brilho" },
+  { id: "adesivo-branco-brilho", label: "Adesivo branco brilho" },
+  { id: "adesivo-branco-fosco", label: "Adesivo branco fosco" },
+  { id: "adesivo-blackout-brilho", label: "Adesivo blackout Brilho" },
+  { id: "adesivo-transparente-brilho", label: "Adesivo transparente brilho" },
+  { id: "adesivo-jateado", label: "Adesivo jateado" },
+];
+
 const DEFAULT_M2_DESCRIPTIONS = {
   "digital-cut": "Adesivo vinil com impressão digital",
   "flat-cut": "Adesivo vinil com impressão digital",
@@ -1059,6 +1068,7 @@ function createDefaultConfig() {
       { id: "verniz-laka", label: "Verniz laka", type: "area", price: 5.0 },
       { id: M2_LASER_CUT_FINISH_ID, label: "Corte lazer", type: "area", price: 10.0 },
     ],
+    m2Media: DEFAULT_M2_MEDIA.map((media) => ({ ...media })),
     catalogSections: [],
     spiralPlasticDiscount: 1.5,
   };
@@ -1115,6 +1125,8 @@ function createDefaultM2Row(index) {
   return {
     id: `m2-row-${index + 1}`,
     productId: M2_CATALOG[0].id,
+    mediaId: "",
+    mediaLabel: "",
     description: DEFAULT_M2_DESCRIPTIONS[M2_CATALOG[0].id] || "",
     measureUnit: "cm",
     widthMm: 0,
@@ -1601,6 +1613,18 @@ function normalizeCatalogSections(list) {
   return normalized;
 }
 
+function normalizeM2Media(list) {
+  if (!Array.isArray(list)) return [];
+  const usedIds = new Set();
+  return list.flatMap((item) => {
+    const id = typeof item?.id === "string" ? item.id.trim() : "";
+    const label = typeof item?.label === "string" ? repairBrokenText(item.label.trim()) : "";
+    if (!id || !label || usedIds.has(id)) return [];
+    usedIds.add(id);
+    return [{ id, label }];
+  });
+}
+
 function createUniqueM2PricingKey(baseKey, existingKeys) {
   const base = `custom-${baseKey}`.toLowerCase().replace(/[^a-z0-9-]/g, "-");
   let candidate = base;
@@ -1879,6 +1903,10 @@ function mergeConfig(candidate) {
 
   merged.m2Finishes = normalizeM2Finishes(candidate.m2Finishes, defaults.m2Finishes);
 
+  if (Array.isArray(candidate.m2Media)) {
+    merged.m2Media = normalizeM2Media(candidate.m2Media);
+  }
+
   if (Array.isArray(candidate.catalogSections)) {
     merged.catalogSections = normalizeCatalogSections(candidate.catalogSections);
   }
@@ -2045,6 +2073,8 @@ function mergeState(candidate) {
     state.m2Items = candidate.m2Items.map((row, index) => ({
       ...createDefaultM2Row(index),
       ...row,
+      mediaId: typeof row?.mediaId === "string" ? row.mediaId : "",
+      mediaLabel: typeof row?.mediaLabel === "string" ? row.mediaLabel : "",
       widthMm: toDecimalNumber(row?.widthMm),
       heightMm: toDecimalNumber(row?.heightMm),
       measureUnit: row?.measureUnit === "m" ? "m" : "cm",
@@ -4316,6 +4346,7 @@ function calculateM2WorkbookFromConfig(state, config) {
     return {
       ...row,
       productLabel: product.label,
+      mediaLabel: getM2MediaLabel(row, config),
       finishIds: Array.isArray(row.finishIds) ? row.finishIds : [],
       finishSummary: getM2FinishSummary(row, config).join(" | "),
       widthMm: widthInput,
@@ -5147,6 +5178,11 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
       "Faixas de preço do m²",
       "Cada produto abaixo usa suas próprias faixas na aba de cálculo de m².",
       createM2PricingMarkup(config.m2Pricing)
+    ),
+    createConfigCardMarkup(
+      "Mídias do m²",
+      "A mídia escolhida identifica o material no orçamento. O preço continua vindo da tabela do produto.",
+      createM2MediaMarkup(config.m2Media)
     ),
     createConfigCardMarkup(
       "Acabamentos do m²",
@@ -6079,6 +6115,22 @@ function createM2PricingMarkup(m2Pricing) {
   return `<div class="m2-config-list">${rows}</div>`;
 }
 
+function createM2MediaMarkup(mediaList) {
+  return `
+    <div class="m2-config-heading">
+      <h4>Mídias disponíveis</h4>
+      <button class="button button-small button-primary" type="button" data-add-m2-media="1">Adicionar mídia</button>
+    </div>
+    <div class="m2-media-list">
+      ${(mediaList || []).map((media, index) => `
+        <div class="m2-media-row">
+          <label><span>Nome da mídia</span><input data-m2-media-index="${index}" type="text" value="${escapeHtml(media.label)}" placeholder="Ex.: Lona fosca"></label>
+          ${createConfigDeleteButtonMarkup("m2-media", { "media-index": index })}
+        </div>
+      `).join("") || `<p class="helper-text">Nenhuma mídia cadastrada. Use o botão acima para adicionar.</p>`}
+    </div>`;
+}
+
 function createM2FinishesMarkup(m2Finishes) {
   const rows = (m2Finishes || [])
     .map(
@@ -6307,6 +6359,17 @@ function getM2Catalog(config) {
     });
   }
   return baseCatalog;
+}
+
+function getM2MediaLabel(row, config) {
+  if (!row.mediaId) return "";
+  const media = (config.m2Media || DEFAULT_M2_MEDIA).find((item) => item.id === row.mediaId);
+  return media?.label || row.mediaLabel || "";
+}
+
+function buildM2MediaOptions(currentValue, config) {
+  const media = config.m2Media || DEFAULT_M2_MEDIA;
+  return `<option value="">Selecionar mídia</option>${media.map((item) => `<option value="${escapeHtml(item.id)}"${item.id === currentValue ? " selected" : ""}>${escapeHtml(item.label)}</option>`).join("")}`;
 }
 
 function calculateM2FinishExtra(row, product, config, onlyFinishId = null) {
@@ -6723,7 +6786,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       sourceIndex: index,
       kind: "Cálculo de m²",
       description: getM2RowDescription(row),
-      detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.productLabel}${row.finishSummary ? ` | ${row.finishSummary}` : ""}`,
+      detail: `${formatInteger(row.quantity)} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.productLabel}${row.mediaLabel ? ` | Mídia: ${row.mediaLabel}` : ""}${row.finishSummary ? ` | ${row.finishSummary}` : ""}`,
       artDetail: formatArtCreationDetail(row),
       discountDetail: row.discountDescription,
       total: row.total,
@@ -6900,7 +6963,7 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
       text: `- ${row.description || row.productLabel || `Metro linear ${index + 1}`} | ${formatMeasure(row.linearMeters)} m | ${row.productLabel}${row.variantLabel ? ` | ${row.variantLabel}` : ""} | Largura: ${row.fixedWidthLabel}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...m2Workbook.activeRows.map((row, index) => ({
-      text: `- ${getM2RowDescription(row) || `M² ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.finishSummary ? `${row.finishSummary} | ` : ""}${formatArtCreationDetail(row) ? `${formatArtCreationDetail(row)} | ` : ""}${row.discountDescription ? `${row.discountDescription} | ` : ""}${formatCurrency(row.total)}`,
+      text: `- ${getM2RowDescription(row) || `M² ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.mediaLabel ? `Mídia: ${row.mediaLabel} | ` : ""}${row.finishSummary ? `${row.finishSummary} | ` : ""}${formatArtCreationDetail(row) ? `${formatArtCreationDetail(row)} | ` : ""}${row.discountDescription ? `${row.discountDescription} | ` : ""}${formatCurrency(row.total)}`,
     })),
     ...resinWorkbook.activeRows.map((row, index) => ({
       text: `- ${row.description || `Resinado ${index + 1}`} | ${row.quantity} unidades | ${formatResinMeasureCm(row.widthMm)} x ${formatResinMeasureCm(row.heightMm)} cm | ${row.materialLabel} | ${row.sheetsNeeded} folha(s) A3 | ${row.piecesPerSheet} por folha${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
@@ -8085,6 +8148,7 @@ async function initApp() {
                 ${m2Catalog.map((product) => `<option value="${escapeHtml(product.id)}"${product.id === row.productId ? " selected" : ""}>${escapeHtml(product.label)}</option>`).join("")}
               </select>
             </td>
+            <td><select class="cell-select m2-media-select" name="mediaId">${buildM2MediaOptions(row.mediaId, config)}</select></td>
             <td>
               ${createM2FinishPickerMarkup(row, config)}
             </td>
@@ -9841,6 +9905,9 @@ async function initApp() {
       if (!currentDescription || currentDescription === previousDefaultDescription) {
         row.description = nextDefaultDescription;
       }
+    } else if (field === "mediaId") {
+      row.mediaId = target.value;
+      row.mediaLabel = getM2MediaLabel(row, config);
     } else if (field === "widthMm" || field === "heightMm") {
       row[field] = toDecimalNumber(target.value);
     } else if (field === "measureUnit") {
@@ -9982,6 +10049,19 @@ async function initApp() {
     const catalogProductTab = target.dataset.catalogProductTab;
     const catalogProductIndex = Number(target.dataset.catalogProductIndex);
     const catalogProductKey = target.dataset.catalogProductKey;
+    if ("m2MediaIndex" in target.dataset) {
+      const media = config.m2Media[Number(target.dataset.m2MediaIndex)];
+      const label = target.value.trim();
+      if (!media || !label) return;
+      media.label = label;
+      state.m2Items.forEach((row) => {
+        if (row.mediaId === media.id) row.mediaLabel = label;
+      });
+      persist();
+      renderRowsAndSummary();
+      setConfigStatus("Nome da mídia atualizado.", "success");
+      return;
+    }
     if (!prefix || !key) {
       if (catalogProductTab && catalogProductKey && Number.isFinite(catalogProductIndex)) {
         const product = config.catalogSections.filter((item) => item?.tab === catalogProductTab)[catalogProductIndex];
@@ -10188,6 +10268,27 @@ async function initApp() {
     const deleteButton = event.target.closest("[data-config-delete]");
     if (deleteButton) {
       const deleteType = deleteButton.dataset.configDelete;
+      if (deleteType === "m2-media") {
+        const index = Number(deleteButton.dataset.mediaIndex);
+        const media = config.m2Media[index];
+        if (!media) return;
+        if (!(await confirmConfigDelete(`Deseja realmente excluir a mídia "${media.label}"?`))) {
+          setConfigStatus("Exclusão cancelada.", "warning");
+          return;
+        }
+        config.m2Media.splice(index, 1);
+        state.m2Items.forEach((row) => {
+          if (row.mediaId === media.id) {
+            row.mediaId = "";
+            row.mediaLabel = "";
+          }
+        });
+        persist();
+        renderConfig();
+        renderRowsAndSummary();
+        setConfigStatus("Mídia excluída com sucesso.", "warning");
+        return;
+      }
       if (deleteType === "config-row") {
         const prefix = deleteButton.dataset.configPrefix;
         const rowIndex = Number(deleteButton.dataset.configRow);
@@ -10234,6 +10335,19 @@ async function initApp() {
         }
         return;
       }
+    }
+
+    const addMediaButton = event.target.closest("[data-add-m2-media]");
+    if (addMediaButton) {
+      const usedIds = new Set(config.m2Media.map((item) => item.id));
+      let nextId = 1;
+      while (usedIds.has(`midia-${nextId}`)) nextId += 1;
+      config.m2Media.push({ id: `midia-${nextId}`, label: "Nova mídia" });
+      persist();
+      renderConfig();
+      renderRowsAndSummary();
+      setConfigStatus("Nova mídia adicionada. Edite o nome antes de usá-la.", "success");
+      return;
     }
 
     const button = event.target.closest("[data-add-m2-pricing]");

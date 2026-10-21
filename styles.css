@@ -1108,7 +1108,7 @@ textarea {
 }
 
 .m2-budget-table {
-  min-width: 1820px;
+  min-width: 1970px;
 }
 
 .m2-budget-table thead th {
@@ -1120,13 +1120,13 @@ textarea {
   background: rgba(231, 245, 237, 0.78);
 }
 
-.m2-budget-table td:nth-child(9),
 .m2-budget-table td:nth-child(10),
 .m2-budget-table td:nth-child(11),
 .m2-budget-table td:nth-child(12),
 .m2-budget-table td:nth-child(13),
 .m2-budget-table td:nth-child(14),
-.m2-budget-table td:nth-child(15) {
+.m2-budget-table td:nth-child(15),
+.m2-budget-table td:nth-child(16) {
   background: rgba(255, 255, 255, 0.5);
 }
 
@@ -1137,6 +1137,10 @@ textarea {
 
 .m2-budget-table .cell-input.description {
   min-width: 165px;
+}
+
+.m2-budget-table .m2-media-select {
+  min-width: 180px;
 }
 
 .m2-budget-table .readonly-value {
@@ -1399,6 +1403,28 @@ textarea {
 
 .nested-row.is-advanced {
   grid-template-columns: 1.1fr 0.7fr 1.2fr auto;
+}
+
+.m2-media-list {
+  display: grid;
+  gap: 10px;
+}
+
+.m2-media-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.m2-media-row label {
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .m2-media-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .m2-product-pricing {
