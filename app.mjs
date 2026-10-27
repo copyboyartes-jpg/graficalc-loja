@@ -1065,7 +1065,7 @@ function createDefaultConfig() {
       { id: "ilhós-simples", label: "Ilhós Simples", type: "eyelet", price: 0.9, spacingCm: 20 },
       { id: "ilhós-latão", label: "Ilhós Latão", type: "eyelet", price: 1.5, spacingCm: 20 },
       { id: "bainha-corda", label: "Bainha com corda", type: "perimeter", price: 5.0 },
-      { id: "laminacao", label: "Laminação", type: "area", price: 25.0 },
+      { id: "laminacao", label: "Laminação", type: "area", price: 25.0, minimumPrice: 10.0 },
       { id: "verniz-laka", label: "Verniz laka", type: "area", price: 5.0 },
       { id: M2_LASER_CUT_FINISH_ID, label: "Corte lazer", type: "area", price: 10.0 },
     ],
@@ -1642,6 +1642,7 @@ function createUniqueM2PricingKey(baseKey, existingKeys) {
 
 function normalizeM2Finishes(candidateFinishes, defaultFinishes) {
   const defaults = Array.isArray(defaultFinishes) ? defaultFinishes : [];
+  const defaultsById = new Map(defaults.map((finish) => [finish.id, finish]));
   if (!Array.isArray(candidateFinishes) || candidateFinishes.length === 0) {
     return deepClone(defaults);
   }
@@ -1653,6 +1654,7 @@ function normalizeM2Finishes(candidateFinishes, defaultFinishes) {
       label: repairBrokenText(item.label || "Novo acabamento"),
       type: item.type || "area",
       price: Number.isFinite(Number(item.price)) ? Number(item.price) : 0,
+      minimumPrice: Math.max(0, toMoneyNumber(item.minimumPrice ?? defaultsById.get(item.id)?.minimumPrice ?? 0)),
       spacingCm: item.spacingCm === "" || item.spacingCm == null ? "" : Number(item.spacingCm),
     }));
 
@@ -4331,17 +4333,18 @@ function calculateM2WorkbookFromConfig(state, config) {
     const areaM2 = unitPricingAreaM2 * quantity;
     const tier = getM2PricingBand(pricing, areaM2);
     const pricePerM2 = Number(tier?.value || 0);
-    const configuredFinishExtra = calculateM2FinishExtra(row, product, config);
-    const configuredFinishExtraTotal = configuredFinishExtra * quantity;
+    const active = widthMm > 0 && heightMm > 0 && quantity > 0;
+    const configuredFinishExtraTotal = active ? calculateM2FinishTotal(row, product, config, quantity) : 0;
+    const configuredFinishExtra = quantity > 0 ? configuredFinishExtraTotal / quantity : 0;
     const laserCutExtraTotal = calculateM2FinishExtra(row, product, config, M2_LASER_CUT_FINISH_ID) * quantity;
     const extraCharge = toMoneyNumber(typeof row.extraCharge !== "undefined" ? row.extraCharge : row.finishingExtra);
     const artCreationFee = toMoneyNumber(row.artCreationFee);
     const fixedCharges = extraCharge + artCreationFee;
     const finishingExtra = configuredFinishExtra;
-    const subtotal = (areaM2 * pricePerM2) + configuredFinishExtraTotal;
+    const materialSubtotal = areaM2 * pricePerM2;
+    const subtotal = materialSubtotal + configuredFinishExtraTotal;
     const unitValue = quantity > 0 ? subtotal / quantity : 0;
     const total = subtotal + fixedCharges;
-    const active = widthMm > 0 && heightMm > 0 && quantity > 0;
 
     if (active && areaM2 <= 0) {
       warnings.push(`Item m² ${index + 1}: informe largura e altura válidas.`);
@@ -4362,6 +4365,7 @@ function calculateM2WorkbookFromConfig(state, config) {
       tierValue: pricePerM2,
       configuredFinishExtra,
       configuredFinishExtraTotal,
+      materialSubtotal,
       laserCutExtraTotal,
       extraCharge,
       artCreationFee,
@@ -4391,7 +4395,8 @@ function calculateM2WorkbookFromConfig(state, config) {
     const pricingArea = shouldGroupSameMaterials ? pricingAreaByProduct[row.productId] || row.effectiveArea : row.effectiveArea;
     const tier = getM2PricingBand(pricing, pricingArea);
     const pricePerM2 = Number(tier?.value || 0);
-    const subtotal = (row.effectiveArea * pricePerM2) + row.configuredFinishExtraTotal;
+    const materialSubtotal = row.effectiveArea * pricePerM2;
+    const subtotal = materialSubtotal + row.configuredFinishExtraTotal;
     const unitValue = row.quantity > 0 ? subtotal / row.quantity : 0;
     const total = subtotal + row.fixedCharges;
 
@@ -4399,6 +4404,7 @@ function calculateM2WorkbookFromConfig(state, config) {
       ...row,
       tierLabel: tier?.label || "",
       tierValue: pricePerM2,
+      materialSubtotal,
       subtotal,
       unitValue,
       total,
@@ -4407,15 +4413,15 @@ function calculateM2WorkbookFromConfig(state, config) {
   });
 
   const totalsByProduct = {};
-  const baseTotalsByProduct = {};
-  const laserCutTotalsByProduct = {};
+  const materialTotalsByProduct = {};
+  const finishTotalsByProduct = {};
   const fixedTotalsByProduct = {};
   for (const row of rows) {
     if (!row.active) continue;
     if (shouldGroupSameMaterials) {
       totalsByProduct[row.productId] = (totalsByProduct[row.productId] || 0) + row.total;
-      baseTotalsByProduct[row.productId] = (baseTotalsByProduct[row.productId] || 0) + row.subtotal;
-      laserCutTotalsByProduct[row.productId] = (laserCutTotalsByProduct[row.productId] || 0) + row.laserCutExtraTotal;
+      materialTotalsByProduct[row.productId] = (materialTotalsByProduct[row.productId] || 0) + row.materialSubtotal;
+      finishTotalsByProduct[row.productId] = (finishTotalsByProduct[row.productId] || 0) + row.configuredFinishExtraTotal;
       fixedTotalsByProduct[row.productId] = (fixedTotalsByProduct[row.productId] || 0) + row.fixedCharges;
     }
   }
@@ -4432,9 +4438,8 @@ function calculateM2WorkbookFromConfig(state, config) {
     const minimumValue = getM2MinimumValue(config.m2Pricing?.[product.pricingKey || product.configKey] || []);
 
     if (!shouldGroupSameMaterials) {
-      const minimumBase = row.subtotal - row.laserCutExtraTotal;
-      const minimumApplied = row.active && row.subtotal > 0 && minimumBase < minimumValue;
-      const adjustedBase = minimumApplied ? minimumValue + row.laserCutExtraTotal : row.subtotal;
+      const minimumApplied = row.active && row.materialSubtotal > 0 && row.materialSubtotal < minimumValue;
+      const adjustedBase = (minimumApplied ? minimumValue : row.materialSubtotal) + row.configuredFinishExtraTotal;
       return {
         ...row,
         total: row.active ? adjustedBase + row.fixedCharges : 0,
@@ -4447,16 +4452,17 @@ function calculateM2WorkbookFromConfig(state, config) {
     }
 
     const groupTotal = totalsByProduct[row.productId] || 0;
-    const groupBaseTotal = baseTotalsByProduct[row.productId] || 0;
-    const groupLaserCutTotal = laserCutTotalsByProduct[row.productId] || 0;
+    const groupMaterialTotal = materialTotalsByProduct[row.productId] || 0;
+    const groupFinishTotal = finishTotalsByProduct[row.productId] || 0;
+    const groupBaseTotal = groupMaterialTotal + groupFinishTotal;
     const groupFixedTotal = fixedTotalsByProduct[row.productId] || 0;
-    const minimumApplied = groupBaseTotal > 0 && groupBaseTotal - groupLaserCutTotal < minimumValue;
-    const adjustedGroupBaseTotal = minimumApplied ? minimumValue + groupLaserCutTotal : groupBaseTotal;
+    const minimumApplied = groupMaterialTotal > 0 && groupMaterialTotal < minimumValue;
+    const adjustedGroupBaseTotal = (minimumApplied ? minimumValue : groupMaterialTotal) + groupFinishTotal;
     const displayTotal = row.active
       ? minimumApplied
         ? firstActiveIndexByProduct[row.productId] === index
-          ? minimumValue + row.laserCutExtraTotal + row.fixedCharges
-          : row.laserCutExtraTotal + row.fixedCharges
+          ? minimumValue + row.configuredFinishExtraTotal + row.fixedCharges
+          : row.configuredFinishExtraTotal + row.fixedCharges
         : row.total
       : 0;
 
@@ -6192,6 +6198,7 @@ function createM2FinishesMarkup(m2Finishes) {
             </select>
           </td>
           <td><input data-config-prefix="m2-finish" data-config-row="${rowIndex}" data-config-key="price" type="number" step="0.01" value="${escapeHtml(finish.price)}"></td>
+          <td><input data-config-prefix="m2-finish" data-config-row="${rowIndex}" data-config-key="minimumPrice" type="number" min="0" step="0.01" value="${escapeHtml(finish.minimumPrice ?? 0)}"></td>
           <td><input data-config-prefix="m2-finish" data-config-row="${rowIndex}" data-config-key="spacingCm" type="number" step="1" value="${escapeHtml(finish.spacingCm ?? "")}"></td>
           <td class="config-action-cell">
             ${createConfigDeleteButtonMarkup(
@@ -6217,6 +6224,7 @@ function createM2FinishesMarkup(m2Finishes) {
             <th>Nome</th>
             <th>Como calcula</th>
             <th>Valor</th>
+            <th>Valor mínimo (R$)</th>
             <th>Espaçamento padrão (cm)</th>
             <th>Ações</th>
           </tr>
@@ -6444,6 +6452,16 @@ function calculateM2FinishExtra(row, product, config, onlyFinishId = null) {
       return sum + areaM2 * price;
     }
     return sum;
+  }, 0);
+}
+
+function calculateM2FinishTotal(row, product, config, quantity) {
+  const finishes = Array.isArray(config.m2Finishes) ? config.m2Finishes : [];
+  const selectedIds = Array.isArray(row.finishIds) ? row.finishIds : [];
+  return finishes.reduce((sum, finish) => {
+    if (!selectedIds.includes(finish.id)) return sum;
+    const calculatedPrice = calculateM2FinishExtra(row, product, config, finish.id) * quantity;
+    return sum + Math.max(calculatedPrice, toMoneyNumber(finish.minimumPrice));
   }, 0);
 }
 
@@ -10160,7 +10178,7 @@ async function initApp() {
       }
       if (key === "spacingCm") {
         finish[key] = toWholeNumber(target.value);
-      } else if (key === "price") {
+      } else if (key === "price" || key === "minimumPrice") {
         finish[key] = toMoneyNumber(target.value);
       } else {
         finish[key] = target.value;
@@ -10388,6 +10406,7 @@ async function initApp() {
           label: "Novo acabamento",
           type: "area",
           price: 0,
+          minimumPrice: 0,
           spacingCm: 20,
         });
         persist();
