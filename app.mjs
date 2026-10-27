@@ -731,7 +731,7 @@ function createDefaultLinearMeterPricing() {
     },
     products: {
       canvas: { rate: 110, minimumOrder: 45 },
-      "magneto-automotivo": { rate: 164, minimumOrder: 55, widthLabel: "" },
+      "magneto-automotivo": { rate: 164, minimumOrder: 55, widthLabel: "60 cm" },
       "tecido-microfibra-extra": { rateUpTo3m: 71.5, rateAbove3m: 60.5, minimumOrder: 25 },
       "papel-glossy": { rate: 90, minimumOrder: 32 },
       "couche-210g": { rate: 39, minimumOrder: 39 },
@@ -1276,7 +1276,7 @@ const LINEAR_METER_CATALOG = [
   {
     id: "magneto-automotivo",
     label: "Magneto automotivo",
-    widthLabel: "",
+    widthLabel: "60 cm",
     rate: 164,
     minimumOrder: 55,
   },
@@ -1912,6 +1912,11 @@ function mergeConfig(candidate) {
         ...(pricing.products || {}),
       },
     };
+  }
+
+  const magnetoPricing = merged.linearMeterPricing.products["magneto-automotivo"];
+  if (magnetoPricing && !String(magnetoPricing.widthLabel || "").trim()) {
+    magnetoPricing.widthLabel = "60 cm";
   }
 
   merged.m2Finishes = normalizeM2Finishes(candidate.m2Finishes, defaults.m2Finishes);
@@ -5421,12 +5426,12 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
     ),
     createConfigCardMarkup(
       "Magneto automotivo",
-      "O valor mínimo é aplicado ao total calculado pela metragem. A largura é opcional e permite calcular o aproveitamento das peças.",
+      "Largura fixa de 60 cm. O valor mínimo é aplicado ao total calculado pela metragem, incluindo o aproveitamento das peças.",
       `
         <div class="config-grid compact-grid">
           <label><span>Valor mínimo (R$)</span><input data-config-prefix="linear-meter" data-config-key="products.magneto-automotivo.minimumOrder" type="number" min="0" step="0.01" value="${escapeHtml(linearPricing.products["magneto-automotivo"].minimumOrder)}"></label>
           <label><span>Valor por metro (R$/m)</span><input data-config-prefix="linear-meter" data-config-key="products.magneto-automotivo.rate" type="number" min="0" step="0.01" value="${escapeHtml(linearPricing.products["magneto-automotivo"].rate)}"></label>
-          <label><span>Largura do material (opcional)</span><input data-config-prefix="linear-meter" data-config-key="products.magneto-automotivo.widthLabel" type="text" value="${escapeHtml(linearPricing.products["magneto-automotivo"].widthLabel)}" placeholder="Ex.: 60 cm"></label>
+          <label><span>Largura do material</span><input data-config-prefix="linear-meter" data-config-key="products.magneto-automotivo.widthLabel" type="text" value="${escapeHtml(linearPricing.products["magneto-automotivo"].widthLabel)}"></label>
         </div>
       `
     ),

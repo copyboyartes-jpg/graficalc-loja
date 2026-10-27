@@ -29,7 +29,7 @@ test("magneto automotivo aparece na aba e nas configurações", () => {
   assert.equal(product.label, "Magneto automotivo");
   assert.equal(product.minimumOrder, 55);
   assert.equal(product.rate, 164);
-  assert.equal(product.widthLabel, "");
+  assert.equal(product.widthLabel, "60 cm");
   assert.match(app.buildLinearMeterProductOptions(product.id, config), /value="magneto-automotivo" selected/);
   const settings = app.createConfigSectionsMarkup(config, "advanced", "metro-linear");
   assert.match(settings, /products\.magneto-automotivo\.minimumOrder/);
@@ -47,6 +47,7 @@ test("configuração antiga recebe o produto e preços editados entram no cálcu
   const oldConfig = app.createDefaultConfig();
   delete oldConfig.linearMeterPricing.products["magneto-automotivo"];
   const restored = app.mergeConfig(oldConfig);
+  assert.equal(restored.linearMeterPricing.products["magneto-automotivo"].widthLabel, "60 cm");
   assert.equal(quote({ meters: 1, config: restored }).totals.totalGeneral, 164);
   restored.linearMeterPricing.products["magneto-automotivo"].rate = 180;
   restored.linearMeterPricing.products["magneto-automotivo"].minimumOrder = 60;
@@ -54,15 +55,23 @@ test("configuração antiga recebe o produto e preços editados entram no cálcu
   assert.equal(quote({ meters: 1, config: restored }).totals.totalGeneral, 180);
 });
 
-test("largura configurada permite calcular o encaixe das peças", () => {
+test("largura fixa de 60 cm calcula o encaixe das peças", () => {
   const config = app.createDefaultConfig();
-  const missing = quote({ widthCm: 50, heightCm: 100, quantity: 2, config });
-  assert.equal(missing.activeRows.length, 0);
-  assert.match(missing.warnings[0], /configure a largura do material/);
-
-  config.linearMeterPricing.products["magneto-automotivo"].widthLabel = "60 cm";
   const result = quote({ widthCm: 30, heightCm: 100, quantity: 2, config });
+  assert.equal(result.activeRows[0].materialWidthCm, 60);
   assert.equal(result.activeRows[0].columns, 2);
   assert.equal(result.activeRows[0].linearMeters, 1);
   assert.equal(result.totals.totalGeneral, 164);
+  assert.equal(quote({ widthCm: 70, heightCm: 100, quantity: 1, config }).activeRows.length, 0);
+});
+
+test("largura vazia salva anteriormente migra para 60 cm sem alterar uma personalizada", () => {
+  const oldConfig = app.createDefaultConfig();
+  oldConfig.linearMeterPricing.products["magneto-automotivo"].widthLabel = "";
+  const migrated = app.mergeConfig(oldConfig);
+  assert.equal(migrated.linearMeterPricing.products["magneto-automotivo"].widthLabel, "60 cm");
+  assert.equal(quote({ widthCm: 30, heightCm: 100, quantity: 2, config: migrated }).totals.totalGeneral, 164);
+
+  oldConfig.linearMeterPricing.products["magneto-automotivo"].widthLabel = "62 cm";
+  assert.equal(app.mergeConfig(oldConfig).linearMeterPricing.products["magneto-automotivo"].widthLabel, "62 cm");
 });
