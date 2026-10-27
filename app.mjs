@@ -731,6 +731,7 @@ function createDefaultLinearMeterPricing() {
     },
     products: {
       canvas: { rate: 110, minimumOrder: 45 },
+      "magneto-automotivo": { rate: 164, minimumOrder: 55, widthLabel: "" },
       "tecido-microfibra-extra": { rateUpTo3m: 71.5, rateAbove3m: 60.5, minimumOrder: 25 },
       "papel-glossy": { rate: 90, minimumOrder: 32 },
       "couche-210g": { rate: 39, minimumOrder: 39 },
@@ -1271,6 +1272,13 @@ const LINEAR_METER_CATALOG = [
     widthLabel: "1,24 m",
     rate: 110,
     minimumOrder: 45,
+  },
+  {
+    id: "magneto-automotivo",
+    label: "Magneto automotivo",
+    widthLabel: "",
+    rate: 164,
+    minimumOrder: 55,
   },
   {
     id: "tecido-microfibra-extra",
@@ -4552,7 +4560,7 @@ function calculateLinearMeterRow(source, index, config) {
     productLabel: product?.label || "",
     variantType: variant?.id || "",
     variantLabel: variant?.label || "",
-    fixedWidthLabel: product?.widthLabel || "-",
+    fixedWidthLabel: product?.widthLabel || "Não definida",
     widthCm,
     heightCm,
     quantity,
@@ -4585,7 +4593,9 @@ function calculateLinearMeterRow(source, index, config) {
   if (hasDimensions && !layout) {
     return {
       ...baseRow,
-      warning: `Item ${String(index + 1).padStart(2, "0")}: a peça não cabe na largura de ${product?.widthLabel || "material"}.`,
+      warning: materialWidthCm <= 0
+        ? `Item ${String(index + 1).padStart(2, "0")}: configure a largura do material para calcular o encaixe ou informe a metragem diretamente.`
+        : `Item ${String(index + 1).padStart(2, "0")}: a peça não cabe na largura de ${product?.widthLabel || "material"}.`,
     };
   }
 
@@ -4672,7 +4682,10 @@ function createLinearMeterLayoutMarkup(row, index) {
     </div>`;
 
   if (!row.valid || row.columns <= 0 || row.rows <= 0) {
-    return `<article class="linear-layout-card">${heading}<p class="linear-layout-prompt">${escapeHtml(row.warning || "Informe largura, altura e quantidade para visualizar o encaixe.")}</p></article>`;
+    const prompt = row.warning || (row.materialWidthCm <= 0
+      ? "Informe a largura do material nas configurações para visualizar o encaixe. A metragem pode ser calculada diretamente na linha."
+      : "Informe largura, altura e quantidade para visualizar o encaixe.");
+    return `<article class="linear-layout-card">${heading}<p class="linear-layout-prompt">${escapeHtml(prompt)}</p></article>`;
   }
 
   const pieceWidth = row.rotated ? row.heightCm : row.widthCm;
@@ -5393,7 +5406,7 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
           <table class="config-table">
             <thead><tr><th>Produto</th><th>Largura</th><th>Valor por metro</th><th>Valor mínimo</th></tr></thead>
             <tbody>
-              ${getLinearMeterCatalog(config).filter((product) => product.rate).map((product) => `
+              ${getLinearMeterCatalog(config).filter((product) => product.rate && product.id !== "magneto-automotivo").map((product) => `
                 <tr>
                   <td>${escapeHtml(product.label)}</td>
                   <td>${escapeHtml(product.widthLabel)}</td>
@@ -5403,6 +5416,17 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
               `).join("")}
             </tbody>
           </table>
+        </div>
+      `
+    ),
+    createConfigCardMarkup(
+      "Magneto automotivo",
+      "O valor mínimo é aplicado ao total calculado pela metragem. A largura é opcional e permite calcular o aproveitamento das peças.",
+      `
+        <div class="config-grid compact-grid">
+          <label><span>Valor mínimo (R$)</span><input data-config-prefix="linear-meter" data-config-key="products.magneto-automotivo.minimumOrder" type="number" min="0" step="0.01" value="${escapeHtml(linearPricing.products["magneto-automotivo"].minimumOrder)}"></label>
+          <label><span>Valor por metro (R$/m)</span><input data-config-prefix="linear-meter" data-config-key="products.magneto-automotivo.rate" type="number" min="0" step="0.01" value="${escapeHtml(linearPricing.products["magneto-automotivo"].rate)}"></label>
+          <label><span>Largura do material (opcional)</span><input data-config-prefix="linear-meter" data-config-key="products.magneto-automotivo.widthLabel" type="text" value="${escapeHtml(linearPricing.products["magneto-automotivo"].widthLabel)}" placeholder="Ex.: 60 cm"></label>
         </div>
       `
     ),
@@ -6841,7 +6865,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       sourceIndex: index,
       kind: "Metro linear",
       description: row.description || row.productLabel,
-      detail: `${formatMeasure(row.linearMeters)} m | ${row.productLabel}${row.variantLabel ? ` | ${row.variantLabel}` : ""} | Largura: ${row.fixedWidthLabel}`,
+      detail: `${formatMeasure(row.linearMeters)} m | ${row.productLabel}${row.variantLabel ? ` | ${row.variantLabel}` : ""}${row.materialWidthCm > 0 ? ` | Largura: ${row.fixedWidthLabel}` : ""}`,
       artDetail: formatArtCreationDetail(row),
       discountDetail: row.discountDescription,
       total: row.total,
@@ -7025,7 +7049,7 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
       text: `- ${row.description || `Bloco autocopiativo ${index + 1}`} | ${row.quantity} blocos | ${row.format} | ${row.measure} | ${row.vias} via${row.vias > 1 ? "s" : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...linearMeterWorkbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || row.productLabel || `Metro linear ${index + 1}`} | ${formatMeasure(row.linearMeters)} m | ${row.productLabel}${row.variantLabel ? ` | ${row.variantLabel}` : ""} | Largura: ${row.fixedWidthLabel}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
+      text: `- ${row.description || row.productLabel || `Metro linear ${index + 1}`} | ${formatMeasure(row.linearMeters)} m | ${row.productLabel}${row.variantLabel ? ` | ${row.variantLabel}` : ""}${row.materialWidthCm > 0 ? ` | Largura: ${row.fixedWidthLabel}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...m2Workbook.activeRows.map((row, index) => ({
       text: `- ${getM2RowDescription(row) || `M² ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.mediaLabel ? `Mídia: ${row.mediaLabel} | ` : ""}${row.finishSummary ? `${row.finishSummary} | ` : ""}${formatArtCreationDetail(row) ? `${formatArtCreationDetail(row)} | ` : ""}${row.discountDescription ? `${row.discountDescription} | ` : ""}${formatCurrency(row.total)}`,
@@ -8172,7 +8196,9 @@ async function initApp() {
             <td><input class="cell-input" name="heightCm" type="number" min="0" step="0.1" value="${row.heightCm > 0 ? escapeHtml(row.heightCm) : ""}" placeholder="0"></td>
             <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${row.quantity > 0 ? escapeHtml(row.quantity) : ""}" placeholder="0"></td>
             <td><span class="readonly-value subtle">${row.columns > 0 ? `${row.columns} col. x ${row.rows} lin.${row.rotated ? " | girado" : ""}` : "-"}</span></td>
-            <td><span class="readonly-value subtle">${formatMeasure(row.linearMeters)} m</span></td>
+            <td>${row.productType === "magneto-automotivo"
+              ? `<input class="cell-input" name="linearMeters" type="number" min="0" step="0.01" value="${row.linearMeters > 0 ? escapeHtml(row.linearMeters) : ""}" placeholder="Metros">`
+              : `<span class="readonly-value subtle">${formatMeasure(row.linearMeters)} m</span>`}</td>
             <td><span class="readonly-value subtle">${formatCurrency(row.baseTotal)}</span></td>
             <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
             <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
@@ -9893,6 +9919,11 @@ async function initApp() {
     } else if (field === "quantity") {
       row[field] = toWholeNumber(target.value);
       row.linearMeters = 0;
+    } else if (field === "linearMeters" && row.productType === "magneto-automotivo") {
+      row.linearMeters = toDecimalNumber(target.value);
+      row.widthCm = 0;
+      row.heightCm = 0;
+      row.quantity = 0;
     } else if (field === "artCreationFee" || field === "discountValue") {
       row[field] = toMoneyNumber(target.value);
     } else if (field === "discountType") {
