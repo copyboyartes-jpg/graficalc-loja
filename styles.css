@@ -804,6 +804,29 @@ textarea {
   font-weight: 600;
 }
 
+.linear-layout-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-bottom: 12px;
+  color: var(--muted-strong);
+  font-size: 0.8rem;
+}
+
+.linear-layout-legend span::before {
+  display: inline-block;
+  width: 0.75em;
+  height: 0.75em;
+  margin-right: 6px;
+  border-radius: 2px;
+  background: var(--item-color);
+  content: "";
+}
+
+.linear-layout-group-card {
+  grid-column: 1 / -1;
+}
+
 .linear-layout-figure {
   margin: 0;
   padding: 12px;

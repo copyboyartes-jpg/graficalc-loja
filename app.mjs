@@ -1423,6 +1423,7 @@ function createDefaultState() {
     budgetRowsVersion: 4,
     calcMode: "Independente",
     m2CalcMode: "Independente",
+    linearMeterCalcMode: "Independente",
     presets: {
       printType: "Preto e branco",
       innerPaper: "Sulfite 75g",
@@ -1487,6 +1488,7 @@ function createQuoteHistorySnapshot(state) {
     budgetRowsVersion: state.budgetRowsVersion,
     calcMode: state.calcMode,
     m2CalcMode: state.m2CalcMode,
+    linearMeterCalcMode: state.linearMeterCalcMode,
     presets: state.presets,
     rows: state.rows,
     colorPrintItems: state.colorPrintItems,
@@ -1535,6 +1537,7 @@ function applyQuoteHistorySnapshot(state, snapshot) {
   const restored = mergeState(snapshot);
   state.calcMode = restored.calcMode;
   state.m2CalcMode = restored.m2CalcMode;
+  state.linearMeterCalcMode = restored.linearMeterCalcMode;
   state.presets = deepClone(restored.presets);
   state.rows = deepClone(restored.rows);
   state.colorPrintItems = deepClone(restored.colorPrintItems);
@@ -1958,6 +1961,7 @@ function mergeState(candidate) {
   const state = deepClone(defaults);
   state.calcMode = OPTIONS.calcModes.includes(candidate.calcMode) ? candidate.calcMode : state.calcMode;
   state.m2CalcMode = OPTIONS.m2CalcModes.includes(candidate.m2CalcMode) ? candidate.m2CalcMode : state.m2CalcMode;
+  state.linearMeterCalcMode = candidate.linearMeterCalcMode === "Juntar mesma base" ? "Juntar mesma base" : "Independente";
   state.presets = { ...state.presets, ...(candidate.presets || {}) };
   state.presets.size = getValidApostilaSize(state.presets.printType, state.presets.size);
   state.presets.innerPaper = getValidApostilaInnerPaper(state.presets.innerPaper);
@@ -4646,8 +4650,98 @@ function calculateLinearMeterRow(source, index, config) {
   };
 }
 
+function getLinearMeterCombinedLayout(groupRows, materialWidthCm) {
+  const standaloneCm = groupRows.reduce((sum, { row }) => sum + row.linearMeters * 100, 0);
+  const totalPieces = groupRows.reduce((sum, { row }) => sum + (row.columns > 0 ? row.quantity : 0), 0);
+  if (totalPieces > 250) {
+    return { linearMeters: Math.round(standaloneCm * 10000) / 1000000, standaloneMeters: Math.round(standaloneCm * 10000) / 1000000, placements: [], previewLimited: true };
+  }
+  const pieces = [];
+  for (const { row, index } of groupRows) {
+    if (row.widthCm <= 0 || row.heightCm <= 0 || row.quantity <= 0) continue;
+    for (let piece = 0; piece < row.quantity; piece += 1) {
+      pieces.push({ width: row.widthCm, height: row.heightCm, index });
+    }
+  }
+
+  const makeSeparatePlacements = () => {
+    const placements = [];
+    let top = 0;
+    for (const { row, index } of groupRows) {
+      if (row.columns > 0 && row.rows > 0) {
+        const width = row.rotated ? row.heightCm : row.widthCm;
+        const height = row.rotated ? row.widthCm : row.heightCm;
+        for (let piece = 0; piece < Math.min(row.quantity, 250 - placements.length); piece += 1) {
+          placements.push({ x: (piece % row.columns) * width, y: top + Math.floor(piece / row.columns) * height, width, height, index });
+        }
+      } else if (row.linearMeters > 0 && materialWidthCm > 0 && placements.length < 250) {
+        placements.push({ x: 0, y: top, width: materialWidthCm, height: row.linearMeters * 100, index });
+      }
+      top += row.linearMeters * 100;
+    }
+    return placements;
+  };
+
+  const manualRows = groupRows.filter(({ row }) => row.columns <= 0 || row.rows <= 0);
+  let best = { height: standaloneCm, placements: makeSeparatePlacements() };
+  if (materialWidthCm > 0 && pieces.length > 0) {
+    const sorters = [
+      (a, b) => b.width * b.height - a.width * a.height || Math.max(b.width, b.height) - Math.max(a.width, a.height),
+      (a, b) => Math.max(b.width, b.height) - Math.max(a.width, a.height) || b.width * b.height - a.width * a.height,
+      (a, b) => Math.min(b.width, b.height) - Math.min(a.width, a.height) || b.width * b.height - a.width * a.height,
+    ];
+    for (const sorter of sorters) {
+      const placed = [];
+      let height = 0;
+      for (const piece of [...pieces].sort(sorter)) {
+        let choice = null;
+        const orientations = [{ width: piece.width, height: piece.height }];
+        if (piece.width !== piece.height) orientations.push({ width: piece.height, height: piece.width });
+        for (const orientation of orientations) {
+          if (orientation.width > materialWidthCm) continue;
+          const positions = new Set([0, materialWidthCm - orientation.width]);
+          for (const placedPiece of placed) {
+            positions.add(placedPiece.x + placedPiece.width);
+            positions.add(placedPiece.x - orientation.width);
+          }
+          for (const x of positions) {
+            if (x < -1e-7 || x + orientation.width > materialWidthCm + 1e-7) continue;
+            const y = placed.reduce((top, other) =>
+              x < other.x + other.width - 1e-7 && x + orientation.width > other.x + 1e-7
+                ? Math.max(top, other.y + other.height)
+                : top, 0);
+            const nextHeight = Math.max(height, y + orientation.height);
+            if (!choice || nextHeight < choice.nextHeight - 1e-7
+              || (Math.abs(nextHeight - choice.nextHeight) < 1e-7 && (y < choice.y - 1e-7
+                || (Math.abs(y - choice.y) < 1e-7 && x < choice.x)))) {
+              choice = { x, y, width: orientation.width, height: orientation.height, index: piece.index, nextHeight };
+            }
+          }
+        }
+        if (!choice) break;
+        placed.push(choice);
+        height = choice.nextHeight;
+      }
+      if (placed.length !== pieces.length) continue;
+      const placements = [...placed];
+      let manualTop = height;
+      for (const { row, index } of manualRows) {
+        placements.push({ x: 0, y: manualTop, width: materialWidthCm, height: row.linearMeters * 100, index });
+        manualTop += row.linearMeters * 100;
+      }
+      if (manualTop < best.height - 1e-7) best = { height: manualTop, placements };
+    }
+  }
+
+  return {
+    linearMeters: Math.round(best.height * 10000) / 1000000,
+    standaloneMeters: Math.round(standaloneCm * 10000) / 1000000,
+    placements: best.placements,
+  };
+}
+
 function calculateLinearMeterWorkbook(state, config) {
-  const rows = state.linearMeterItems.map((row, index) =>
+  const baseRows = state.linearMeterItems.map((row, index) =>
     calculateLinearMeterRow(
       {
         ...createDefaultLinearMeterRow(index),
@@ -4659,14 +4753,59 @@ function calculateLinearMeterWorkbook(state, config) {
     )
   );
 
+  const rows = [...baseRows];
+  const groupLayouts = [];
+  if (state.linearMeterCalcMode === "Juntar mesma base") {
+    const groups = new Map();
+    baseRows.forEach((row, index) => {
+      if (!row.active || !row.valid) return;
+      const key = `${row.productType}|${row.variantType}|${row.materialWidthCm}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push({ row, index });
+    });
+
+    for (const groupRows of groups.values()) {
+      if (groupRows.length < 2) continue;
+      const first = groupRows[0].row;
+      const layout = getLinearMeterCombinedLayout(groupRows, first.materialWidthCm);
+      const groupPrice = calculateLinearMeterRow({
+        ...createDefaultLinearMeterRow(0),
+        productType: first.productType,
+        variantType: first.variantType,
+        linearMeters: layout.linearMeters,
+      }, 0, config).baseTotal;
+      const weights = groupRows.map(({ row }) => row.widthCm > 0 && row.heightCm > 0
+        ? row.widthCm * row.heightCm * row.quantity
+        : Math.max(1, row.materialWidthCm) * row.linearMeters * 100);
+      const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+      let allocated = 0;
+      groupRows.forEach(({ row, index }, position) => {
+        const baseTotal = position === groupRows.length - 1
+          ? Math.round((groupPrice - allocated) * 100) / 100
+          : Math.round(groupPrice * weights[position] / totalWeight * 100) / 100;
+        allocated += baseTotal;
+        rows[index] = {
+          ...row,
+          groupId: groupLayouts.length + 1,
+          groupLinearMeters: layout.linearMeters,
+          baseTotal,
+          ...applyRowDiscount(row, baseTotal + row.artCreationFee, row.linearMeters),
+        };
+      });
+      groupLayouts.push({ ...layout, groupId: groupLayouts.length + 1, productLabel: first.productLabel, variantLabel: first.variantLabel, fixedWidthLabel: first.fixedWidthLabel, materialWidthCm: first.materialWidthCm, itemIndexes: groupRows.map(({ index }) => index) });
+    }
+  }
+
   const activeRows = rows.filter((row) => row.active && row.valid);
   const warnings = rows.filter((row) => row.warning).map((row) => row.warning);
-  const totalQuantity = activeRows.reduce((sum, row) => sum + row.linearMeters, 0);
+  const totalQuantity = activeRows.filter((row) => !row.groupId).reduce((sum, row) => sum + row.linearMeters, 0)
+    + groupLayouts.reduce((sum, group) => sum + group.linearMeters, 0);
   const totalGeneral = activeRows.reduce((sum, row) => sum + row.total, 0);
 
   return {
     rows,
     activeRows,
+    groupLayouts,
     warnings,
     totals: {
       activeLines: activeRows.length,
@@ -4728,10 +4867,44 @@ function createLinearMeterLayoutMarkup(row, index) {
     </article>`;
 }
 
-function createLinearMeterLayoutsMarkup(rows) {
-  const activeRows = rows.map((row, index) => ({ row, index })).filter(({ row }) => row.active);
-  return activeRows.length
-    ? activeRows.map(({ row, index }) => createLinearMeterLayoutMarkup(row, index)).join("")
+function createLinearMeterGroupLayoutMarkup(group) {
+  const previewCm = Math.min(group.linearMeters * 100, 200);
+  const svgHeight = Math.max(90, Math.min(260, Math.round(560 * previewCm / Math.max(1, group.materialWidthCm))));
+  const palette = ["#176b6b", "#b96b35", "#4567a1", "#7d5aa5", "#749334", "#b35075"];
+  const pieces = group.placements.filter((piece) => piece.y < previewCm).map((piece) => {
+    const gap = Math.min(0.8, piece.width * 0.06, piece.height * 0.06);
+    const visibleHeight = Math.min(piece.height, previewCm - piece.y) - gap;
+    return visibleHeight > 0 ? `<rect x="${piece.x + gap / 2}" y="${piece.y + gap / 2}" width="${piece.width - gap}" height="${visibleHeight}" rx="${Math.min(0.7, piece.width * 0.05, piece.height * 0.05)}" fill="${palette[group.itemIndexes.indexOf(piece.index) % palette.length]}" />` : "";
+  }).join("");
+  const itemLabels = group.itemIndexes.map((index, position) => `<span style="--item-color:${palette[position % palette.length]}">Item ${String(index + 1).padStart(2, "0")}</span>`).join("");
+  const savings = Math.max(0, group.standaloneMeters - group.linearMeters);
+  return `
+    <article class="linear-layout-card linear-layout-group-card">
+      <div class="linear-layout-card-heading">
+        <span>Base compartilhada</span>
+        <strong>${escapeHtml(group.productLabel)}${group.variantLabel ? ` · ${escapeHtml(group.variantLabel)}` : ""}</strong>
+        <small>Largura do material: ${escapeHtml(group.fixedWidthLabel)}</small>
+      </div>
+      <div class="linear-layout-facts">
+        <span>${formatMeasure(group.linearMeters)} m no grupo</span>
+        <span>${formatMeasure(group.standaloneMeters)} m se calculados separados</span>
+        ${savings > 1e-7 ? `<span>${formatMeasure(savings)} m de aproveitamento</span>` : ""}
+      </div>
+      <div class="linear-layout-legend">${itemLabels}</div>
+      ${group.previewLimited ? `<p class="linear-layout-prompt">Mais de 250 peças: a metragem foi somada sem encaixe misto. Divida o pedido em grupos menores para visualizar o aproveitamento.</p>` : group.materialWidthCm > 0 && previewCm > 0 ? `<figure class="linear-layout-figure">
+        <svg class="linear-layout-svg" viewBox="0 0 ${group.materialWidthCm} ${previewCm}" style="height: ${svgHeight}px" role="img" aria-label="Encaixe compartilhado de ${group.itemIndexes.length} itens em ${formatMeasure(group.linearMeters)} metros lineares">
+          <rect width="${group.materialWidthCm}" height="${previewCm}" fill="#e9dfd0" />${pieces}
+        </svg>
+        <figcaption>${group.linearMeters * 100 > previewCm ? `Primeiros ${formatMeasure(previewCm)} cm da faixa` : "Encaixe completo"} · ${formatMeasure(group.linearMeters)} m usados</figcaption>
+      </figure>` : `<p class="linear-layout-prompt">Metragem compartilhada; informe a largura do material para ver o encaixe.</p>`}
+    </article>`;
+}
+
+function createLinearMeterLayoutsMarkup(rows, groupLayouts = []) {
+  const groupedIndexes = new Set(groupLayouts.flatMap((group) => group.itemIndexes));
+  const activeRows = rows.map((row, index) => ({ row, index })).filter(({ row, index }) => row.active && !groupedIndexes.has(index));
+  return activeRows.length || groupLayouts.length
+    ? [...groupLayouts.map(createLinearMeterGroupLayoutMarkup), ...activeRows.map(({ row, index }) => createLinearMeterLayoutMarkup(row, index))].join("")
     : `<p class="linear-layout-empty">Preencha uma linha na tabela para ver o encaixe das peças no material.</p>`;
 }
 
@@ -6870,7 +7043,7 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       sourceIndex: index,
       kind: "Metro linear",
       description: row.description || row.productLabel,
-      detail: `${formatMeasure(row.linearMeters)} m | ${row.productLabel}${row.variantLabel ? ` | ${row.variantLabel}` : ""}${row.materialWidthCm > 0 ? ` | Largura: ${row.fixedWidthLabel}` : ""}`,
+      detail: `${formatMeasure(row.groupLinearMeters || row.linearMeters)} m${row.groupId ? " no encaixe compartilhado" : ""} | ${row.productLabel}${row.variantLabel ? ` | ${row.variantLabel}` : ""}${row.materialWidthCm > 0 ? ` | Largura: ${row.fixedWidthLabel}` : ""}`,
       artDetail: formatArtCreationDetail(row),
       discountDetail: row.discountDescription,
       total: row.total,
@@ -7054,7 +7227,7 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
       text: `- ${row.description || `Bloco autocopiativo ${index + 1}`} | ${row.quantity} blocos | ${row.format} | ${row.measure} | ${row.vias} via${row.vias > 1 ? "s" : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...linearMeterWorkbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || row.productLabel || `Metro linear ${index + 1}`} | ${formatMeasure(row.linearMeters)} m | ${row.productLabel}${row.variantLabel ? ` | ${row.variantLabel}` : ""}${row.materialWidthCm > 0 ? ` | Largura: ${row.fixedWidthLabel}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
+      text: `- ${row.description || row.productLabel || `Metro linear ${index + 1}`} | ${formatMeasure(row.groupLinearMeters || row.linearMeters)} m${row.groupId ? " no encaixe compartilhado" : ""} | ${row.productLabel}${row.variantLabel ? ` | ${row.variantLabel}` : ""}${row.materialWidthCm > 0 ? ` | Largura: ${row.fixedWidthLabel}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...m2Workbook.activeRows.map((row, index) => ({
       text: `- ${getM2RowDescription(row) || `M² ${index + 1}`} | ${row.quantity} unidades | ${formatMeasure(row.widthMm)} x ${formatMeasure(row.heightMm)} ${row.measureUnit || "cm"} | ${formatAreaM2(row.areaM2)} m² | ${row.mediaLabel ? `Mídia: ${row.mediaLabel} | ` : ""}${row.finishSummary ? `${row.finishSummary} | ` : ""}${formatArtCreationDetail(row) ? `${formatArtCreationDetail(row)} | ` : ""}${row.discountDescription ? `${row.discountDescription} | ` : ""}${formatCurrency(row.total)}`,
@@ -7566,6 +7739,7 @@ async function initApp() {
   function renderPresetControls() {
     document.getElementById("calc-mode-select").value = state.calcMode;
     document.getElementById("m2-calc-mode-select").value = state.m2CalcMode;
+    document.getElementById("linear-meter-calc-mode-select").value = state.linearMeterCalcMode;
     document.getElementById("preset-print-type").innerHTML = buildOptions(OPTIONS.printTypes, state.presets.printType);
     const innerPaperSelect = document.getElementById("preset-inner-paper");
     innerPaperSelect.innerHTML = buildOptions(OPTIONS.colorPaperTypes, state.presets.printType === "Colorido laser" ? state.presets.innerPaper : "Sulfite 75g");
@@ -8203,7 +8377,7 @@ async function initApp() {
             <td><span class="readonly-value subtle">${row.columns > 0 ? `${row.columns} col. x ${row.rows} lin.${row.rotated ? " | girado" : ""}` : "-"}</span></td>
             <td>${row.productType === "magneto-automotivo"
               ? `<input class="cell-input" name="linearMeters" type="number" min="0" step="0.01" value="${row.linearMeters > 0 ? escapeHtml(row.linearMeters) : ""}" placeholder="Metros">`
-              : `<span class="readonly-value subtle">${formatMeasure(row.linearMeters)} m</span>`}</td>
+              : `<span class="readonly-value subtle">${formatMeasure(row.linearMeters)} m</span>`}${row.groupId ? `<small>${formatMeasure(row.groupLinearMeters)} m no grupo</small>` : ""}</td>
             <td><span class="readonly-value subtle">${formatCurrency(row.baseTotal)}</span></td>
             <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
             <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
@@ -8215,7 +8389,7 @@ async function initApp() {
       )
       .join("");
 
-    linearMeterLayouts.innerHTML = createLinearMeterLayoutsMarkup(linearMeterWorkbook.rows);
+    linearMeterLayouts.innerHTML = createLinearMeterLayoutsMarkup(linearMeterWorkbook.rows, linearMeterWorkbook.groupLayouts);
 
     linearMeterWarningList.innerHTML = linearMeterWorkbook.warnings.length
       ? linearMeterWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("")
@@ -9283,6 +9457,12 @@ async function initApp() {
 
   document.getElementById("m2-calc-mode-select").addEventListener("change", (event) => {
     state.m2CalcMode = OPTIONS.m2CalcModes.includes(event.target.value) ? event.target.value : "Independente";
+    persist();
+    renderRowsAndSummary();
+  });
+
+  document.getElementById("linear-meter-calc-mode-select").addEventListener("change", (event) => {
+    state.linearMeterCalcMode = event.target.value === "Juntar mesma base" ? "Juntar mesma base" : "Independente";
     persist();
     renderRowsAndSummary();
   });

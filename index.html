@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GrafiCalc | Orçamento Gráfico</title>
-  <link rel="stylesheet" href="./styles.css?v=magneto-width-20261027b">
+  <link rel="stylesheet" href="./styles.css?v=linear-group-20261028a">
 </head>
 <body>
   <div class="page-shell">
@@ -864,7 +864,16 @@
 
           <div class="toolbar">
             <button id="clear-linear-meter-rows-button" class="button button-danger" type="button">Limpar linhas</button>
+            <label class="toolbar-field">
+              <span>Encaixe do material</span>
+              <select id="linear-meter-calc-mode-select">
+                <option value="Independente">Calcular cada item separado</option>
+                <option value="Juntar mesma base">Juntar itens da mesma base</option>
+              </select>
+            </label>
           </div>
+
+          <p class="helper-text">Ao juntar, itens do mesmo material e da mesma tabela/prazo compartilham o encaixe e o valor mínimo. O custo é dividido entre os itens conforme a área impressa.</p>
 
           <p class="helper-text status-note" id="linear-meter-feedback">
             Use esta aba para calcular materiais vendidos por metro linear.
@@ -904,7 +913,7 @@
                 <span class="linear-layout-eyebrow">Aproveitamento visual</span>
                 <h3 id="linear-layout-title">Encaixe no material</h3>
               </div>
-              <p>Verde: peças encaixadas. Bege: sobra do material.</p>
+              <p>As cores identificam os itens. Bege: sobra do material.</p>
             </div>
             <div id="linear-meter-layouts" class="linear-layout-grid" aria-live="polite"></div>
           </section>
@@ -1288,7 +1297,7 @@
       }
     })();
   </script>
-  <script src="./app.mjs?v=magneto-width-20261027b"></script>
+  <script src="./app.mjs?v=linear-group-20261028a"></script>
 </body>
 </html>
 
