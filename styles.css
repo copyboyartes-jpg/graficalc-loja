@@ -576,6 +576,172 @@ textarea:disabled {
   justify-content: end;
 }
 
+.history-workspace {
+  grid-template-columns: minmax(260px, 0.6fr) minmax(0, 1.4fr);
+  align-items: start;
+}
+
+.client-search-field,
+.history-filters {
+  margin-bottom: 18px;
+}
+
+.history-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 0.45fr);
+  gap: 12px;
+}
+
+.client-stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.client-stat-row > * {
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: rgba(23, 107, 107, 0.08);
+  color: var(--ink);
+  font-size: 0.8rem;
+}
+
+.client-stat-row strong {
+  color: var(--accent);
+  background: rgba(196, 104, 46, 0.1);
+}
+
+.client-history-details,
+.quote-record-details {
+  margin-top: 12px;
+}
+
+.client-history-details > summary,
+.quote-record-details > summary {
+  color: var(--accent);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.client-detail-content {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.client-detail-content h4 {
+  margin: 6px 0 0;
+}
+
+.client-purchase-list,
+.quote-record-details ul {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding-left: 22px;
+}
+
+.client-purchase-list li,
+.quote-record-details li {
+  overflow-wrap: anywhere;
+}
+
+.client-purchase-list small,
+.quote-record-details small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.client-record-card,
+.quote-record-card {
+  min-width: 0;
+}
+
+.client-record-card {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.client-record-card .list-actions {
+  justify-content: start;
+}
+
+.quote-record-card {
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.42fr);
+}
+
+.quote-record-body {
+  min-width: 0;
+}
+
+.quote-record-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.quote-status-badge {
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #8a5521;
+  background: rgba(196, 104, 46, 0.12);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.quote-status-badge[data-status="Aprovado"] {
+  color: #176b48;
+  background: rgba(43, 155, 95, 0.14);
+}
+
+.quote-status-badge[data-status="Recusado"] {
+  color: var(--danger);
+  background: rgba(163, 56, 53, 0.1);
+}
+
+.quote-record-total {
+  display: block;
+  margin-top: 8px;
+  color: var(--ink);
+  font-size: 1.1rem;
+}
+
+.quote-record-controls {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.quote-record-controls .list-actions {
+  justify-content: start;
+}
+
+.quote-record-controls .button {
+  padding: 8px 10px;
+  font-size: 0.8rem;
+}
+
+.client-detail-content .quote-record-card {
+  grid-template-columns: minmax(0, 1fr);
+  box-shadow: none;
+}
+
+@media (max-width: 1050px) {
+  .history-workspace,
+  .quote-record-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .history-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .empty-state {
   display: grid;
   gap: 6px;

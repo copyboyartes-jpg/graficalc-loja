@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GrafiCalc | Orçamento Gráfico</title>
-  <link rel="stylesheet" href="./styles.css?v=linear-group-20261028a">
+  <link rel="stylesheet" href="./styles.css?v=crm-clients-20261029a">
 </head>
 <body>
   <div class="page-shell">
@@ -1016,8 +1016,16 @@
             <strong id="clients-count">0</strong>
           </article>
           <article class="summary-card">
-            <span class="summary-label">Último cliente</span>
-            <strong id="clients-latest">Nenhum cliente salvo</strong>
+            <span class="summary-label">Orçamentos vinculados</span>
+            <strong id="clients-quotes-count">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Aprovados</span>
+            <strong id="clients-approved-count">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Total aprovado</span>
+            <strong id="clients-approved-total">R$ 0,00</strong>
           </article>
         </div>
 
@@ -1025,8 +1033,8 @@
           <article class="panel">
             <div class="panel-heading">
               <div>
-                <h2>Cadastro de contatos</h2>
-                <p class="panel-copy">Cadastre, altere, salve e exclua contatos para reutilizar em qualquer orçamento.</p>
+                <h2>Cadastro de clientes</h2>
+                <p class="panel-copy">Os orçamentos vinculados e as compras aprovadas aparecem no histórico de cada cliente.</p>
               </div>
             </div>
 
@@ -1050,8 +1058,8 @@
             </div>
 
             <div class="toolbar">
-              <button id="save-client-button" class="button button-primary" type="button">Salvar contato</button>
-              <button id="new-client-button" class="button" type="button">Novo contato</button>
+              <button id="save-client-button" class="button button-primary" type="button">Salvar cliente</button>
+              <button id="new-client-button" class="button" type="button">Novo cliente</button>
               <button id="load-current-client-button" class="button" type="button">Usar dados do orçamento atual</button>
             </div>
 
@@ -1063,10 +1071,12 @@
           <article class="panel">
             <div class="panel-heading">
               <div>
-                <h2>Base compartilhada</h2>
-                <p class="panel-copy">A lista abaixo funciona como um cadastro rápido de clientes para toda a equipe.</p>
+                <h2>Clientes cadastrados</h2>
+                <p class="panel-copy">Consulte orçamentos, aprovações, compras e total gasto por cliente. O total gasto considera os orçamentos aprovados.</p>
               </div>
             </div>
+
+            <label class="client-search-field"><span>Buscar cliente</span><input id="clients-search" type="search" placeholder="Nome, contato ou CNPJ"></label>
 
             <div id="clients-list" class="stack-list"></div>
           </article>
@@ -1080,17 +1090,25 @@
             <strong id="history-count">0</strong>
           </article>
           <article class="summary-card">
-            <span class="summary-label">Total acumulado</span>
+            <span class="summary-label">Pendentes</span>
+            <strong id="history-pending">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Aprovados</span>
+            <strong id="history-approved">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Total aprovado</span>
             <strong id="history-total">R$ 0,00</strong>
           </article>
         </div>
 
-        <div class="workspace-grid">
+        <div class="workspace-grid history-workspace">
           <article class="panel">
             <div class="panel-heading">
               <div>
-                <h2>Salvar fechamento</h2>
-                <p class="panel-copy">Guarde os principais dados do fechamento para consulta posterior.</p>
+                <h2>Orçamentos salvos</h2>
+                <p class="panel-copy">Salve o orçamento atual e acompanhe se ele está pendente, aprovado ou recusado.</p>
               </div>
             </div>
 
@@ -1098,15 +1116,20 @@
               <button id="save-history-button" class="button button-primary" type="button">Salvar orçamento atual</button>
             </div>
 
-            <p class="helper-text">Cada registro salva o total, o cliente e um resumo curto do orçamento.</p>
+            <p class="helper-text">O total aprovado reúne os orçamentos marcados como aprovados.</p>
           </article>
 
           <article class="panel">
             <div class="panel-heading">
               <div>
-                <h2>Histórico compartilhado</h2>
-                <p class="panel-copy">Use para consultar orçamentos recentes ou reaproveitar dados do cliente em qualquer computador.</p>
+                <h2>Arquivo de orçamentos</h2>
+                <p class="panel-copy">Pesquise por cliente ou item e filtre pelo andamento.</p>
               </div>
+            </div>
+
+            <div class="history-filters">
+              <label><span>Buscar</span><input id="history-search" type="search" placeholder="Cliente, descrição ou item"></label>
+              <label><span>Situação</span><select id="history-status-filter"><option value="all">Todas</option><option value="Pendente">Pendentes</option><option value="Aprovado">Aprovadas</option><option value="Recusado">Recusadas</option></select></label>
             </div>
 
             <div id="history-list" class="stack-list"></div>
@@ -1125,6 +1148,10 @@
             </div>
 
             <div class="quote-form-grid">
+              <label class="full-width">
+                <span>Cliente cadastrado</span>
+                <select id="quote-client-select"><option value="">Novo cliente ou não cadastrado</option></select>
+              </label>
               <label>
                 <span>Nome / Razão social</span>
                 <input id="client-name" type="text">
@@ -1256,6 +1283,17 @@
 
           <div class="quote-preview" id="quote-preview"></div>
         </article>
+
+        <article class="panel quote-records-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>Orçamentos do cliente</h2>
+              <p class="panel-copy">Salve esta proposta, consulte as anteriores e acompanhe as aprovações.</p>
+            </div>
+          </div>
+          <div class="toolbar"><button id="save-quote-button" class="button button-primary" type="button">Salvar orçamento atual</button></div>
+          <div id="quote-client-history" class="stack-list"></div>
+        </article>
       </section>
     </main>
   </div>
@@ -1297,7 +1335,7 @@
       }
     })();
   </script>
-  <script src="./app.mjs?v=linear-group-20261028a"></script>
+  <script src="./app.mjs?v=crm-clients-20261029a"></script>
 </body>
 </html>
 

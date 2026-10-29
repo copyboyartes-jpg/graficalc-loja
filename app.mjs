@@ -1451,6 +1451,7 @@ function createDefaultState() {
       autocopiativo: Array.from({ length: INITIAL_BUDGET_ROWS }, (_, index) => createDefaultBlockRow(index, "autocopiativo")),
     },
     client: {
+      id: "",
       name: "",
       contact: "",
       cnpj: "",
@@ -1502,7 +1503,7 @@ function createQuoteHistorySnapshot(state) {
     flyerItems: state.flyerItems,
     blockItems: state.blockItems,
     client: state.client,
-    company: state.company,
+    company: { ...state.company, logoDataUrl: "" },
     paymentTerms: state.paymentTerms,
     productionDeadline: state.productionDeadline,
     quoteTotalVisibility: state.quoteTotalVisibility,
@@ -1529,12 +1530,109 @@ function getQuoteHistorySnapshot(item) {
   return null;
 }
 
+function normalizeQuoteStatus(value) {
+  return value === "Aprovado" || value === "Recusado" ? value : "Pendente";
+}
+
+function normalizeClientMatchValue(value) {
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function findUniqueClientMatch(clients, clientData) {
+  const cnpj = String(clientData?.cnpj || "").replace(/\D/g, "");
+  const name = normalizeClientMatchValue(clientData?.name);
+  const candidates = cnpj.length >= 11
+    ? clients.filter((client) => String(client.cnpj || "").replace(/\D/g, "") === cnpj)
+    : [];
+  if (candidates.length === 1) return candidates[0];
+  const nameMatches = name ? clients.filter((client) => normalizeClientMatchValue(client.name) === name) : [];
+  return nameMatches.length === 1 ? nameMatches[0] : null;
+}
+
+function getQuoteClient(quote, clients) {
+  if (quote.clientId) return clients.find((client) => client.id === quote.clientId) || null;
+  return findUniqueClientMatch(clients, {
+    name: quote.clientName || quote.snapshot?.client?.name,
+    cnpj: quote.snapshot?.client?.cnpj,
+  });
+}
+
+function getQuoteHistoryItems(quote) {
+  if (Array.isArray(quote.items) && quote.items.length > 0) return quote.items;
+  const snapshot = getQuoteHistorySnapshot(quote);
+  if (!snapshot) return [];
+  const sources = [
+    [snapshot.rows, "Apostila"],
+    [snapshot.colorPrintItems, "Impresso colorido"],
+    [snapshot.credentialItems, "Credencial"],
+    [snapshot.readyProductItems, "Produto pronto"],
+    [snapshot.freeQuoteItems, "Item livre"],
+    [snapshot.businessCardItems, "Cartão de visita"],
+    [snapshot.flyerItems, "Panfleto/folder"],
+    [snapshot.blockItems?.sulfite, "Bloco sulfite"],
+    [snapshot.blockItems?.autocopiativo, "Bloco autocopiativo"],
+    [snapshot.linearMeterItems, "Metro linear"],
+    [snapshot.m2Items, "Material por m²"],
+    [snapshot.resinItems, "Resinado"],
+  ];
+  return sources.flatMap(([rows, fallback]) => (Array.isArray(rows) ? rows : []).flatMap((row) => {
+    const quantity = toDecimalNumber(row?.quantity || row?.quantityValue || row?.linearMeters);
+    if (!row || quantity <= 0) return [];
+    return [{
+      description: String(row.itemName || row.description || row.productLabel || row.productId || row.productType || fallback),
+      detail: `${formatMeasure(quantity)} ${row.linearMeters > 0 && !row.quantity ? "m" : "unidade(s)"}`,
+      extraDetail: "",
+      total: 0,
+    }];
+  }));
+}
+
+function getClientQuoteStats(client, quoteHistory, clients) {
+  const quotes = quoteHistory.filter((quote) => getQuoteClient(quote, clients)?.id === client.id);
+  const approvedQuotes = quotes.filter((quote) => normalizeQuoteStatus(quote.status) === "Aprovado");
+  return {
+    quotes,
+    quoteCount: quotes.length,
+    approvedCount: approvedQuotes.length,
+    spent: approvedQuotes.reduce((sum, quote) => sum + toMoneyNumber(quote.total), 0),
+    purchases: approvedQuotes.flatMap((quote) => getQuoteHistoryItems(quote).map((item) => ({ ...item, quoteId: quote.id, date: quote.approvedAt || quote.createdAt }))),
+  };
+}
+
+function createQuoteRecordMarkup(quote, clients, { compact = false } = {}) {
+  const items = getQuoteHistoryItems(quote);
+  const client = getQuoteClient(quote, clients);
+  const status = normalizeQuoteStatus(quote.status);
+  const hasFullSnapshot = Boolean(getQuoteHistorySnapshot(quote));
+  const statusOptions = ["Pendente", "Aprovado", "Recusado"].map((option) => `<option value="${option}"${option === status ? " selected" : ""}>${option}</option>`).join("");
+  return `
+    <article class="list-card quote-record-card" data-quote-id="${escapeHtml(quote.id)}">
+      <div class="quote-record-body">
+        <div class="quote-record-heading"><h3>${escapeHtml(quote.title || "Orçamento salvo")}</h3><span class="quote-status-badge" data-status="${status}">${status}</span></div>
+        <p class="list-meta">${escapeHtml(client?.name || quote.clientName || "Cliente não informado")} · ${escapeHtml(formatDateTime(quote.createdAt) || "data indisponível")}</p>
+        <strong class="quote-record-total">${formatCurrency(quote.total)}</strong>
+        ${items.length ? `<details class="quote-record-details"${compact ? "" : " open"}><summary>${items.length} ${items.length === 1 ? "item" : "itens"} do orçamento</summary><ul>${items.map((entry) => `<li><strong>${escapeHtml(entry.description)}</strong>${entry.detail ? `<small>${escapeHtml(entry.detail)}</small>` : ""}${entry.extraDetail ? `<small>${escapeHtml(entry.extraDetail)}</small>` : ""}</li>`).join("")}</ul></details>` : quote.summary ? `<p class="list-notes">${escapeHtml(quote.summary)}</p>` : ""}
+        ${hasFullSnapshot ? "" : `<p class="list-meta">Registro antigo: somente os dados salvos estão disponíveis.</p>`}
+      </div>
+      ${compact ? "" : `<div class="quote-record-controls">
+        <label><span>Situação</span><select data-quote-status="${escapeHtml(quote.id)}">${statusOptions}</select></label>
+        <div class="list-actions">
+          <button class="button button-primary" type="button" data-history-action="load-full" data-quote-id="${escapeHtml(quote.id)}" ${hasFullSnapshot ? "" : "disabled"}>${hasFullSnapshot ? "Abrir orçamento" : "Somente resumo"}</button>
+          <button class="button" type="button" data-history-action="load-client" data-quote-id="${escapeHtml(quote.id)}">Usar cliente</button>
+          <button class="button" type="button" data-history-action="copy" data-quote-id="${escapeHtml(quote.id)}">Copiar resumo</button>
+          <button class="button button-danger" type="button" data-history-action="delete" data-quote-id="${escapeHtml(quote.id)}">Excluir</button>
+        </div>
+      </div>`}
+    </article>`;
+}
+
 function applyQuoteHistorySnapshot(state, snapshot) {
   if (!snapshot || typeof snapshot !== "object") {
     return false;
   }
 
   const restored = mergeState(snapshot);
+  const currentLogo = state.company.logoDataUrl;
   state.calcMode = restored.calcMode;
   state.m2CalcMode = restored.m2CalcMode;
   state.linearMeterCalcMode = restored.linearMeterCalcMode;
@@ -1552,6 +1650,7 @@ function applyQuoteHistorySnapshot(state, snapshot) {
   state.blockItems = deepClone(restored.blockItems);
   state.client = deepClone(restored.client);
   state.company = deepClone(restored.company);
+  if (!state.company.logoDataUrl) state.company.logoDataUrl = currentLogo;
   state.paymentTerms = restored.paymentTerms;
   state.productionDeadline = restored.productionDeadline;
   state.quoteTotalVisibility = restored.quoteTotalVisibility;
@@ -1966,6 +2065,7 @@ function mergeState(candidate) {
   state.presets.size = getValidApostilaSize(state.presets.printType, state.presets.size);
   state.presets.innerPaper = getValidApostilaInnerPaper(state.presets.innerPaper);
   state.client = { ...state.client, ...(candidate.client || {}) };
+  state.client.id = typeof state.client.id === "string" ? state.client.id : "";
   state.company = { ...state.company, ...(candidate.company || {}) };
   state.clients = Array.isArray(candidate.clients)
     ? candidate.clients
@@ -1985,9 +2085,18 @@ function mergeState(candidate) {
         .map((item, index) => ({
           id: item.id || `quote-${index + 1}`,
           title: typeof item.title === "string" ? item.title : "",
+          clientId: typeof item.clientId === "string" ? item.clientId : "",
           clientName: typeof item.clientName === "string" ? item.clientName : "",
+          status: normalizeQuoteStatus(item.status),
+          approvedAt: typeof item.approvedAt === "string" ? item.approvedAt : "",
           total: Number.isFinite(Number(item.total)) ? Number(item.total) : 0,
           summary: typeof item.summary === "string" ? item.summary : "",
+          items: Array.isArray(item.items) ? item.items.filter((entry) => entry && typeof entry === "object").map((entry) => ({
+            description: String(entry.description || ""),
+            detail: String(entry.detail || ""),
+            extraDetail: String(entry.extraDetail || ""),
+            total: toMoneyNumber(entry.total),
+          })) : [],
           createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString(),
           snapshot: getQuoteHistorySnapshot(item) ? deepClone(getQuoteHistorySnapshot(item)) : null,
         }))
@@ -6937,9 +7046,8 @@ function calculateQuoteUrgency(state, items, quoteDiscount) {
   return { ...options, selectedItems };
 }
 
-function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, linearMeterWorkbook, m2Workbook, resinWorkbook) {
-  const dateText = new Intl.DateTimeFormat("pt-BR").format(new Date());
-  const quoteEntries = [
+function collectQuoteEntries(workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, linearMeterWorkbook, m2Workbook, resinWorkbook) {
+  return [
     ...workbook.activeRows.map((row, index) => {
       const coverDetail = buildApostilaCoverDetail(row);
       return {
@@ -7070,6 +7178,11 @@ function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, rea
       total: row.total,
     })),
   ];
+}
+
+function createQuoteHtml(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, linearMeterWorkbook, m2Workbook, resinWorkbook) {
+  const dateText = new Intl.DateTimeFormat("pt-BR").format(new Date());
+  const quoteEntries = collectQuoteEntries(workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, linearMeterWorkbook, m2Workbook, resinWorkbook);
   const combinedSubtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + freeQuoteWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + flyerWorkbook.totals.totalGeneral + blockSulfiteWorkbook.totals.totalGeneral + blockAutocopiativoWorkbook.totals.totalGeneral + linearMeterWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
   const quoteDiscount = calculateDiscount(combinedSubtotal, state.quoteDiscountType, state.quoteDiscountValue);
   const combinedTotal = quoteDiscount.total;
@@ -7338,6 +7451,7 @@ async function initApp() {
   const configSections = document.getElementById("config-sections");
   const clientsList = document.getElementById("clients-list");
   const historyList = document.getElementById("history-list");
+  const quoteClientHistory = document.getElementById("quote-client-history");
   const m2RowsTableBody = document.getElementById("m2-rows-table-body");
   const quotePreview = document.getElementById("quote-preview");
   const feedback = document.getElementById("import-feedback");
@@ -7370,6 +7484,9 @@ async function initApp() {
   const tabButtons = [...document.querySelectorAll(".tab-button")];
   const tabPanels = [...document.querySelectorAll(".tab-panel")];
   let activeClientEditorId = "";
+  let clientSearchQuery = "";
+  let historySearchQuery = "";
+  let historyStatusFilter = "all";
 
   function setStatusMessage(element, message, tone = "neutral") {
     if (!element) {
@@ -7755,6 +7872,9 @@ async function initApp() {
   }
 
   function renderClientFields() {
+    const selectedClient = state.clients.find((client) => client.id === state.client.id)
+      || findUniqueClientMatch(state.clients, state.client);
+    document.getElementById("quote-client-select").innerHTML = `<option value="">Novo cliente ou não cadastrado</option>${state.clients.map((client) => `<option value="${escapeHtml(client.id)}"${selectedClient?.id === client.id ? " selected" : ""}>${escapeHtml(client.name)}</option>`).join("")}`;
     document.getElementById("client-name").value = state.client.name;
     document.getElementById("client-contact").value = state.client.contact;
     document.getElementById("client-cnpj").value = state.client.cnpj;
@@ -7922,63 +8042,73 @@ async function initApp() {
   }
 
   function renderClientsTab() {
+    const linkedQuotes = state.quoteHistory.filter((quote) => getQuoteClient(quote, state.clients));
+    const approvedQuotes = linkedQuotes.filter((quote) => normalizeQuoteStatus(quote.status) === "Aprovado");
     document.getElementById("clients-count").textContent = formatInteger(state.clients.length);
-    document.getElementById("clients-latest").textContent = state.clients[0]?.name || "Nenhum cliente salvo";
-    clientsList.innerHTML = state.clients.length
-      ? state.clients
-          .map(
-            (client) => `
-              <article class="list-card" data-client-id="${escapeHtml(client.id)}">
-                <div>
-                  <h3>${escapeHtml(client.name || "Sem nome")}</h3>
-                  <p>${escapeHtml(client.contact || "Sem contato")}</p>
-                  <p class="list-meta">${escapeHtml(client.cnpj || "Sem CNPJ")}</p>
-                  ${client.notes ? `<p class="list-notes">${escapeHtml(client.notes)}</p>` : ""}
-                  <p class="list-meta">Criado em ${escapeHtml(formatDateTime(client.createdAt) || "data indisponível")}</p>
+    document.getElementById("clients-quotes-count").textContent = formatInteger(linkedQuotes.length);
+    document.getElementById("clients-approved-count").textContent = formatInteger(approvedQuotes.length);
+    document.getElementById("clients-approved-total").textContent = formatCurrency(approvedQuotes.reduce((sum, quote) => sum + quote.total, 0));
+    const search = normalizeClientMatchValue(clientSearchQuery);
+    const filteredClients = state.clients.filter((client) => normalizeClientMatchValue(`${client.name} ${client.contact} ${client.cnpj}`).includes(search));
+    clientsList.innerHTML = filteredClients.length
+      ? filteredClients.map((client) => {
+        const stats = getClientQuoteStats(client, state.quoteHistory, state.clients);
+        return `
+          <article class="list-card client-record-card" data-client-id="${escapeHtml(client.id)}">
+            <div>
+              <h3>${escapeHtml(client.name || "Sem nome")}</h3>
+              <p>${escapeHtml(client.contact || "Sem contato")} · ${escapeHtml(client.cnpj || "Sem CNPJ")}</p>
+              ${client.notes ? `<p class="list-notes">${escapeHtml(client.notes)}</p>` : ""}
+              <div class="client-stat-row"><span>${formatInteger(stats.quoteCount)} orçamentos</span><span>${formatInteger(stats.approvedCount)} aprovados</span><strong>Total gasto: ${formatCurrency(stats.spent)}</strong></div>
+              <details class="client-history-details"><summary>Ver histórico e compras</summary>
+                <div class="client-detail-content">
+                  <h4>O que comprou</h4>
+                  ${stats.purchases.length ? `<ul class="client-purchase-list">${stats.purchases.map((item) => `<li><strong>${escapeHtml(item.description)}</strong>${item.detail ? `<small>${escapeHtml(item.detail)}</small>` : ""}<small>${escapeHtml(formatDateTime(item.date) || "data indisponível")}</small></li>`).join("")}</ul>` : `<p class="list-meta">Nenhum orçamento aprovado.</p>`}
+                  <h4>Orçamentos feitos</h4>
+                  ${stats.quotes.length ? `<div class="stack-list">${stats.quotes.map((quote) => createQuoteRecordMarkup(quote, state.clients, { compact: true })).join("")}</div>` : `<p class="list-meta">Nenhum orçamento vinculado.</p>`}
                 </div>
-                <div class="list-actions">
-                  <button class="button button-primary" type="button" data-client-action="load" data-client-id="${escapeHtml(client.id)}">Usar no orçamento</button>
-                  <button class="button" type="button" data-client-action="edit" data-client-id="${escapeHtml(client.id)}">Editar</button>
-                  <button class="button button-danger" type="button" data-client-action="delete" data-client-id="${escapeHtml(client.id)}">Excluir</button>
-                </div>
-              </article>
-            `
-          )
-          .join("")
-      : `<div class="empty-state"><strong>Nenhum cliente salvo ainda</strong><span>Preencha o cadastro ao lado ou use os dados do orçamento atual para montar sua base compartilhada de contatos.</span></div>`;
+              </details>
+            </div>
+            <div class="list-actions">
+              <button class="button button-primary" type="button" data-client-action="load" data-client-id="${escapeHtml(client.id)}">Usar no orçamento</button>
+              <button class="button" type="button" data-client-action="edit" data-client-id="${escapeHtml(client.id)}">Editar</button>
+              <button class="button button-danger" type="button" data-client-action="delete" data-client-id="${escapeHtml(client.id)}">Excluir</button>
+            </div>
+          </article>`;
+      }).join("")
+      : `<div class="empty-state"><strong>${state.clients.length ? "Nenhum cliente encontrado" : "Nenhum cliente salvo ainda"}</strong><span>Cadastre um cliente ou ajuste a busca.</span></div>`;
   }
 
   function renderHistoryTab() {
     const totalQuotes = state.quoteHistory.length;
-    const totalValue = state.quoteHistory.reduce((sum, item) => sum + Number(item.total || 0), 0);
+    const approvedQuotes = state.quoteHistory.filter((item) => normalizeQuoteStatus(item.status) === "Aprovado");
+    const pendingQuotes = state.quoteHistory.filter((item) => normalizeQuoteStatus(item.status) === "Pendente");
     document.getElementById("history-count").textContent = formatInteger(totalQuotes);
-    document.getElementById("history-total").textContent = formatCurrency(totalValue);
-    historyList.innerHTML = state.quoteHistory.length
-      ? state.quoteHistory
-          .map(
-            (item) => {
-              const hasFullSnapshot = Boolean(getQuoteHistorySnapshot(item));
-              return `
-              <article class="list-card" data-quote-id="${escapeHtml(item.id)}">
-                <div>
-                  <h3>${escapeHtml(item.title || "Orçamento salvo")}</h3>
-                  <p>${escapeHtml(item.clientName || "Cliente não informado")}</p>
-                  <p class="list-meta">${escapeHtml(formatDateTime(item.createdAt) || "data indisponível")}</p>
-                  ${item.summary ? `<p class="list-notes">${escapeHtml(item.summary)}</p>` : ""}
-                  ${hasFullSnapshot ? "" : `<p class="list-meta">Este registro tem somente o resumo salvo.</p>`}
-                </div>
-                <div class="list-actions">
-                  <button class="button button-primary" type="button" data-history-action="load-full" data-quote-id="${escapeHtml(item.id)}" ${hasFullSnapshot ? "" : "disabled"}>${hasFullSnapshot ? "Abrir completo" : "Somente resumo"}</button>
-                  <button class="button button-primary" type="button" data-history-action="load-client" data-quote-id="${escapeHtml(item.id)}">Usar cliente</button>
-                  <button class="button" type="button" data-history-action="copy" data-quote-id="${escapeHtml(item.id)}">Copiar resumo</button>
-                  <button class="button button-danger" type="button" data-history-action="delete" data-quote-id="${escapeHtml(item.id)}">Excluir</button>
-                </div>
-              </article>
-            `;
-            }
-          )
-          .join("")
-      : `<div class="empty-state"><strong>Nenhum orçamento salvo ainda</strong><span>Salve um fechamento para manter um histórico rápido de clientes, valores e resumos recentes.</span></div>`;
+    document.getElementById("history-pending").textContent = formatInteger(pendingQuotes.length);
+    document.getElementById("history-approved").textContent = formatInteger(approvedQuotes.length);
+    document.getElementById("history-total").textContent = formatCurrency(approvedQuotes.reduce((sum, item) => sum + item.total, 0));
+    const search = normalizeClientMatchValue(historySearchQuery);
+    const filteredQuotes = state.quoteHistory.filter((item) => {
+      if (historyStatusFilter !== "all" && normalizeQuoteStatus(item.status) !== historyStatusFilter) return false;
+      const searchable = `${item.title} ${item.clientName} ${getQuoteClient(item, state.clients)?.name || ""} ${getQuoteHistoryItems(item).map((entry) => `${entry.description} ${entry.detail}`).join(" ")}`;
+      return normalizeClientMatchValue(searchable).includes(search);
+    });
+    historyList.innerHTML = filteredQuotes.length
+      ? filteredQuotes.map((item) => createQuoteRecordMarkup(item, state.clients)).join("")
+      : `<div class="empty-state"><strong>${totalQuotes ? "Nenhum orçamento encontrado" : "Nenhum orçamento salvo ainda"}</strong><span>${totalQuotes ? "Ajuste a busca ou a situação selecionada." : "Salve o orçamento atual para começar o histórico."}</span></div>`;
+  }
+
+  function renderQuoteClientHistory() {
+    const client = state.clients.find((item) => item.id === state.client.id)
+      || findUniqueClientMatch(state.clients, state.client);
+    if (!client) {
+      quoteClientHistory.innerHTML = `<div class="empty-state"><strong>Selecione um cliente cadastrado</strong><span>Você também pode preencher o nome acima e salvar o orçamento para criar o cadastro automaticamente.</span></div>`;
+      return;
+    }
+    const stats = getClientQuoteStats(client, state.quoteHistory, state.clients);
+    quoteClientHistory.innerHTML = `
+      <div class="client-stat-row"><span>${formatInteger(stats.quoteCount)} orçamentos</span><span>${formatInteger(stats.approvedCount)} aprovados</span><strong>Total gasto: ${formatCurrency(stats.spent)}</strong></div>
+      ${stats.quotes.length ? stats.quotes.map((quote) => createQuoteRecordMarkup(quote, state.clients)).join("") : `<div class="empty-state"><strong>Nenhum orçamento salvo para ${escapeHtml(client.name)}</strong><span>Salve a proposta atual para iniciar o histórico.</span></div>`}`;
   }
 
   function renderRowsAndSummary() {
@@ -9107,6 +9237,7 @@ async function initApp() {
       renderConfig,
       renderClientsTab,
       renderHistoryTab,
+      renderQuoteClientHistory,
     ];
 
     for (const renderSection of sections) {
@@ -10774,6 +10905,12 @@ async function initApp() {
     const updateField = (event) => {
       if (section) {
         state[section][field] = event.target.value;
+        if (section === "client" && state.client.id) {
+          const linkedClient = state.clients.find((client) => client.id === state.client.id);
+          if (!linkedClient || (field === "name" && normalizeClientMatchValue(linkedClient.name) !== normalizeClientMatchValue(state.client.name)) || (field === "cnpj" && String(linkedClient.cnpj || "").replace(/\D/g, "") !== String(state.client.cnpj || "").replace(/\D/g, ""))) {
+            state.client.id = "";
+          }
+        }
       } else if (field === "quoteDiscountValue") {
         state[field] = toMoneyNumber(event.target.value);
       } else if (field === "quoteDiscountType") {
@@ -10783,11 +10920,36 @@ async function initApp() {
       }
       persist();
       renderRowsAndSummary();
+      if (section === "client") {
+        renderQuoteClientHistory();
+        document.getElementById("quote-client-select").value = state.client.id || findUniqueClientMatch(state.clients, state.client)?.id || "";
+      }
     };
     element.addEventListener("input", updateField);
     if (element.tagName === "SELECT") {
       element.addEventListener("change", updateField);
     }
+  });
+
+  document.getElementById("quote-client-select").addEventListener("change", (event) => {
+    const client = state.clients.find((item) => item.id === event.target.value);
+    state.client = client
+      ? { id: client.id, name: client.name, contact: client.contact, cnpj: client.cnpj }
+      : { id: "", name: "", contact: "", cnpj: "" };
+    persistLocalOnly();
+    renderAll();
+  });
+  document.getElementById("clients-search").addEventListener("input", (event) => {
+    clientSearchQuery = event.target.value;
+    renderClientsTab();
+  });
+  document.getElementById("history-search").addEventListener("input", (event) => {
+    historySearchQuery = event.target.value;
+    renderHistoryTab();
+  });
+  document.getElementById("history-status-filter").addEventListener("change", (event) => {
+    historyStatusFilter = event.target.value;
+    renderHistoryTab();
   });
 
   document.getElementById("quote-urgency-scope").addEventListener("change", (event) => {
@@ -10955,6 +11117,16 @@ async function initApp() {
     };
 
     if (existingIndex >= 0) {
+      const previous = state.clients[existingIndex];
+      state.quoteHistory.forEach((quote) => {
+        if (!quote.clientId && getQuoteClient(quote, state.clients)?.id === previous.id) quote.clientId = previous.id;
+      });
+      if (state.client.id === previous.id) {
+        state.client = { id: payload.id, name: payload.name, contact: payload.contact, cnpj: payload.cnpj };
+      }
+    }
+
+    if (existingIndex >= 0) {
       state.clients[existingIndex] = payload;
     } else {
       state.clients.unshift(payload);
@@ -10963,7 +11135,10 @@ async function initApp() {
     activeClientEditorId = payload.id;
     fillClientRecordForm(payload);
     persist();
+    renderClientFields();
     renderClientsTab();
+    renderHistoryTab();
+    renderQuoteClientHistory();
     setClientsFeedback(existingIndex >= 0 ? "Contato atualizado com sucesso." : "Contato salvo com sucesso.", "success");
   });
 
@@ -10973,17 +11148,17 @@ async function initApp() {
   });
 
   document.getElementById("load-current-client-button").addEventListener("click", () => {
-    activeClientEditorId = "";
+    activeClientEditorId = state.client.id || findUniqueClientMatch(state.clients, state.client)?.id || "";
     fillClientRecordForm({
       name: state.client.name,
       contact: state.client.contact,
       cnpj: state.client.cnpj,
-      notes: state.quoteNotes,
+      notes: state.clients.find((client) => client.id === activeClientEditorId)?.notes || "",
     });
     setClientsFeedback("Dados do orçamento atual carregados no formulário. Agora é só salvar o contato.", "success");
   });
 
-  document.getElementById("save-history-button").addEventListener("click", () => {
+  function saveCurrentQuote() {
     const workbook = calculateWorkbook(state, config);
     const colorWorkbook = calculateColorPrintWorkbook(state, config);
     const credentialWorkbook = calculateCredentialWorkbook(state, config);
@@ -10997,6 +11172,22 @@ async function initApp() {
     const title = state.client.name.trim() || `Orçamento ${new Date().toLocaleDateString("pt-BR")}`;
     const blockSulfiteWorkbook = calculateBlockWorkbook(state, "sulfite");
     const blockAutocopiativoWorkbook = calculateBlockWorkbook(state, "autocopiativo");
+    const entries = collectQuoteEntries(workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, linearMeterWorkbook, m2Workbook, resinWorkbook);
+    if (!entries.length) {
+      setMainFeedback("Adicione ao menos um item antes de salvar o orçamento.", "warning");
+      return;
+    }
+    const clientName = state.client.name.trim();
+    if (clientName) {
+      let client = state.clients.find((item) => item.id === state.client.id) || findUniqueClientMatch(state.clients, state.client);
+      if (!client) {
+        client = { id: `client-${Date.now()}`, name: clientName, contact: state.client.contact.trim(), cnpj: state.client.cnpj.trim(), notes: "", createdAt: new Date().toISOString() };
+        state.clients.unshift(client);
+      }
+      state.client.id = client.id;
+    } else {
+      state.client.id = "";
+    }
     const summary = createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, linearMeterWorkbook, m2Workbook, resinWorkbook).split("\n").slice(0, 10).join(" • ");
     const subtotal = workbook.totals.totalGeneral + colorWorkbook.totals.totalGeneral + credentialWorkbook.totals.totalGeneral + readyWorkbook.totals.totalGeneral + freeQuoteWorkbook.totals.totalGeneral + businessCardWorkbook.totals.totalGeneral + flyerWorkbook.totals.totalGeneral + blockSulfiteWorkbook.totals.totalGeneral + blockAutocopiativoWorkbook.totals.totalGeneral + linearMeterWorkbook.totals.totalGeneral + m2Workbook.totals.totalGeneral + resinWorkbook.totals.totalGeneral;
     const quoteDiscount = calculateDiscount(subtotal, state.quoteDiscountType, state.quoteDiscountValue);
@@ -11004,18 +11195,27 @@ async function initApp() {
     state.quoteHistory.unshift({
       id: `quote-${Date.now()}`,
       title,
-      clientName: state.client.name.trim(),
+      clientName,
+      clientId: state.client.id,
       total: quoteDiscount.total,
+      status: "Pendente",
+      approvedAt: "",
+      items: entries.map(({ description, detail, extraDetail, total }) => ({ description, detail, extraDetail: extraDetail || "", total })),
       summary,
       createdAt: new Date().toISOString(),
       snapshot: createQuoteHistorySnapshot(state),
     });
 
-    state.quoteHistory = state.quoteHistory.slice(0, 20);
     persist();
+    renderClientFields();
+    renderClientsTab();
     renderHistoryTab();
+    renderQuoteClientHistory();
     setMainFeedback("Orçamento salvo no histórico compartilhado.", "success");
-  });
+  }
+
+  document.getElementById("save-history-button").addEventListener("click", saveCurrentQuote);
+  document.getElementById("save-quote-button").addEventListener("click", saveCurrentQuote);
 
   clientsList.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-client-action]");
@@ -11029,10 +11229,7 @@ async function initApp() {
     }
 
     if (button.dataset.clientAction === "load") {
-      state.client.name = client.name;
-      state.client.contact = client.contact;
-      state.client.cnpj = client.cnpj;
-      state.quoteNotes = client.notes || state.quoteNotes;
+      state.client = { id: client.id, name: client.name, contact: client.contact, cnpj: client.cnpj };
       persistLocalOnly();
       renderAll();
       setMainFeedback("Cliente carregado no orçamento atual.", "success");
@@ -11052,16 +11249,23 @@ async function initApp() {
         return;
       }
       state.clients = state.clients.filter((item) => item.id !== client.id);
+      state.quoteHistory.forEach((quote) => {
+        if (quote.clientId === client.id) quote.clientId = "";
+      });
+      if (state.client.id === client.id) state.client.id = "";
       if (activeClientEditorId === client.id) {
         resetClientRecordForm();
       }
       persist();
+      renderClientFields();
       renderClientsTab();
+      renderHistoryTab();
+      renderQuoteClientHistory();
       setClientsFeedback("Contato excluído da base compartilhada.", "warning");
     }
   });
 
-  historyList.addEventListener("click", async (event) => {
+  async function handleHistoryAction(event) {
     const button = event.target.closest("[data-history-action]");
     if (!button) {
       return;
@@ -11083,8 +11287,11 @@ async function initApp() {
       selectTab("orcamento");
       setMainFeedback("Orçamento completo carregado a partir do histórico.", "success");
     } else if (button.dataset.historyAction === "load-client") {
-      state.client.name = item.clientName || state.client.name;
-      persist();
+      const client = getQuoteClient(item, state.clients);
+      state.client = client
+        ? { id: client.id, name: client.name, contact: client.contact, cnpj: client.cnpj }
+        : { id: "", name: item.clientName || "", contact: "", cnpj: "" };
+      persistLocalOnly();
       renderAll();
       setMainFeedback("Cliente do histórico carregado no orçamento atual.", "success");
     } else if (button.dataset.historyAction === "copy") {
@@ -11103,10 +11310,32 @@ async function initApp() {
       }
       state.quoteHistory = state.quoteHistory.filter((entry) => entry.id !== item.id);
       persist();
+      renderClientsTab();
       renderHistoryTab();
+      renderQuoteClientHistory();
       setMainFeedback("Item removido do histórico.", "warning");
     }
-  });
+  }
+  historyList.addEventListener("click", handleHistoryAction);
+  quoteClientHistory.addEventListener("click", handleHistoryAction);
+
+  function handleQuoteStatusChange(event) {
+    const quoteId = event.target.dataset.quoteStatus;
+    if (!quoteId) return;
+    const quote = state.quoteHistory.find((item) => item.id === quoteId);
+    if (!quote) return;
+    const previousStatus = normalizeQuoteStatus(quote.status);
+    quote.status = normalizeQuoteStatus(event.target.value);
+    if (quote.status === "Aprovado" && previousStatus !== "Aprovado") quote.approvedAt = new Date().toISOString();
+    if (quote.status !== "Aprovado") quote.approvedAt = "";
+    persist();
+    renderClientsTab();
+    renderHistoryTab();
+    renderQuoteClientHistory();
+    setMainFeedback(`Orçamento marcado como ${quote.status.toLowerCase()}.`, "success");
+  }
+  historyList.addEventListener("change", handleQuoteStatusChange);
+  quoteClientHistory.addEventListener("change", handleQuoteStatusChange);
 
   const dropzone = document.getElementById("pdf-dropzone");
   ["dragenter", "dragover"].forEach((eventName) => {
