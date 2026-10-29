@@ -127,6 +127,15 @@ async function readSharedState() {
 }
 
 async function writeSharedState(payload) {
+  if (!Array.isArray(payload.state?.serviceOrders)) {
+    const current = await readSharedState();
+    if (Array.isArray(current.payload?.state?.serviceOrders)) {
+      payload = {
+        ...payload,
+        state: { ...payload.state, serviceOrders: current.payload.state.serviceOrders },
+      };
+    }
+  }
   const updatedAt = new Date().toISOString();
   await supabaseRequest("/shared_app_state", {
     method: "POST",

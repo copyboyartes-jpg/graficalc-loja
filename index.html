@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GrafiCalc | Orçamento Gráfico</title>
-  <link rel="stylesheet" href="./styles.css?v=crm-clients-20261029a">
+  <link rel="stylesheet" href="./styles.css?v=service-orders-20261029a">
 </head>
 <body>
   <div class="page-shell">
@@ -34,6 +34,7 @@
       <button class="tab-button" data-tab-target="configuracao">Configuração</button>
       <button class="tab-button" data-tab-target="clientes">Clientes</button>
       <button class="tab-button" data-tab-target="historico">Histórico</button>
+      <button class="tab-button" data-tab-target="os">O.S.</button>
       <button class="tab-button" data-tab-target="orcamento">Orçamento</button>
     </nav>
 
@@ -1137,6 +1138,29 @@
         </div>
       </section>
 
+      <section class="tab-panel" data-tab-panel="os">
+        <div class="summary-grid">
+          <article class="summary-card"><span class="summary-label">O.S. geradas</span><strong id="os-count">0</strong></article>
+          <article class="summary-card"><span class="summary-label">Em produção</span><strong id="os-production-count">0</strong></article>
+          <article class="summary-card"><span class="summary-label">Prontas pra entrega</span><strong id="os-ready-count">0</strong></article>
+          <article class="summary-card"><span class="summary-label">Retiradas</span><strong id="os-collected-count">0</strong></article>
+        </div>
+        <article class="panel os-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>Ordens de serviço</h2>
+              <p class="panel-copy">Acompanhe a produção, a entrega e quem atendeu cada pedido.</p>
+            </div>
+          </div>
+          <div class="history-filters">
+            <label><span>Buscar O.S.</span><input id="os-search" type="search" placeholder="Número, cliente, item ou funcionário"></label>
+            <label><span>Etapa</span><select id="os-status-filter"><option value="all">Todas</option><option value="Em produção">Em produção</option><option value="Pronto pra entrega">Pronto pra entrega</option><option value="Retirado">Retirado</option></select></label>
+          </div>
+          <p class="helper-text status-note" id="os-feedback">As O.S. são compartilhadas entre os computadores.</p>
+          <div id="os-list" class="stack-list"></div>
+        </article>
+      </section>
+
       <section class="tab-panel" data-tab-panel="orcamento">
         <div class="workspace-grid quote-grid">
           <article class="panel">
@@ -1335,7 +1359,7 @@
       }
     })();
   </script>
-  <script src="./app.mjs?v=crm-clients-20261029a"></script>
+  <script src="./app.mjs?v=service-orders-20261029a"></script>
 </body>
 </html>
 

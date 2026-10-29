@@ -1465,6 +1465,7 @@ function createDefaultState() {
     },
     clients: [],
     quoteHistory: [],
+    serviceOrders: [],
     paymentTerms: "",
     productionDeadline: "",
     quoteTotalVisibility: "show",
@@ -1599,11 +1600,81 @@ function getClientQuoteStats(client, quoteHistory, clients) {
   };
 }
 
-function createQuoteRecordMarkup(quote, clients, { compact = false } = {}) {
+const SERVICE_ORDER_STATUSES = ["Em produção", "Pronto pra entrega", "Retirado"];
+
+function normalizeServiceOrderStatus(value) {
+  return SERVICE_ORDER_STATUSES.includes(value) ? value : SERVICE_ORDER_STATUSES[0];
+}
+
+function generateServiceOrderNumber(orders, date = new Date(), random = Math.random) {
+  const day = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
+  const used = new Set(orders.map((order) => order.number));
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const suffix = String((Math.floor(random() * 100000000) + attempt) % 100000000).padStart(8, "0");
+    const number = `OS-${day}-${suffix}`;
+    if (!used.has(number)) return number;
+  }
+  return `OS-${day}-${Date.now()}`;
+}
+
+function createServiceOrderFromQuote(quote, clients, orders, employeeName, date = new Date(), random = Math.random) {
+  const employee = String(employeeName || "").trim();
+  if (!quote || normalizeQuoteStatus(quote.status) !== "Aprovado" || !employee || orders.some((order) => order.quoteId === quote.id)) return null;
+  const client = getQuoteClient(quote, clients);
+  const snapshotClient = getQuoteHistorySnapshot(quote)?.client || {};
+  const clientName = String(client?.name || quote.clientName || snapshotClient.name || "").trim();
+  if (!clientName) return null;
+  const createdAt = date.toISOString();
+  return {
+    id: `service-order-${quote.id}`,
+    number: generateServiceOrderNumber(orders, date, random),
+    quoteId: quote.id,
+    quoteTitle: quote.title || "Orçamento aprovado",
+    clientId: client?.id || quote.clientId || "",
+    clientName,
+    clientContact: client?.contact || snapshotClient.contact || "",
+    clientCnpj: client?.cnpj || snapshotClient.cnpj || "",
+    employeeName: employee,
+    items: getQuoteHistoryItems(quote).map((item) => ({
+      description: String(item.description || ""),
+      detail: String(item.detail || ""),
+      extraDetail: String(item.extraDetail || ""),
+      total: toMoneyNumber(item.total),
+    })),
+    total: toMoneyNumber(quote.total),
+    productionDeadline: String(getQuoteHistorySnapshot(quote)?.productionDeadline || ""),
+    status: SERVICE_ORDER_STATUSES[0],
+    createdAt,
+    updatedAt: createdAt,
+    readyAt: "",
+    collectedAt: "",
+  };
+}
+
+function updateServiceOrderStatus(order, status, date = new Date()) {
+  const next = normalizeServiceOrderStatus(status);
+  if (next === order.status) return false;
+  order.status = next;
+  order.updatedAt = date.toISOString();
+  if (next === "Em produção") {
+    order.readyAt = "";
+    order.collectedAt = "";
+  } else if (next === "Pronto pra entrega") {
+    order.readyAt = order.readyAt || order.updatedAt;
+    order.collectedAt = "";
+  } else {
+    order.readyAt = order.readyAt || order.updatedAt;
+    order.collectedAt = order.updatedAt;
+  }
+  return true;
+}
+
+function createQuoteRecordMarkup(quote, clients, { compact = false, serviceOrders = [], employeeDraft = "" } = {}) {
   const items = getQuoteHistoryItems(quote);
   const client = getQuoteClient(quote, clients);
   const status = normalizeQuoteStatus(quote.status);
   const hasFullSnapshot = Boolean(getQuoteHistorySnapshot(quote));
+  const serviceOrder = serviceOrders.find((order) => order.quoteId === quote.id);
   const statusOptions = ["Pendente", "Aprovado", "Recusado"].map((option) => `<option value="${option}"${option === status ? " selected" : ""}>${option}</option>`).join("");
   return `
     <article class="list-card quote-record-card" data-quote-id="${escapeHtml(quote.id)}">
@@ -1611,18 +1682,46 @@ function createQuoteRecordMarkup(quote, clients, { compact = false } = {}) {
         <div class="quote-record-heading"><h3>${escapeHtml(quote.title || "Orçamento salvo")}</h3><span class="quote-status-badge" data-status="${status}">${status}</span></div>
         <p class="list-meta">${escapeHtml(client?.name || quote.clientName || "Cliente não informado")} · ${escapeHtml(formatDateTime(quote.createdAt) || "data indisponível")}</p>
         <strong class="quote-record-total">${formatCurrency(quote.total)}</strong>
+        ${serviceOrder ? `<p class="list-meta">O.S. vinculada: <strong>${escapeHtml(serviceOrder.number)}</strong></p>` : ""}
         ${items.length ? `<details class="quote-record-details"${compact ? "" : " open"}><summary>${items.length} ${items.length === 1 ? "item" : "itens"} do orçamento</summary><ul>${items.map((entry) => `<li><strong>${escapeHtml(entry.description)}</strong>${entry.detail ? `<small>${escapeHtml(entry.detail)}</small>` : ""}${entry.extraDetail ? `<small>${escapeHtml(entry.extraDetail)}</small>` : ""}</li>`).join("")}</ul></details>` : quote.summary ? `<p class="list-notes">${escapeHtml(quote.summary)}</p>` : ""}
         ${hasFullSnapshot ? "" : `<p class="list-meta">Registro antigo: somente os dados salvos estão disponíveis.</p>`}
       </div>
       ${compact ? "" : `<div class="quote-record-controls">
-        <label><span>Situação</span><select data-quote-status="${escapeHtml(quote.id)}">${statusOptions}</select></label>
+        <label><span>Situação</span><select data-quote-status="${escapeHtml(quote.id)}"${serviceOrder ? " disabled" : ""}>${statusOptions}</select></label>
+        ${status === "Aprovado" && !serviceOrder ? `<div class="service-order-create"><label><span>Funcionário responsável</span><input type="text" data-os-employee-for="${escapeHtml(quote.id)}" value="${escapeHtml(employeeDraft)}" placeholder="Nome do funcionário" autocomplete="name"></label><button class="button button-primary" type="button" data-history-action="generate-os" data-quote-id="${escapeHtml(quote.id)}">Gerar O.S.</button></div>` : ""}
+        ${serviceOrder ? `<button class="button" type="button" data-history-action="open-os" data-quote-id="${escapeHtml(quote.id)}">Abrir O.S.</button>` : ""}
         <div class="list-actions">
           <button class="button button-primary" type="button" data-history-action="load-full" data-quote-id="${escapeHtml(quote.id)}" ${hasFullSnapshot ? "" : "disabled"}>${hasFullSnapshot ? "Abrir orçamento" : "Somente resumo"}</button>
           <button class="button" type="button" data-history-action="load-client" data-quote-id="${escapeHtml(quote.id)}">Usar cliente</button>
           <button class="button" type="button" data-history-action="copy" data-quote-id="${escapeHtml(quote.id)}">Copiar resumo</button>
-          <button class="button button-danger" type="button" data-history-action="delete" data-quote-id="${escapeHtml(quote.id)}">Excluir</button>
+          <button class="button button-danger" type="button" data-history-action="delete" data-quote-id="${escapeHtml(quote.id)}"${serviceOrder ? " disabled title=\"Este orçamento possui uma O.S. vinculada\"" : ""}>Excluir</button>
         </div>
       </div>`}
+    </article>`;
+}
+
+function createServiceOrderMarkup(order, { employeeDraft = order.employeeName } = {}) {
+  const status = normalizeServiceOrderStatus(order.status);
+  const statusOptions = SERVICE_ORDER_STATUSES.map((option) => `<option value="${option}"${option === status ? " selected" : ""}>${option}</option>`).join("");
+  return `
+    <article class="list-card service-order-card" data-order-id="${escapeHtml(order.id)}">
+      <div class="service-order-main">
+        <div class="quote-record-heading"><h3>O.S. nº ${escapeHtml(order.number)}</h3><span class="service-order-badge" data-status="${escapeHtml(status)}">${escapeHtml(status)}</span></div>
+        <p class="list-meta">Gerada em ${escapeHtml(formatDateTime(order.createdAt) || "data indisponível")} · Orçamento: ${escapeHtml(order.quoteTitle || order.quoteId)}</p>
+        <div class="service-order-info">
+          <div><strong>Cliente</strong><span>${escapeHtml(order.clientName || "Cliente não informado")}</span>${order.clientContact ? `<span>${escapeHtml(order.clientContact)}</span>` : ""}${order.clientCnpj ? `<span>CNPJ: ${escapeHtml(order.clientCnpj)}</span>` : ""}</div>
+          <div><strong>Funcionário responsável</strong><span>${escapeHtml(order.employeeName || "Não informado")}</span>${order.productionDeadline ? `<small>Prazo informado: ${escapeHtml(order.productionDeadline)}</small>` : ""}</div>
+        </div>
+        <div class="service-order-items"><strong>Itens do pedido</strong>${order.items.length ? `<ul>${order.items.map((item) => `<li><strong>${escapeHtml(item.description)}</strong>${item.detail ? `<span>${escapeHtml(item.detail)}</span>` : ""}${item.extraDetail ? `<small>${escapeHtml(item.extraDetail)}</small>` : ""}</li>`).join("")}</ul>` : `<p class="list-meta">Consulte o orçamento original para os detalhes dos itens.</p>`}</div>
+        <p class="service-order-total"><strong>Total aprovado:</strong> ${formatCurrency(order.total)}</p>
+        ${order.readyAt ? `<p class="list-meta">Pronto em ${escapeHtml(formatDateTime(order.readyAt))}</p>` : ""}
+        ${order.collectedAt ? `<p class="list-meta">Retirado em ${escapeHtml(formatDateTime(order.collectedAt))}</p>` : ""}
+      </div>
+      <div class="service-order-controls">
+        <label><span>Etapa da O.S.</span><select data-os-status="${escapeHtml(order.id)}">${statusOptions}</select></label>
+        <label><span>Funcionário responsável</span><input type="text" data-os-employee="${escapeHtml(order.id)}" value="${escapeHtml(employeeDraft)}"></label>
+        <div class="list-actions"><button class="button" type="button" data-os-action="save-employee" data-order-id="${escapeHtml(order.id)}">Salvar nome</button><button class="button" type="button" data-os-action="open-quote" data-order-id="${escapeHtml(order.id)}">Abrir orçamento</button><button class="button button-primary" type="button" data-os-action="print" data-order-id="${escapeHtml(order.id)}">Imprimir O.S.</button></div>
+      </div>
     </article>`;
 }
 
@@ -2101,6 +2200,34 @@ function mergeState(candidate) {
           snapshot: getQuoteHistorySnapshot(item) ? deepClone(getQuoteHistorySnapshot(item)) : null,
         }))
     : state.quoteHistory;
+  state.serviceOrders = Array.isArray(candidate.serviceOrders)
+    ? candidate.serviceOrders
+        .filter((order) => order && typeof order === "object" && order.id && order.quoteId)
+        .map((order) => ({
+          id: String(order.id),
+          number: String(order.number || ""),
+          quoteId: String(order.quoteId),
+          quoteTitle: String(order.quoteTitle || ""),
+          clientId: String(order.clientId || ""),
+          clientName: String(order.clientName || ""),
+          clientContact: String(order.clientContact || ""),
+          clientCnpj: String(order.clientCnpj || ""),
+          employeeName: String(order.employeeName || ""),
+          items: Array.isArray(order.items) ? order.items.filter((item) => item && typeof item === "object").map((item) => ({
+            description: String(item.description || ""),
+            detail: String(item.detail || ""),
+            extraDetail: String(item.extraDetail || ""),
+            total: toMoneyNumber(item.total),
+          })) : [],
+          total: toMoneyNumber(order.total),
+          productionDeadline: String(order.productionDeadline || ""),
+          status: normalizeServiceOrderStatus(order.status),
+          createdAt: String(order.createdAt || ""),
+          updatedAt: String(order.updatedAt || ""),
+          readyAt: String(order.readyAt || ""),
+          collectedAt: String(order.collectedAt || ""),
+        }))
+    : state.serviceOrders;
   state.paymentTerms = typeof candidate.paymentTerms === "string" ? candidate.paymentTerms : state.paymentTerms;
   state.productionDeadline = typeof candidate.productionDeadline === "string" ? candidate.productionDeadline : state.productionDeadline;
   state.quoteTotalVisibility = candidate.quoteTotalVisibility === "hide" ? "hide" : "show";
@@ -7451,6 +7578,8 @@ async function initApp() {
   const configSections = document.getElementById("config-sections");
   const clientsList = document.getElementById("clients-list");
   const historyList = document.getElementById("history-list");
+  const serviceOrdersList = document.getElementById("os-list");
+  const serviceOrdersFeedback = document.getElementById("os-feedback");
   const quoteClientHistory = document.getElementById("quote-client-history");
   const m2RowsTableBody = document.getElementById("m2-rows-table-body");
   const quotePreview = document.getElementById("quote-preview");
@@ -7487,6 +7616,10 @@ async function initApp() {
   let clientSearchQuery = "";
   let historySearchQuery = "";
   let historyStatusFilter = "all";
+  let serviceOrderSearchQuery = "";
+  let serviceOrderStatusFilter = "all";
+  const serviceOrderCreationDrafts = new Map();
+  const serviceOrderEmployeeDrafts = new Map();
 
   function setStatusMessage(element, message, tone = "neutral") {
     if (!element) {
@@ -7583,6 +7716,24 @@ async function initApp() {
     return safeClientName ? `Orçamento - ${safeClientName}` : "Orçamento";
   }
 
+  function printServiceOrder(order) {
+    const card = [...serviceOrdersList.querySelectorAll(".service-order-card")].find((item) => item.dataset.orderId === order.id);
+    if (!card) return;
+    const previousTitle = document.title;
+    const restore = () => {
+      document.title = previousTitle;
+      document.body.classList.remove("printing-os");
+      card.classList.remove("is-print-target");
+      window.removeEventListener("afterprint", restore);
+    };
+    document.title = `O.S. ${order.number}`;
+    document.body.classList.add("printing-os");
+    card.classList.add("is-print-target");
+    window.addEventListener("afterprint", restore);
+    window.print();
+    setTimeout(restore, 1000);
+  }
+
   function persistLocalOnly() {
     saveToStorage(STORAGE_KEYS.state, state);
     saveToStorage(STORAGE_KEYS.config, config);
@@ -7592,6 +7743,7 @@ async function initApp() {
     return {
       clients: deepClone(state.clients),
       quoteHistory: deepClone(state.quoteHistory),
+      serviceOrders: deepClone(state.serviceOrders),
     };
   }
 
@@ -7613,6 +7765,9 @@ async function initApp() {
 
     if (Array.isArray(sharedState.quoteHistory)) {
       state.quoteHistory = mergeState({ quoteHistory: sharedState.quoteHistory }).quoteHistory;
+    }
+    if (Array.isArray(sharedState.serviceOrders)) {
+      state.serviceOrders = mergeState({ serviceOrders: sharedState.serviceOrders }).serviceOrders;
     }
   }
 
@@ -8065,7 +8220,7 @@ async function initApp() {
                   <h4>O que comprou</h4>
                   ${stats.purchases.length ? `<ul class="client-purchase-list">${stats.purchases.map((item) => `<li><strong>${escapeHtml(item.description)}</strong>${item.detail ? `<small>${escapeHtml(item.detail)}</small>` : ""}<small>${escapeHtml(formatDateTime(item.date) || "data indisponível")}</small></li>`).join("")}</ul>` : `<p class="list-meta">Nenhum orçamento aprovado.</p>`}
                   <h4>Orçamentos feitos</h4>
-                  ${stats.quotes.length ? `<div class="stack-list">${stats.quotes.map((quote) => createQuoteRecordMarkup(quote, state.clients, { compact: true })).join("")}</div>` : `<p class="list-meta">Nenhum orçamento vinculado.</p>`}
+                  ${stats.quotes.length ? `<div class="stack-list">${stats.quotes.map((quote) => createQuoteRecordMarkup(quote, state.clients, { compact: true, serviceOrders: state.serviceOrders })).join("")}</div>` : `<p class="list-meta">Nenhum orçamento vinculado.</p>`}
                 </div>
               </details>
             </div>
@@ -8094,8 +8249,24 @@ async function initApp() {
       return normalizeClientMatchValue(searchable).includes(search);
     });
     historyList.innerHTML = filteredQuotes.length
-      ? filteredQuotes.map((item) => createQuoteRecordMarkup(item, state.clients)).join("")
+      ? filteredQuotes.map((item) => createQuoteRecordMarkup(item, state.clients, { serviceOrders: state.serviceOrders, employeeDraft: serviceOrderCreationDrafts.get(item.id) || "" })).join("")
       : `<div class="empty-state"><strong>${totalQuotes ? "Nenhum orçamento encontrado" : "Nenhum orçamento salvo ainda"}</strong><span>${totalQuotes ? "Ajuste a busca ou a situação selecionada." : "Salve o orçamento atual para começar o histórico."}</span></div>`;
+  }
+
+  function renderServiceOrdersTab() {
+    document.getElementById("os-count").textContent = formatInteger(state.serviceOrders.length);
+    document.getElementById("os-production-count").textContent = formatInteger(state.serviceOrders.filter((order) => normalizeServiceOrderStatus(order.status) === "Em produção").length);
+    document.getElementById("os-ready-count").textContent = formatInteger(state.serviceOrders.filter((order) => normalizeServiceOrderStatus(order.status) === "Pronto pra entrega").length);
+    document.getElementById("os-collected-count").textContent = formatInteger(state.serviceOrders.filter((order) => normalizeServiceOrderStatus(order.status) === "Retirado").length);
+    const search = normalizeClientMatchValue(serviceOrderSearchQuery);
+    const filteredOrders = state.serviceOrders.filter((order) => {
+      if (serviceOrderStatusFilter !== "all" && normalizeServiceOrderStatus(order.status) !== serviceOrderStatusFilter) return false;
+      const searchable = `${order.number} ${order.clientName} ${order.employeeName} ${order.quoteTitle} ${order.items.map((item) => `${item.description} ${item.detail}`).join(" ")}`;
+      return normalizeClientMatchValue(searchable).includes(search);
+    });
+    serviceOrdersList.innerHTML = filteredOrders.length
+      ? filteredOrders.map((order) => createServiceOrderMarkup(order, { employeeDraft: serviceOrderEmployeeDrafts.get(order.id) ?? order.employeeName })).join("")
+      : `<div class="empty-state"><strong>${state.serviceOrders.length ? "Nenhuma O.S. encontrada" : "Nenhuma O.S. gerada"}</strong><span>${state.serviceOrders.length ? "Ajuste a busca ou a etapa selecionada." : "Aprove um orçamento, informe o funcionário responsável e clique em Gerar O.S."}</span></div>`;
   }
 
   function renderQuoteClientHistory() {
@@ -8108,7 +8279,7 @@ async function initApp() {
     const stats = getClientQuoteStats(client, state.quoteHistory, state.clients);
     quoteClientHistory.innerHTML = `
       <div class="client-stat-row"><span>${formatInteger(stats.quoteCount)} orçamentos</span><span>${formatInteger(stats.approvedCount)} aprovados</span><strong>Total gasto: ${formatCurrency(stats.spent)}</strong></div>
-      ${stats.quotes.length ? stats.quotes.map((quote) => createQuoteRecordMarkup(quote, state.clients)).join("") : `<div class="empty-state"><strong>Nenhum orçamento salvo para ${escapeHtml(client.name)}</strong><span>Salve a proposta atual para iniciar o histórico.</span></div>`}`;
+      ${stats.quotes.length ? stats.quotes.map((quote) => createQuoteRecordMarkup(quote, state.clients, { serviceOrders: state.serviceOrders, employeeDraft: serviceOrderCreationDrafts.get(quote.id) || "" })).join("") : `<div class="empty-state"><strong>Nenhum orçamento salvo para ${escapeHtml(client.name)}</strong><span>Salve a proposta atual para iniciar o histórico.</span></div>`}`;
   }
 
   function renderRowsAndSummary() {
@@ -9237,6 +9408,7 @@ async function initApp() {
       renderConfig,
       renderClientsTab,
       renderHistoryTab,
+      renderServiceOrdersTab,
       renderQuoteClientHistory,
     ];
 
@@ -10951,6 +11123,14 @@ async function initApp() {
     historyStatusFilter = event.target.value;
     renderHistoryTab();
   });
+  document.getElementById("os-search").addEventListener("input", (event) => {
+    serviceOrderSearchQuery = event.target.value;
+    renderServiceOrdersTab();
+  });
+  document.getElementById("os-status-filter").addEventListener("change", (event) => {
+    serviceOrderStatusFilter = event.target.value;
+    renderServiceOrdersTab();
+  });
 
   document.getElementById("quote-urgency-scope").addEventListener("change", (event) => {
     state.quoteUrgency.scope = event.target.value === "selected" ? "selected" : "all";
@@ -11276,7 +11456,34 @@ async function initApp() {
       return;
     }
 
-    if (button.dataset.historyAction === "load-full") {
+    if (button.dataset.historyAction === "generate-os") {
+      const employeeName = button.closest(".quote-record-card")?.querySelector("[data-os-employee-for]")?.value.trim() || "";
+      if (!employeeName) {
+        setMainFeedback("Informe o nome do funcionário responsável antes de gerar a O.S.", "warning");
+        return;
+      }
+      const order = createServiceOrderFromQuote(item, state.clients, state.serviceOrders, employeeName);
+      if (!order) {
+        setMainFeedback("Não foi possível gerar a O.S. Verifique se o orçamento está aprovado, tem cliente identificado e ainda não possui O.S.", "warning");
+        return;
+      }
+      state.serviceOrders.unshift(order);
+      serviceOrderCreationDrafts.delete(item.id);
+      persist();
+      renderAll();
+      selectTab("os");
+      setStatusMessage(serviceOrdersFeedback, `O.S. nº ${order.number} gerada e enviada para produção.`, "success");
+      setMainFeedback(`O.S. nº ${order.number} gerada.`, "success");
+    } else if (button.dataset.historyAction === "open-os") {
+      const order = state.serviceOrders.find((entry) => entry.quoteId === item.id);
+      if (!order) return;
+      serviceOrderSearchQuery = order.number;
+      document.getElementById("os-search").value = order.number;
+      serviceOrderStatusFilter = "all";
+      document.getElementById("os-status-filter").value = "all";
+      renderServiceOrdersTab();
+      selectTab("os");
+    } else if (button.dataset.historyAction === "load-full") {
       const snapshot = getQuoteHistorySnapshot(item);
       if (!applyQuoteHistorySnapshot(state, snapshot)) {
         setMainFeedback("Este item do histórico tem apenas o resumo salvo e não pode ser reaberto por completo.", "warning");
@@ -11298,6 +11505,10 @@ async function initApp() {
       navigator.clipboard.writeText(item.summary || item.title || "").catch(() => {});
       setMainFeedback("Resumo do histórico copiado.", "success");
     } else if (button.dataset.historyAction === "delete") {
+      if (state.serviceOrders.some((order) => order.quoteId === item.id)) {
+        setMainFeedback("Este orçamento possui uma O.S. vinculada e não pode ser excluído.", "warning");
+        return;
+      }
       if (!(await confirmAppAction({
         kicker: "Exclusão",
         title: "Excluir item do histórico",
@@ -11318,12 +11529,24 @@ async function initApp() {
   }
   historyList.addEventListener("click", handleHistoryAction);
   quoteClientHistory.addEventListener("click", handleHistoryAction);
+  const rememberServiceOrderCreationDraft = (event) => {
+    const quoteId = event.target.dataset.osEmployeeFor;
+    if (quoteId) serviceOrderCreationDrafts.set(quoteId, event.target.value);
+  };
+  historyList.addEventListener("input", rememberServiceOrderCreationDraft);
+  quoteClientHistory.addEventListener("input", rememberServiceOrderCreationDraft);
 
   function handleQuoteStatusChange(event) {
     const quoteId = event.target.dataset.quoteStatus;
     if (!quoteId) return;
     const quote = state.quoteHistory.find((item) => item.id === quoteId);
     if (!quote) return;
+    if (state.serviceOrders.some((order) => order.quoteId === quote.id)) {
+      renderHistoryTab();
+      renderQuoteClientHistory();
+      setMainFeedback("A situação deste orçamento está vinculada a uma O.S. gerada.", "warning");
+      return;
+    }
     const previousStatus = normalizeQuoteStatus(quote.status);
     quote.status = normalizeQuoteStatus(event.target.value);
     if (quote.status === "Aprovado" && previousStatus !== "Aprovado") quote.approvedAt = new Date().toISOString();
@@ -11336,6 +11559,54 @@ async function initApp() {
   }
   historyList.addEventListener("change", handleQuoteStatusChange);
   quoteClientHistory.addEventListener("change", handleQuoteStatusChange);
+
+  serviceOrdersList.addEventListener("change", (event) => {
+    const orderId = event.target.dataset.osStatus;
+    if (!orderId) return;
+    const order = state.serviceOrders.find((item) => item.id === orderId);
+    if (!order || !updateServiceOrderStatus(order, event.target.value)) return;
+    persist();
+    renderServiceOrdersTab();
+    setStatusMessage(serviceOrdersFeedback, `O.S. nº ${order.number}: ${order.status.toLowerCase()}.`, "success");
+  });
+
+  serviceOrdersList.addEventListener("input", (event) => {
+    const orderId = event.target.dataset.osEmployee;
+    if (orderId) serviceOrderEmployeeDrafts.set(orderId, event.target.value);
+  });
+
+  serviceOrdersList.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-os-action]");
+    if (!button) return;
+    const order = state.serviceOrders.find((item) => item.id === button.dataset.orderId);
+    if (!order) return;
+    if (button.dataset.osAction === "save-employee") {
+      const employeeName = button.closest(".service-order-card")?.querySelector("[data-os-employee]")?.value.trim() || "";
+      if (!employeeName) {
+        setStatusMessage(serviceOrdersFeedback, "Informe o nome do funcionário responsável.", "warning");
+        return;
+      }
+      order.employeeName = employeeName;
+      order.updatedAt = new Date().toISOString();
+      serviceOrderEmployeeDrafts.delete(order.id);
+      persist();
+      renderServiceOrdersTab();
+      setStatusMessage(serviceOrdersFeedback, `Funcionário da O.S. nº ${order.number} atualizado.`, "success");
+    } else if (button.dataset.osAction === "open-quote") {
+      const quote = state.quoteHistory.find((item) => item.id === order.quoteId);
+      const snapshot = getQuoteHistorySnapshot(quote);
+      if (!applyQuoteHistorySnapshot(state, snapshot)) {
+        setStatusMessage(serviceOrdersFeedback, "Este orçamento antigo não possui dados completos para reabertura.", "warning");
+        return;
+      }
+      persistLocalOnly();
+      renderAll();
+      selectTab("orcamento");
+      setMainFeedback(`Orçamento da O.S. nº ${order.number} carregado para consulta.`, "success");
+    } else if (button.dataset.osAction === "print") {
+      printServiceOrder(order);
+    }
+  });
 
   const dropzone = document.getElementById("pdf-dropzone");
   ["dragenter", "dragover"].forEach((eventName) => {

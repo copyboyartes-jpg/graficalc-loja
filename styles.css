@@ -729,6 +729,100 @@ textarea:disabled {
   box-shadow: none;
 }
 
+.service-order-create,
+.service-order-controls {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.service-order-create {
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(43, 155, 95, 0.08);
+}
+
+.service-order-card {
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.35fr);
+}
+
+.service-order-main {
+  min-width: 0;
+}
+
+.service-order-badge {
+  padding: 5px 9px;
+  border-radius: 999px;
+  color: #176b48;
+  background: rgba(43, 155, 95, 0.14);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.service-order-badge[data-status="Pronto pra entrega"] {
+  color: #8a5521;
+  background: rgba(196, 104, 46, 0.12);
+}
+
+.service-order-badge[data-status="Retirado"] {
+  color: var(--brand);
+  background: rgba(23, 107, 107, 0.12);
+}
+
+.service-order-info {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 16px 0;
+}
+
+.service-order-info > div {
+  display: grid;
+  gap: 3px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(23, 107, 107, 0.06);
+}
+
+.service-order-info small,
+.service-order-items small {
+  color: var(--muted);
+}
+
+.service-order-items ul {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0;
+  padding-left: 20px;
+}
+
+.service-order-items li span,
+.service-order-items li small {
+  display: block;
+  margin-top: 2px;
+}
+
+.service-order-total {
+  margin-top: 14px !important;
+  font-size: 1.05rem;
+}
+
+.service-order-controls .list-actions {
+  justify-content: start;
+}
+
+@media (max-width: 1050px) {
+  .service-order-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .service-order-info {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (max-width: 1050px) {
   .history-workspace,
   .quote-record-card {
@@ -2352,6 +2446,36 @@ textarea {
     margin-top: 2px;
     font-size: 0.82rem;
     line-height: 1.22;
+  }
+}
+
+@media print {
+  body.printing-os .tab-panel[data-tab-panel="orcamento"] {
+    display: none !important;
+  }
+
+  body.printing-os .tab-panel[data-tab-panel="os"],
+  body.printing-os .panel.os-panel {
+    display: block !important;
+  }
+
+  body.printing-os .panel.os-panel {
+    padding: 0;
+    border: none;
+    box-shadow: none;
+  }
+
+  body.printing-os .history-filters,
+  body.printing-os .service-order-controls,
+  body.printing-os .service-order-card:not(.is-print-target) {
+    display: none !important;
+  }
+
+  body.printing-os .service-order-card.is-print-target {
+    display: block !important;
+    border: none;
+    box-shadow: none;
+    background: #fff;
   }
 }
 
