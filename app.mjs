@@ -1643,6 +1643,7 @@ function createServiceOrderFromQuote(quote, clients, orders, employeeName, date 
     })),
     total: toMoneyNumber(quote.total),
     productionDeadline: String(getQuoteHistorySnapshot(quote)?.productionDeadline || ""),
+    notes: String(getQuoteHistorySnapshot(quote)?.quoteNotes || ""),
     status: SERVICE_ORDER_STATUSES[0],
     createdAt,
     updatedAt: createdAt,
@@ -1700,13 +1701,13 @@ function createQuoteRecordMarkup(quote, clients, { compact = false, serviceOrder
     </article>`;
 }
 
-function createServiceOrderMarkup(order, { employeeDraft = order.employeeName } = {}) {
+function createServiceOrderMarkup(order, { employeeDraft = order.employeeName, selectedForPrint = false } = {}) {
   const status = normalizeServiceOrderStatus(order.status);
   const statusOptions = SERVICE_ORDER_STATUSES.map((option) => `<option value="${option}"${option === status ? " selected" : ""}>${option}</option>`).join("");
   return `
     <article class="list-card service-order-card" data-order-id="${escapeHtml(order.id)}">
       <div class="service-order-main">
-        <div class="quote-record-heading"><h3>O.S. nº ${escapeHtml(order.number)}</h3><span class="service-order-badge" data-status="${escapeHtml(status)}">${escapeHtml(status)}</span></div>
+        <div class="quote-record-heading"><label class="service-order-select"><input type="checkbox" data-os-select="${escapeHtml(order.id)}" aria-label="Selecionar O.S. nº ${escapeHtml(order.number)}"${selectedForPrint ? " checked" : ""}></label><h3>O.S. nº ${escapeHtml(order.number)}</h3><span class="service-order-badge" data-status="${escapeHtml(status)}">${escapeHtml(status)}</span></div>
         <p class="list-meta">Gerada em ${escapeHtml(formatDateTime(order.createdAt) || "data indisponível")} · Orçamento: ${escapeHtml(order.quoteTitle || order.quoteId)}</p>
         <div class="service-order-info">
           <div><strong>Cliente</strong><span>${escapeHtml(order.clientName || "Cliente não informado")}</span>${order.clientContact ? `<span>${escapeHtml(order.clientContact)}</span>` : ""}${order.clientCnpj ? `<span>CNPJ: ${escapeHtml(order.clientCnpj)}</span>` : ""}</div>
@@ -1723,6 +1724,89 @@ function createServiceOrderMarkup(order, { employeeDraft = order.employeeName } 
         <div class="list-actions"><button class="button" type="button" data-os-action="save-employee" data-order-id="${escapeHtml(order.id)}">Salvar nome</button><button class="button" type="button" data-os-action="open-quote" data-order-id="${escapeHtml(order.id)}">Abrir orçamento</button><button class="button button-primary" type="button" data-os-action="print" data-order-id="${escapeHtml(order.id)}">Imprimir O.S.</button></div>
       </div>
     </article>`;
+}
+
+function formatServiceOrderDate(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat("pt-BR").format(date);
+}
+
+const SERVICE_ORDER_NOTICE = "Confirmo ter conferido todo o pedido retirado na presente data. Não obstante, abdico o direito de reclamações quanto à cor, tamanho, quantidade ou quaisquer outros possíveis motivos para solicitação de re-produção após a retirada deste material.";
+
+function createServiceOrderSlipMarkup(order, company = {}) {
+  const logo = company.logoDataUrl
+    ? `<img class="os-slip-logo" src="${escapeHtml(company.logoDataUrl)}" alt="${escapeHtml(company.name || "Logo da empresa")}">`
+    : `<span class="os-slip-company">${escapeHtml(company.name || "Copy Boy")}</span>`;
+  const materials = order.items?.length
+    ? order.items.map((item) => `<div class="os-slip-material"><strong>${escapeHtml(item.description || "Material")}</strong>${item.detail ? ` · ${escapeHtml(item.detail)}` : ""}${item.extraDetail ? ` · ${escapeHtml(item.extraDetail)}` : ""}</div>`).join("")
+    : `<div class="os-slip-material">${escapeHtml(order.quoteTitle || "Consultar orçamento vinculado")}</div>`;
+  return `<article class="os-slip" data-slip-order-id="${escapeHtml(order.id)}">
+    <div class="os-slip-left">
+      <header class="os-slip-header"><div class="os-slip-brand">${logo}</div><div class="os-slip-title"><h2>Ordem de Serviço</h2>${order.printPart ? `<small>Continuação ${order.printPart} de ${order.printPartCount}</small>` : ""}</div></header>
+      <div class="os-slip-strip"><span><b>Atendimento:</b> ${escapeHtml(order.employeeName || "")}</span><span><b>Acabamento:</b> <i class="os-slip-blank"></i></span><span><b>Nº</b> ${escapeHtml(order.number)}</span></div>
+      <div class="os-slip-customer"><span><b>Cliente:</b> ${escapeHtml(order.clientName || "")}</span><span><b>Fone:</b> ${escapeHtml(order.clientContact || "")}</span></div>
+      <div class="os-slip-cnpj"><b>CNPJ/CPF:</b> ${escapeHtml(order.clientCnpj || "")}</div>
+      <div class="os-slip-dates"><span><b>Data:</b> ${escapeHtml(formatServiceOrderDate(order.createdAt))}</span><span><b>Entrega:</b> ${escapeHtml(order.productionDeadline || "")}</span><span><b>Horas:</b> ______</span></div>
+      <div class="os-slip-employee"><b>Funcionário:</b> ${escapeHtml(order.employeeName || "")}</div>
+      <div class="os-slip-description"><b>Descrição dos materiais:</b><div class="os-slip-materials">${materials}</div><div class="os-slip-writing-lines" aria-hidden="true"><span></span><span></span><span></span><span></span></div></div>
+      <div class="os-slip-notes"><b>Observação:</b> ${escapeHtml(order.notes || "")}</div>
+      <div class="os-slip-payments"><span><b>total</b><strong>${formatCurrency(order.total)}</strong></span><span><b>entrada</b></span><span><b>falta pagar</b></span></div>
+    </div>
+    <aside class="os-slip-right"><p>${escapeHtml(SERVICE_ORDER_NOTICE)}</p><div class="os-slip-signatures"><div>Nome: <i></i></div><div>Ass: <i></i></div><div>Data: <i></i></div></div></aside>
+  </article>`;
+}
+
+function splitServiceOrderItemsForPrint(items) {
+  const blocks = [];
+  for (const item of items || []) {
+    const text = [item.description, item.detail, item.extraDetail].filter(Boolean).join(" · ");
+    if (text.length <= 350) {
+      blocks.push(item);
+      continue;
+    }
+    let remaining = text;
+    while (remaining.length > 350) {
+      const lastSpace = remaining.lastIndexOf(" ", 350);
+      const cut = lastSpace > 220 ? lastSpace : 350;
+      blocks.push({ description: remaining.slice(0, cut).trim(), detail: "", extraDetail: "" });
+      remaining = remaining.slice(cut).trim();
+    }
+    if (remaining) blocks.push({ description: remaining, detail: "", extraDetail: "" });
+  }
+  if (!blocks.length) return [[]];
+  const chunks = [];
+  let current = [];
+  let estimatedLines = 0;
+  for (const item of blocks) {
+    const text = [item.description, item.detail, item.extraDetail].filter(Boolean).join(" · ");
+    const lines = Math.max(1, Math.ceil(text.length / 70));
+    if (current.length && (estimatedLines + lines > 8 || current.length >= 6)) {
+      chunks.push(current);
+      current = [];
+      estimatedLines = 0;
+    }
+    current.push(item);
+    estimatedLines += lines;
+  }
+  if (current.length) chunks.push(current);
+  return chunks;
+}
+
+function createServiceOrderPrintMarkup(orders, company = {}) {
+  const slips = orders.flatMap((order) => {
+    const chunks = splitServiceOrderItemsForPrint(order.items);
+    return chunks.map((items, index) => ({
+      ...order,
+      items,
+      printPart: chunks.length > 1 ? index + 1 : 0,
+      printPartCount: chunks.length,
+    }));
+  });
+  const pages = [];
+  for (let index = 0; index < slips.length; index += 3) {
+    pages.push(`<div class="os-print-page">${slips.slice(index, index + 3).map((order) => createServiceOrderSlipMarkup(order, company)).join("")}</div>`);
+  }
+  return pages.join("");
 }
 
 function applyQuoteHistorySnapshot(state, snapshot) {
@@ -2221,6 +2305,7 @@ function mergeState(candidate) {
           })) : [],
           total: toMoneyNumber(order.total),
           productionDeadline: String(order.productionDeadline || ""),
+          notes: String(order.notes || ""),
           status: normalizeServiceOrderStatus(order.status),
           createdAt: String(order.createdAt || ""),
           updatedAt: String(order.updatedAt || ""),
@@ -7580,6 +7665,8 @@ async function initApp() {
   const historyList = document.getElementById("history-list");
   const serviceOrdersList = document.getElementById("os-list");
   const serviceOrdersFeedback = document.getElementById("os-feedback");
+  const serviceOrderPrintRoot = document.getElementById("os-print-root");
+  const printSelectedServiceOrdersButton = document.getElementById("os-print-selected");
   const quoteClientHistory = document.getElementById("quote-client-history");
   const m2RowsTableBody = document.getElementById("m2-rows-table-body");
   const quotePreview = document.getElementById("quote-preview");
@@ -7620,6 +7707,7 @@ async function initApp() {
   let serviceOrderStatusFilter = "all";
   const serviceOrderCreationDrafts = new Map();
   const serviceOrderEmployeeDrafts = new Map();
+  const selectedServiceOrderIds = new Set();
 
   function setStatusMessage(element, message, tone = "neutral") {
     if (!element) {
@@ -7716,22 +7804,29 @@ async function initApp() {
     return safeClientName ? `Orçamento - ${safeClientName}` : "Orçamento";
   }
 
-  function printServiceOrder(order) {
-    const card = [...serviceOrdersList.querySelectorAll(".service-order-card")].find((item) => item.dataset.orderId === order.id);
-    if (!card) return;
+  function printServiceOrders(orders) {
+    if (!orders.length) {
+      setStatusMessage(serviceOrdersFeedback, "Selecione ao menos uma O.S. para imprimir.", "warning");
+      return;
+    }
+    serviceOrderPrintRoot.innerHTML = createServiceOrderPrintMarkup(orders, state.company);
     const previousTitle = document.title;
+    let restored = false;
+    let fallbackTimer;
     const restore = () => {
+      if (restored) return;
+      restored = true;
+      clearTimeout(fallbackTimer);
       document.title = previousTitle;
       document.body.classList.remove("printing-os");
-      card.classList.remove("is-print-target");
+      serviceOrderPrintRoot.innerHTML = "";
       window.removeEventListener("afterprint", restore);
     };
-    document.title = `O.S. ${order.number}`;
+    document.title = orders.length === 1 ? `O.S. ${orders[0].number}` : `${orders.length} Ordens de Serviço`;
     document.body.classList.add("printing-os");
-    card.classList.add("is-print-target");
     window.addEventListener("afterprint", restore);
+    fallbackTimer = setTimeout(restore, 120000);
     window.print();
-    setTimeout(restore, 1000);
   }
 
   function persistLocalOnly() {
@@ -8265,8 +8360,10 @@ async function initApp() {
       return normalizeClientMatchValue(searchable).includes(search);
     });
     serviceOrdersList.innerHTML = filteredOrders.length
-      ? filteredOrders.map((order) => createServiceOrderMarkup(order, { employeeDraft: serviceOrderEmployeeDrafts.get(order.id) ?? order.employeeName })).join("")
+      ? filteredOrders.map((order) => createServiceOrderMarkup(order, { employeeDraft: serviceOrderEmployeeDrafts.get(order.id) ?? order.employeeName, selectedForPrint: selectedServiceOrderIds.has(order.id) })).join("")
       : `<div class="empty-state"><strong>${state.serviceOrders.length ? "Nenhuma O.S. encontrada" : "Nenhuma O.S. gerada"}</strong><span>${state.serviceOrders.length ? "Ajuste a busca ou a etapa selecionada." : "Aprove um orçamento, informe o funcionário responsável e clique em Gerar O.S."}</span></div>`;
+    printSelectedServiceOrdersButton.disabled = selectedServiceOrderIds.size === 0;
+    printSelectedServiceOrdersButton.textContent = `Imprimir selecionadas (${selectedServiceOrderIds.size})`;
   }
 
   function renderQuoteClientHistory() {
@@ -11560,7 +11657,27 @@ async function initApp() {
   historyList.addEventListener("change", handleQuoteStatusChange);
   quoteClientHistory.addEventListener("change", handleQuoteStatusChange);
 
+  document.getElementById("os-select-visible").addEventListener("click", () => {
+    serviceOrdersList.querySelectorAll("[data-os-select]").forEach((input) => selectedServiceOrderIds.add(input.dataset.osSelect));
+    renderServiceOrdersTab();
+  });
+  document.getElementById("os-clear-selection").addEventListener("click", () => {
+    selectedServiceOrderIds.clear();
+    renderServiceOrdersTab();
+  });
+  printSelectedServiceOrdersButton.addEventListener("click", () => {
+    printServiceOrders(state.serviceOrders.filter((order) => selectedServiceOrderIds.has(order.id)));
+  });
+
   serviceOrdersList.addEventListener("change", (event) => {
+    const selectedId = event.target.dataset.osSelect;
+    if (selectedId) {
+      if (event.target.checked) selectedServiceOrderIds.add(selectedId);
+      else selectedServiceOrderIds.delete(selectedId);
+      printSelectedServiceOrdersButton.disabled = selectedServiceOrderIds.size === 0;
+      printSelectedServiceOrdersButton.textContent = `Imprimir selecionadas (${selectedServiceOrderIds.size})`;
+      return;
+    }
     const orderId = event.target.dataset.osStatus;
     if (!orderId) return;
     const order = state.serviceOrders.find((item) => item.id === orderId);
@@ -11604,7 +11721,7 @@ async function initApp() {
       selectTab("orcamento");
       setMainFeedback(`Orçamento da O.S. nº ${order.number} carregado para consulta.`, "success");
     } else if (button.dataset.osAction === "print") {
-      printServiceOrder(order);
+      printServiceOrders([order]);
     }
   });
 

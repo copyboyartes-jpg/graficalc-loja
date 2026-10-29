@@ -811,6 +811,25 @@ textarea:disabled {
   justify-content: start;
 }
 
+.service-order-select {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 3px;
+}
+
+.service-order-select input {
+  width: auto;
+  margin: 0;
+}
+
+.os-print-toolbar {
+  margin-bottom: 10px;
+}
+
+.os-print-root {
+  display: none;
+}
+
 @media (max-width: 1050px) {
   .service-order-card {
     grid-template-columns: minmax(0, 1fr);
@@ -2449,33 +2468,260 @@ textarea {
   }
 }
 
+@page os-slip-page {
+  size: A4 portrait;
+  margin: 0.6cm 0.5cm;
+}
+
 @media print {
-  body.printing-os .tab-panel[data-tab-panel="orcamento"] {
-    display: none !important;
-  }
-
-  body.printing-os .tab-panel[data-tab-panel="os"],
-  body.printing-os .panel.os-panel {
-    display: block !important;
-  }
-
-  body.printing-os .panel.os-panel {
+  body.printing-os,
+  body.printing-os .os-print-root {
+    margin: 0;
     padding: 0;
-    border: none;
-    box-shadow: none;
+    background: #fff;
   }
 
-  body.printing-os .history-filters,
-  body.printing-os .service-order-controls,
-  body.printing-os .service-order-card:not(.is-print-target) {
+  body.printing-os .page-shell,
+  body.printing-os .app-modal {
     display: none !important;
   }
 
-  body.printing-os .service-order-card.is-print-target {
+  body.printing-os .os-print-root {
     display: block !important;
-    border: none;
-    box-shadow: none;
+    width: 20cm;
+  }
+
+  body.printing-os .os-print-page {
+    page: os-slip-page;
+    display: flex;
+    flex-direction: column;
+    width: 20cm;
+    height: 28.5cm;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  body.printing-os .os-print-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  body.printing-os .os-slip {
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: 14.35cm minmax(0, 1fr);
+    flex: 0 0 9.5cm;
+    width: 20cm;
+    height: 9.5cm;
+    min-height: 9.5cm;
+    max-height: 9.5cm;
+    overflow: hidden;
+    border: 0.7pt solid #222;
+    color: #111;
     background: #fff;
+    font-family: Arial, sans-serif;
+    font-size: 8pt;
+    line-height: 1.16;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .os-slip-left {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    border-right: 0.7pt solid #222;
+  }
+
+  .os-slip-header {
+    display: grid;
+    grid-template-columns: 3.6cm 1fr;
+    flex: 0 0 1.38cm;
+    align-items: center;
+    border-bottom: 0.7pt solid #222;
+  }
+
+  .os-slip-brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 1.32cm;
+    padding: 0.08cm;
+    overflow: hidden;
+  }
+
+  .os-slip-logo {
+    display: block;
+    max-width: 3.4cm;
+    max-height: 1.2cm;
+    object-fit: contain;
+  }
+
+  .os-slip-company {
+    font-size: 11pt;
+    font-weight: 800;
+    text-align: center;
+  }
+
+  .os-slip-title {
+    display: grid;
+    justify-items: center;
+    align-content: center;
+  }
+
+  .os-slip-title small {
+    font-size: 7.4pt;
+  }
+
+  .os-slip-header h2 {
+    margin: 0;
+    font-size: 16pt;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    text-align: center;
+  }
+
+  .os-slip-strip,
+  .os-slip-customer,
+  .os-slip-dates {
+    display: grid;
+    align-items: center;
+    gap: 0.12cm;
+    padding: 0.04cm 0.18cm;
+    border-bottom: 0.5pt solid #555;
+  }
+
+  .os-slip-strip {
+    grid-template-columns: 4.1cm minmax(0, 1fr) 4.2cm;
+    flex: 0 0 0.62cm;
+  }
+
+  .os-slip-strip > span:last-child {
+    white-space: nowrap;
+    text-align: right;
+    font-weight: 700;
+    font-size: 7.2pt;
+  }
+
+  .os-slip-blank {
+    display: inline-block;
+    width: 1.5cm;
+    border-bottom: 0.5pt dotted #555;
+  }
+
+  .os-slip-customer {
+    grid-template-columns: minmax(0, 1fr) 4.1cm;
+    flex: 0 0 0.56cm;
+    font-size: 9pt;
+  }
+
+  .os-slip-cnpj {
+    flex: 0 0 0.42cm;
+    padding: 0.06cm 0.18cm;
+    border-bottom: 0.5pt dotted #777;
+  }
+
+  .os-slip-dates {
+    grid-template-columns: 2.9cm minmax(0, 1fr) 2cm;
+    flex: 0 0 0.57cm;
+  }
+
+  .os-slip-employee {
+    flex: 0 0 0.47cm;
+    padding: 0.07cm 0.18cm;
+    border-bottom: 0.5pt dotted #777;
+  }
+
+  .os-slip-description {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0.1cm 0.18cm 0.04cm;
+  }
+
+  .os-slip-materials {
+    display: grid;
+    gap: 0.05cm;
+    margin-top: 0.08cm;
+    font-size: 7.6pt;
+    line-height: 1.15;
+  }
+
+  .os-slip-material {
+    overflow-wrap: anywhere;
+  }
+
+  .os-slip-writing-lines {
+    display: grid;
+    grid-template-rows: repeat(4, 1fr);
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .os-slip-writing-lines span {
+    border-bottom: 0.5pt dotted #777;
+  }
+
+  .os-slip-notes {
+    flex: 0 0 0.55cm;
+    overflow: hidden;
+    padding: 0.08cm 0.18cm;
+    border-top: 0.5pt dotted #777;
+    font-size: 7.5pt;
+  }
+
+  .os-slip-payments {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    flex: 0 0 0.67cm;
+    border-top: 0.7pt solid #222;
+  }
+
+  .os-slip-payments > span {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 0.08cm 0.14cm;
+    border-right: 0.7pt solid #222;
+  }
+
+  .os-slip-payments > span:last-child {
+    border-right: 0;
+  }
+
+  .os-slip-right {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-width: 0;
+    padding: 0.22cm 0.21cm;
+    font-size: 8.8pt;
+  }
+
+  .os-slip-right p {
+    margin: 0;
+    text-align: justify;
+    line-height: 1.19;
+  }
+
+  .os-slip-signatures {
+    display: grid;
+    gap: 0.24cm;
+  }
+
+  .os-slip-signatures > div {
+    display: flex;
+    align-items: end;
+    gap: 0.12cm;
+    min-height: 0.35cm;
+  }
+
+  .os-slip-signatures i {
+    flex: 1;
+    border-bottom: 0.7pt solid #222;
   }
 }
 

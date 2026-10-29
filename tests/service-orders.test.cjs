@@ -74,3 +74,42 @@ test("orçamento aprovado libera geração uma vez e depois mostra a O.S. vincul
   assert.match(after, /data-quote-status="quote-1" disabled/);
   assert.match(after, /OS-20261029-10000000/);
 });
+
+test("comanda mantém aviso, dados e agrupa três O.S. por página A4", () => {
+  const orders = Array.from({ length: 4 }, (_, index) => ({
+    ...app.createServiceOrderFromQuote({ ...approvedQuote, id: `quote-${index}` }, [client], [], "Ana", date, () => index / 10),
+    number: `OS-20261029-${index + 1}`,
+  }));
+  const markup = app.createServiceOrderPrintMarkup(orders, { name: "Copy Boy" });
+  assert.equal((markup.match(/class="os-print-page"/g) || []).length, 2);
+  assert.equal((markup.match(/class="os-slip"/g) || []).length, 4);
+  const firstPage = markup.split('</div><div class="os-print-page">')[0];
+  assert.equal((firstPage.match(/class="os-slip"/g) || []).length, 3);
+  assert.match(markup, /Ordem de Serviço/);
+  assert.match(markup, /Cliente Exemplo/);
+  assert.match(markup, /Funcionário:<\/b> Ana/);
+  assert.match(markup, /Adesivo/);
+  assert.match(markup, /Confirmo ter conferido todo o pedido retirado na presente data/);
+  assert.match(markup, /abdico o direito de reclamações/);
+  assert.match(markup, /Nome: <i><\/i>/);
+  assert.match(markup, /Ass: <i><\/i>/);
+  assert.match(markup, /Data: <i><\/i>/);
+  const css = fs.readFileSync(path.join(__dirname, "..", "styles.css"), "utf8");
+  assert.match(css, /size: A4 portrait/);
+  assert.match(css, /width: 20cm/);
+  assert.match(css, /height: 9\.5cm/);
+  const selectedCard = app.createServiceOrderMarkup(orders[0], { selectedForPrint: true });
+  assert.match(selectedCard, /data-os-select="service-order-quote-0"[^>]* checked/);
+  const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+  assert.match(html, /id="os-print-selected"/);
+  assert.match(html, /id="os-select-visible"/);
+});
+
+test("pedido com muitos materiais continua em outra comanda sem perder itens", () => {
+  const order = app.createServiceOrderFromQuote(approvedQuote, [client], [], "Ana", date, () => 0.1);
+  order.items = Array.from({ length: 12 }, (_, index) => ({ description: `Material ${index + 1}`, detail: `Detalhe ${index + 1}`, extraDetail: "" }));
+  const markup = app.createServiceOrderPrintMarkup([order], { name: "Copy Boy" });
+  assert.ok((markup.match(/class="os-slip"/g) || []).length > 1);
+  assert.match(markup, /Continuação 2 de/);
+  for (let index = 1; index <= 12; index += 1) assert.match(markup, new RegExp(`Material ${index}(?!\\d)`));
+});

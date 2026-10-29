@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GrafiCalc | Orçamento Gráfico</title>
-  <link rel="stylesheet" href="./styles.css?v=service-orders-20261029a">
+  <link rel="stylesheet" href="./styles.css?v=os-comandas-a4-20261029a">
 </head>
 <body>
   <div class="page-shell">
@@ -1156,6 +1156,12 @@
             <label><span>Buscar O.S.</span><input id="os-search" type="search" placeholder="Número, cliente, item ou funcionário"></label>
             <label><span>Etapa</span><select id="os-status-filter"><option value="all">Todas</option><option value="Em produção">Em produção</option><option value="Pronto pra entrega">Pronto pra entrega</option><option value="Retirado">Retirado</option></select></label>
           </div>
+          <div class="toolbar os-print-toolbar">
+            <button id="os-select-visible" class="button" type="button">Selecionar O.S. exibidas</button>
+            <button id="os-clear-selection" class="button" type="button">Limpar seleção</button>
+            <button id="os-print-selected" class="button button-primary" type="button" disabled>Imprimir selecionadas (0)</button>
+          </div>
+          <p class="helper-text">Impressão em A4, com até três comandas de 20 × 9,5 cm por folha. Use escala de 100% e desative cabeçalhos e rodapés na impressão.</p>
           <p class="helper-text status-note" id="os-feedback">As O.S. são compartilhadas entre os computadores.</p>
           <div id="os-list" class="stack-list"></div>
         </article>
@@ -1322,6 +1328,8 @@
     </main>
   </div>
 
+  <div id="os-print-root" class="os-print-root" aria-hidden="true"></div>
+
   <template id="logo-placeholder-template">
     <div class="logo-placeholder">
       <span>Logo da empresa</span>
@@ -1359,7 +1367,7 @@
       }
     })();
   </script>
-  <script src="./app.mjs?v=service-orders-20261029a"></script>
+  <script src="./app.mjs?v=os-comandas-a4-20261029a"></script>
 </body>
 </html>
 
