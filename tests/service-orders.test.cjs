@@ -107,9 +107,35 @@ test("comanda mantém aviso, dados e agrupa três O.S. por página A4", () => {
 
 test("pedido com muitos materiais continua em outra comanda sem perder itens", () => {
   const order = app.createServiceOrderFromQuote(approvedQuote, [client], [], "Ana", date, () => 0.1);
-  order.items = Array.from({ length: 12 }, (_, index) => ({ description: `Material ${index + 1}`, detail: `Detalhe ${index + 1}`, extraDetail: "" }));
+  order.items = Array.from({ length: 30 }, (_, index) => ({ description: `Material ${index + 1}`, detail: `Detalhe ${index + 1}`, extraDetail: "" }));
   const markup = app.createServiceOrderPrintMarkup([order], { name: "Copy Boy" });
   assert.ok((markup.match(/class="os-slip"/g) || []).length > 1);
   assert.match(markup, /Continuação 2 de/);
-  for (let index = 1; index <= 12; index += 1) assert.match(markup, new RegExp(`Material ${index}(?!\\d)`));
+  for (let index = 1; index <= 30; index += 1) assert.match(markup, new RegExp(`Material ${index}(?!\\d)`));
+});
+
+test("três materiais detalhados cabem em uma comanda sem linhas de preenchimento", () => {
+  const order = app.createServiceOrderFromQuote(approvedQuote, [client], [], "Ana", date, () => 0.1);
+  order.items = ["Rótulo Bamboo", "Verso sabonete líquido", "Fragrância 81"].map((name, index) => ({
+    description: `${name} - Adesivo vinil com impressão digital`,
+    detail: `${[70, 200, 300][index]} unidades | 4 x 9 cm | Adesivo impressão digital com corte especial`,
+    extraDetail: "Mídia: Adesivo transparente brilho",
+  }));
+  const markup = app.createServiceOrderPrintMarkup([order], { name: "Copy Boy" });
+  assert.equal((markup.match(/class="os-slip"/g) || []).length, 1);
+  assert.doesNotMatch(markup, /os-slip-writing-lines/);
+  assert.match(markup, /Fragrância 81/);
+});
+
+test("materiais detalhados ocupam duas colunas antes de criar continuação", () => {
+  const order = app.createServiceOrderFromQuote(approvedQuote, [client], [], "Ana", date, () => 0.1);
+  order.items = Array.from({ length: 5 }, (_, index) => ({
+    description: `Rótulo ${index + 1} - Adesivo vinil com impressão digital`,
+    detail: "200 unidades | 4 x 9 cm | Adesivo impressão digital com corte especial",
+    extraDetail: "Mídia: Adesivo transparente brilho",
+  }));
+  const markup = app.createServiceOrderPrintMarkup([order], { name: "Copy Boy" });
+  assert.equal((markup.match(/class="os-slip"/g) || []).length, 1);
+  assert.match(markup, /data-columns="2"/);
+  assert.match(markup, /Rótulo 5/);
 });

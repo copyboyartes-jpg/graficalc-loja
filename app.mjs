@@ -1737,9 +1737,10 @@ function createServiceOrderSlipMarkup(order, company = {}) {
   const logo = company.logoDataUrl
     ? `<img class="os-slip-logo" src="${escapeHtml(company.logoDataUrl)}" alt="${escapeHtml(company.name || "Logo da empresa")}">`
     : `<span class="os-slip-company">${escapeHtml(company.name || "Copy Boy")}</span>`;
+  const columns = order.printColumns?.length ? order.printColumns : [order.items || []];
   const materials = order.items?.length
-    ? order.items.map((item) => `<div class="os-slip-material"><strong>${escapeHtml(item.description || "Material")}</strong>${item.detail ? ` · ${escapeHtml(item.detail)}` : ""}${item.extraDetail ? ` · ${escapeHtml(item.extraDetail)}` : ""}</div>`).join("")
-    : `<div class="os-slip-material">${escapeHtml(order.quoteTitle || "Consultar orçamento vinculado")}</div>`;
+    ? columns.map((items) => `<div class="os-slip-material-column">${items.map((item) => `<div class="os-slip-material"><strong>${escapeHtml(item.description || "Material")}</strong>${item.detail ? ` · ${escapeHtml(item.detail)}` : ""}${item.extraDetail ? ` · ${escapeHtml(item.extraDetail)}` : ""}</div>`).join("")}</div>`).join("")
+    : `<div class="os-slip-material-column"><div class="os-slip-material">${escapeHtml(order.quoteTitle || "Consultar orçamento vinculado")}</div></div>`;
   return `<article class="os-slip" data-slip-order-id="${escapeHtml(order.id)}">
     <div class="os-slip-left">
       <header class="os-slip-header"><div class="os-slip-brand">${logo}</div><div class="os-slip-title"><h2>Ordem de Serviço</h2>${order.printPart ? `<small>Continuação ${order.printPart} de ${order.printPartCount}</small>` : ""}</div></header>
@@ -1748,7 +1749,7 @@ function createServiceOrderSlipMarkup(order, company = {}) {
       <div class="os-slip-cnpj"><b>CNPJ/CPF:</b> ${escapeHtml(order.clientCnpj || "")}</div>
       <div class="os-slip-dates"><span><b>Data:</b> ${escapeHtml(formatServiceOrderDate(order.createdAt))}</span><span><b>Entrega:</b> ${escapeHtml(order.productionDeadline || "")}</span><span><b>Horas:</b> ______</span></div>
       <div class="os-slip-employee"><b>Funcionário:</b> ${escapeHtml(order.employeeName || "")}</div>
-      <div class="os-slip-description"><b>Descrição dos materiais:</b><div class="os-slip-materials">${materials}</div><div class="os-slip-writing-lines" aria-hidden="true"><span></span><span></span><span></span><span></span></div></div>
+      <div class="os-slip-description"><b>Descrição dos materiais:</b><div class="os-slip-materials" data-columns="${columns.length}">${materials}</div></div>
       <div class="os-slip-notes"><b>Observação:</b> ${escapeHtml(order.notes || "")}</div>
       <div class="os-slip-payments"><span><b>total</b><strong>${formatCurrency(order.total)}</strong></span><span><b>entrada</b></span><span><b>falta pagar</b></span></div>
     </div>
@@ -1773,31 +1774,41 @@ function splitServiceOrderItemsForPrint(items) {
     }
     if (remaining) blocks.push({ description: remaining, detail: "", extraDetail: "" });
   }
-  if (!blocks.length) return [[]];
+  if (!blocks.length) return [{ items: [], columns: [[]] }];
+  const oneColumnLines = blocks.reduce((sum, item) => {
+    const text = [item.description, item.detail, item.extraDetail].filter(Boolean).join(" · ");
+    return sum + Math.max(1, Math.ceil(text.length / 75));
+  }, 0) + Math.max(0, blocks.length - 1) * 0.25;
+  if (oneColumnLines <= 12) return [{ items: blocks, columns: [blocks] }];
+
   const chunks = [];
-  let current = [];
-  let estimatedLines = 0;
+  let columns = [[], []];
+  let columnLines = [0, 0];
+  let columnIndex = 0;
   for (const item of blocks) {
     const text = [item.description, item.detail, item.extraDetail].filter(Boolean).join(" · ");
-    const lines = Math.max(1, Math.ceil(text.length / 70));
-    if (current.length && (estimatedLines + lines > 8 || current.length >= 6)) {
-      chunks.push(current);
-      current = [];
-      estimatedLines = 0;
+    const lines = Math.max(1, Math.ceil(text.length / 52));
+    if (columns[columnIndex].length && columnLines[columnIndex] + lines > 12) columnIndex += 1;
+    if (columnIndex > 1) {
+      chunks.push({ items: columns.flat(), columns });
+      columns = [[], []];
+      columnLines = [0, 0];
+      columnIndex = 0;
     }
-    current.push(item);
-    estimatedLines += lines;
+    columns[columnIndex].push(item);
+    columnLines[columnIndex] += lines;
   }
-  if (current.length) chunks.push(current);
+  if (columns[0].length || columns[1].length) chunks.push({ items: columns.flat(), columns: columns[1].length ? columns : [columns[0]] });
   return chunks;
 }
 
 function createServiceOrderPrintMarkup(orders, company = {}) {
   const slips = orders.flatMap((order) => {
     const chunks = splitServiceOrderItemsForPrint(order.items);
-    return chunks.map((items, index) => ({
+    return chunks.map((chunk, index) => ({
       ...order,
-      items,
+      items: chunk.items,
+      printColumns: chunk.columns,
       printPart: chunks.length > 1 ? index + 1 : 0,
       printPartCount: chunks.length,
     }));
