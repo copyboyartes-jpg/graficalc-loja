@@ -122,7 +122,7 @@ test("jato de tinta não aceita A3 nem em estado antigo", () => {
   assert.equal(quote({ printType: "Colorido jato de tinta" }).rows[0].size, "A4");
 });
 
-test("agregação não mistura A3 com A4 e preserva A4/A5", () => {
+test("Somar quantidades separa A3, A4 e A5", () => {
   const rows = quote([
     { size: "A3", quantity: 1 },
     { size: "A4", quantity: 6 },
@@ -130,7 +130,7 @@ test("agregação não mistura A3 com A4 e preserva A4/A5", () => {
   ], app.createDefaultConfig(), "Somar quantidades").rows;
   assert.equal(rows[0].innerTotal, 2.5);
   assert.ok(Math.abs(rows[1].innerTotal - 3.6) < 0.00001);
-  assert.equal(rows[2].innerTotal, 2.4);
+  assert.equal(rows[2].innerTotal, 4);
 });
 
 test("linhas A3 somam impressões entre si sem misturar preços de capa A4", () => {

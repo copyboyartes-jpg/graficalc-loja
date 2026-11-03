@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GrafiCalc | Orçamento Gráfico</title>
-  <link rel="stylesheet" href="./styles.css?v=os-comandas-margem5mm-20261030a">
+  <link rel="stylesheet" href="./styles.css?v=apostila-grupos-paginas-20261103a">
 </head>
 <body>
   <div class="page-shell">
@@ -58,6 +58,16 @@
             <strong id="summary-average">R$ 0,00</strong>
           </article>
         </div>
+
+        <article class="panel apostila-page-summary" aria-live="polite">
+          <div class="panel-heading">
+            <div>
+              <h2>Páginas do miolo</h2>
+              <p class="panel-copy">Total de páginas dos arquivos, considerando a quantidade de apostilas. Páginas coloridas e preto e branco aparecem separadas.</p>
+            </div>
+          </div>
+          <div id="apostila-page-summary">Preencha as linhas para ver os totais.</div>
+        </article>
 
         <div class="workspace-grid">
           <article class="panel">
@@ -117,6 +127,10 @@
                 <select id="preset-print-mode"></select>
               </label>
               <label>
+                <span>Páginas por folha</span>
+                <select id="preset-pages-per-sheet"></select>
+              </label>
+              <label>
                 <span>Acabamento</span>
                 <select id="preset-finishing"></select>
               </label>
@@ -142,6 +156,14 @@
               </label>
             </div>
 
+            <div class="group-toolbar apostila-preset-group">
+              <label class="group-toolbar-field" for="preset-group-select">
+                <span>Configurar grupo</span>
+                <select id="preset-group-select"><option value="">Selecione um grupo</option></select>
+              </label>
+              <button id="apply-preset-group" class="button" type="button">Aplicar configurações ao grupo</button>
+            </div>
+
             <div class="toolbar">
               <button id="apply-preset-active" class="button button-primary" type="button">Aplicar nas linhas ativas</button>
               <button id="apply-preset-all" class="button" type="button">Aplicar em todas</button>
@@ -160,7 +182,7 @@
 
           <div class="group-toolbar">
             <label class="group-toolbar-field">
-              <span>Grupo de acabamento</span>
+              <span>Grupo de arquivos / acabamento</span>
               <input id="group-name-input" type="text" placeholder="Ex.: Grupo A">
             </label>
             <button id="apply-group-selected" class="button button-primary" type="button">Aplicar grupo nos selecionados</button>
@@ -168,7 +190,7 @@
           </div>
 
           <p class="helper-text">
-            Se várias linhas tiverem o mesmo grupo de acabamento, o app soma as páginas desses arquivos e calcula um único acabamento para o grupo. O valor do acabamento entra na primeira linha do grupo.
+            Linhas do mesmo grupo podem receber as mesmas configurações de uma vez. O app também soma as folhas para um único acabamento; esse valor entra na primeira linha do grupo.
           </p>
 
           <div class="table-shell budget-card-shell">
@@ -1367,7 +1389,7 @@
       }
     })();
   </script>
-  <script src="./app.mjs?v=os-comandas-compactas-20261030a"></script>
+  <script src="./app.mjs?v=apostila-grupos-paginas-20261103a"></script>
 </body>
 </html>
 

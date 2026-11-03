@@ -937,6 +937,57 @@ textarea:disabled {
   min-width: 220px;
 }
 
+.apostila-page-summary {
+  margin-bottom: 18px;
+}
+
+.apostila-page-total {
+  margin: 18px 0 14px;
+}
+
+.apostila-page-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.apostila-page-grid > section {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.apostila-page-grid h3,
+.apostila-page-grid h4,
+.apostila-group-summary > h3 {
+  margin: 0 0 10px;
+}
+
+.apostila-page-list {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.apostila-page-list li {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.apostila-group-summary {
+  margin-top: 18px;
+}
+
+.apostila-preset-group {
+  margin: 18px 0 0;
+}
+
 .preset-grid,
 .quote-form-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));

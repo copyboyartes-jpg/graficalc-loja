@@ -1429,6 +1429,7 @@ function createDefaultState() {
       innerPaper: "Sulfite 75g",
       size: "A4",
       printMode: "Só frente",
+      pagesPerSheet: 1,
       finishing: "Sem acabamento",
       coverType: "Sem capa",
       coverPaper: "Sulfite 75g",
@@ -2258,6 +2259,8 @@ function mergeState(candidate) {
   state.presets = { ...state.presets, ...(candidate.presets || {}) };
   state.presets.size = getValidApostilaSize(state.presets.printType, state.presets.size);
   state.presets.innerPaper = getValidApostilaInnerPaper(state.presets.innerPaper);
+  state.presets.pagesPerSheet = [1, 2, 4, 6].includes(toWholeNumber(state.presets.pagesPerSheet))
+    ? toWholeNumber(state.presets.pagesPerSheet) : 1;
   state.client = { ...state.client, ...(candidate.client || {}) };
   state.client.id = typeof state.client.id === "string" ? state.client.id : "";
   state.company = { ...state.company, ...(candidate.company || {}) };
@@ -2910,14 +2913,7 @@ function getApostilaPricingSize(size) {
 
 function getPrintAggregationKey(printType, printMode, size = "A4", paper = "Sulfite 75g") {
   const paperKey = printType === "Colorido laser" ? `::${paper}` : "";
-  if (size === "A3") {
-    return `${size}::${printType}${paperKey}`;
-  }
-  if (printType === "Preto e branco") {
-    return `${printType}::${printMode === "Frente e verso" ? "Frente e verso" : "Só frente"}`;
-  }
-
-  return `${printType}${paperKey}`;
+  return `${size}::${printType}${paperKey}`;
 }
 
 function getApplicableBlackWhiteTiers(config, printMode) {
@@ -4191,7 +4187,7 @@ function calculateWorkbook(state, config) {
     }
 
     if (item.innerBreakdown.colorImpressions > 0 && item.innerBreakdown.normalizedColorPages > 0) {
-      const colorKey = `${pricingSize}::${getApostilaInnerPaper(item.row)}`;
+      const colorKey = `${size}::${item.row.printType}::${getApostilaInnerPaper(item.row)}`;
       aggregateColorPagesByPaper[colorKey] = (aggregateColorPagesByPaper[colorKey] || 0) + item.innerBreakdown.colorImpressions;
     } else if (item.innerBreakdown.colorImpressions > 0 && item.row.printType !== "Preto e branco") {
       const colorKey = getPrintAggregationKey(item.row.printType, item.row.printMode, size, getApostilaInnerPaper(item.row));
@@ -4317,7 +4313,7 @@ function calculateWorkbook(state, config) {
     }
     if (innerBreakdown.colorImpressions > 0) {
       if (innerBreakdown.normalizedColorPages > 0) {
-        const colorKey = `${pricingSize}::${getApostilaInnerPaper(row)}`;
+        const colorKey = `${row.size}::${row.printType}::${getApostilaInnerPaper(row)}`;
         const colorPricingQty = state.calcMode === "Somar quantidades"
           ? aggregateColorPagesByPaper[colorKey] || 0
           : innerBreakdown.colorImpressions;
@@ -4400,6 +4396,72 @@ function calculateWorkbook(state, config) {
     },
     warnings,
   };
+}
+
+function summarizeApostilaPages(rows) {
+  const byType = new Map();
+  const bySizeAndType = new Map();
+  const groups = new Map();
+  let totalPages = 0;
+
+  function add(map, key, details, pages) {
+    const existing = map.get(key);
+    if (existing) existing.pages += pages;
+    else map.set(key, { ...details, pages });
+  }
+
+  rows.forEach((row) => {
+    const quantity = Math.max(0, toWholeNumber(row.quantity));
+    const pagesPerCopy = Math.max(0, toWholeNumber(row.pages));
+    if (!isRowActive(row) || !quantity || !pagesPerCopy) return;
+    const size = getValidApostilaSize(row.printType, row.size);
+    const groupName = normalizeBindingGroup(row.bindingGroup);
+    const colorPages = row.printType === "Preto e branco" ? 0 : getNormalizedColorPages(row);
+    const parts = colorPages > 0
+      ? [["Preto e branco", pagesPerCopy - colorPages], [row.printType, colorPages]]
+      : [[row.printType, pagesPerCopy]];
+
+    parts.forEach(([printType, pages]) => {
+      const count = pages * quantity;
+      if (!count) return;
+      add(byType, printType, { printType }, count);
+      add(bySizeAndType, `${size}::${printType}`, { size, printType }, count);
+      totalPages += count;
+      if (!groupName) return;
+      if (!groups.has(groupName)) groups.set(groupName, { name: groupName, pages: 0, bySizeAndType: new Map() });
+      const group = groups.get(groupName);
+      group.pages += count;
+      add(group.bySizeAndType, `${size}::${printType}`, { size, printType }, count);
+    });
+  });
+
+  const sortedTotals = (map) => [...map.values()].sort((a, b) =>
+    (a.size || "").localeCompare(b.size || "", "pt-BR") || a.printType.localeCompare(b.printType, "pt-BR"));
+  return {
+    totalPages,
+    byType: sortedTotals(byType),
+    bySizeAndType: sortedTotals(bySizeAndType),
+    byGroup: [...groups.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+      .map((group) => ({ name: group.name, pages: group.pages, bySizeAndType: sortedTotals(group.bySizeAndType) })),
+  };
+}
+
+function createApostilaPageSummaryMarkup(summary, calcMode) {
+  if (!summary.totalPages) return '<p class="helper-text">Preencha páginas e quantidade para ver os totais.</p>';
+  const pageList = (entries, withSize = false) => `<ul class="apostila-page-list">${entries.map((entry) => `
+    <li><span>${withSize ? `${escapeHtml(entry.size)} · ` : ""}${escapeHtml(entry.printType)}</span><strong>${formatInteger(entry.pages)} páginas</strong></li>
+  `).join("")}</ul>`;
+  return `
+    <p class="apostila-page-total">Total do miolo: <strong>${formatInteger(summary.totalPages)} páginas</strong></p>
+    <div class="apostila-page-grid">
+      <section><h3>Por tipo de impressão</h3>${pageList(summary.byType)}</section>
+      <section><h3>Por tamanho e tipo</h3>${pageList(summary.bySizeAndType, true)}</section>
+    </div>
+    ${summary.byGroup.length ? `<div class="apostila-group-summary"><h3>Por grupo</h3><div class="apostila-page-grid">${summary.byGroup.map((group) => `
+      <section><h4>${escapeHtml(group.name)} · ${formatInteger(group.pages)} páginas</h4>${pageList(group.bySizeAndType, true)}</section>
+    `).join("")}</div></div>` : ""}
+    ${calcMode === "Somar quantidades" ? '<p class="helper-text">As faixas de preço somam impressões do mesmo tamanho e tipo; papéis laser diferentes mantêm suas próprias tabelas.</p>' : ""}
+  `;
 }
 
 function calculateColorPrintWorkbook(state, config) {
@@ -5500,12 +5562,26 @@ function applyPresetToRow(row, preset) {
   row.innerPaper = getApostilaInnerPaper(preset);
   row.size = getValidApostilaSize(row.printType, preset.size);
   row.printMode = preset.printMode;
+  row.pagesPerSheet = [1, 2, 4, 6].includes(toWholeNumber(preset.pagesPerSheet))
+    ? toWholeNumber(preset.pagesPerSheet) : 1;
   row.finishing = preset.finishing;
   row.coverType = preset.coverType;
   row.coverPaper = preset.coverPaper;
   row.backCoverType = preset.backCoverType;
   row.backCoverPaper = preset.backCoverPaper;
   row.spiralOption = preset.spiralOption;
+}
+
+function applyPresetToGroup(rows, preset, groupName) {
+  const target = normalizeBindingGroup(groupName);
+  if (!target) return 0;
+  let changed = 0;
+  rows.forEach((row) => {
+    if (normalizeBindingGroup(row.bindingGroup) !== target) return;
+    applyPresetToRow(row, preset);
+    changed += 1;
+  });
+  return changed;
 }
 
 function createConfigSectionTabsMarkup(activeSection = "calculo") {
@@ -8124,12 +8200,24 @@ async function initApp() {
     innerPaperSelect.disabled = state.presets.printType !== "Colorido laser";
     document.getElementById("preset-size").innerHTML = buildOptions(getApostilaSizeOptions(state.presets.printType), state.presets.size);
     document.getElementById("preset-print-mode").innerHTML = buildOptions(OPTIONS.printModes, state.presets.printMode);
+    document.getElementById("preset-pages-per-sheet").innerHTML = buildOptions(["1", "2", "4", "6"], String(state.presets.pagesPerSheet));
     document.getElementById("preset-finishing").innerHTML = buildOptions(OPTIONS.finishing, state.presets.finishing);
     document.getElementById("preset-cover").innerHTML = buildOptions(OPTIONS.coverTypes, state.presets.coverType);
     document.getElementById("preset-cover-paper").innerHTML = buildOptions(OPTIONS.coverPapers, state.presets.coverPaper);
     document.getElementById("preset-back-cover").innerHTML = buildOptions(OPTIONS.backCoverTypes, state.presets.backCoverType);
     document.getElementById("preset-back-cover-paper").innerHTML = buildOptions(OPTIONS.coverPapers, state.presets.backCoverPaper);
     document.getElementById("preset-spiral-option").innerHTML = buildOptions(OPTIONS.spiralOptions, state.presets.spiralOption);
+    renderPresetGroupOptions();
+  }
+
+  function renderPresetGroupOptions() {
+    const select = document.getElementById("preset-group-select");
+    const current = select.value;
+    const groups = [...new Set(state.rows.map((row) => normalizeBindingGroup(row.bindingGroup)).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, "pt-BR"));
+    select.innerHTML = `<option value="">Selecione um grupo</option>${buildOptions(groups, current)}`;
+    select.value = groups.includes(current) ? current : "";
+    document.getElementById("apply-preset-group").disabled = groups.length === 0;
   }
 
   function renderClientFields() {
@@ -8392,6 +8480,7 @@ async function initApp() {
 
   function renderRowsAndSummary() {
     const workbook = calculateWorkbook(state, config);
+    const pageSummary = summarizeApostilaPages(workbook.activeRows);
     const colorWorkbook = calculateColorPrintWorkbook(state, config);
     const credentialWorkbook = calculateCredentialWorkbook(state, config);
     const readyWorkbook = calculateReadyProductWorkbook(state, config);
@@ -8409,6 +8498,8 @@ async function initApp() {
     document.getElementById("summary-booklets").textContent = formatInteger(workbook.totals.totalQuantity);
     document.getElementById("summary-total").textContent = formatCurrency(workbook.totals.totalGeneral);
     document.getElementById("summary-average").textContent = formatCurrency(workbook.totals.averageValue);
+    document.getElementById("apostila-page-summary").innerHTML = createApostilaPageSummaryMarkup(pageSummary, state.calcMode);
+    renderPresetGroupOptions();
 
     document.getElementById("color-summary-active").textContent = formatInteger(colorWorkbook.totals.activeLines);
     document.getElementById("color-summary-quantity").textContent = formatInteger(colorWorkbook.totals.totalQuantity);
@@ -9551,7 +9642,7 @@ async function initApp() {
   }
 
   function updatePreset(name, value) {
-    state.presets[name] = value;
+    state.presets[name] = name === "pagesPerSheet" ? toWholeNumber(value) : value;
     state.presets.size = getValidApostilaSize(state.presets.printType, state.presets.size);
     state.presets.innerPaper = getValidApostilaInnerPaper(state.presets.innerPaper);
     persist();
@@ -9567,6 +9658,18 @@ async function initApp() {
     });
     persist();
     renderRowsAndSummary();
+  }
+
+  function applyPresetForSelectedGroup() {
+    const groupName = document.getElementById("preset-group-select").value;
+    const changed = applyPresetToGroup(state.rows, state.presets, groupName);
+    if (!changed) {
+      setMainFeedback("Selecione um grupo com linhas de apostila para aplicar as configurações.", "warning");
+      return;
+    }
+    persist();
+    renderRowsAndSummary();
+    setMainFeedback(`Configurações aplicadas às ${changed} linha(s) do grupo ${groupName}.`, "success");
   }
 
   async function importPdfFiles(fileList) {
@@ -9883,6 +9986,7 @@ async function initApp() {
     ["preset-inner-paper", "innerPaper"],
     ["preset-size", "size"],
     ["preset-print-mode", "printMode"],
+    ["preset-pages-per-sheet", "pagesPerSheet"],
     ["preset-finishing", "finishing"],
     ["preset-cover", "coverType"],
     ["preset-cover-paper", "coverPaper"],
@@ -9998,6 +10102,8 @@ async function initApp() {
   document.getElementById("apply-preset-all").addEventListener("click", () => {
     applyPreset("all");
   });
+
+  document.getElementById("apply-preset-group").addEventListener("click", applyPresetForSelectedGroup);
 
   rowsTableBody.addEventListener("change", (event) => {
     const target = event.target;
