@@ -1607,18 +1607,16 @@ function normalizeServiceOrderStatus(value) {
   return SERVICE_ORDER_STATUSES.includes(value) ? value : SERVICE_ORDER_STATUSES[0];
 }
 
-function generateServiceOrderNumber(orders, date = new Date(), random = Math.random) {
-  const day = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
-  const used = new Set(orders.map((order) => order.number));
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    const suffix = String((Math.floor(random() * 100000000) + attempt) % 100000000).padStart(8, "0");
-    const number = `OS-${day}-${suffix}`;
-    if (!used.has(number)) return number;
-  }
-  return `OS-${day}-${Date.now()}`;
+function generateServiceOrderNumber(orders, date = new Date()) {
+  const year = new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", year: "numeric" }).format(date);
+  const highest = orders.reduce((maximum, order) => {
+    const match = String(order.number || "").match(/^(\d{4,})-(\d{4})$/);
+    return match?.[2] === year ? Math.max(maximum, Number(match[1])) : maximum;
+  }, 0);
+  return `${String(highest + 1).padStart(5, "0")}-${year}`;
 }
 
-function createServiceOrderFromQuote(quote, clients, orders, employeeName, date = new Date(), random = Math.random) {
+function createServiceOrderFromQuote(quote, clients, orders, employeeName, date = new Date(), reservedNumber = "") {
   const employee = String(employeeName || "").trim();
   if (!quote || normalizeQuoteStatus(quote.status) !== "Aprovado" || !employee || orders.some((order) => order.quoteId === quote.id)) return null;
   const client = getQuoteClient(quote, clients);
@@ -1628,7 +1626,8 @@ function createServiceOrderFromQuote(quote, clients, orders, employeeName, date 
   const createdAt = date.toISOString();
   return {
     id: `service-order-${quote.id}`,
-    number: generateServiceOrderNumber(orders, date, random),
+    number: typeof reservedNumber === "string" && /^\d{5,}-\d{4}$/.test(reservedNumber)
+      ? reservedNumber : generateServiceOrderNumber(orders, date),
     quoteId: quote.id,
     quoteTitle: quote.title || "Orçamento aprovado",
     clientId: client?.id || quote.clientId || "",
@@ -7793,6 +7792,7 @@ async function initApp() {
   let serviceOrderSearchQuery = "";
   let serviceOrderStatusFilter = "all";
   const serviceOrderCreationDrafts = new Map();
+  const pendingServiceOrderQuoteIds = new Set();
   const serviceOrderEmployeeDrafts = new Map();
   const selectedServiceOrderIds = new Set();
 
@@ -11671,6 +11671,7 @@ async function initApp() {
     }
 
     if (button.dataset.historyAction === "generate-os") {
+      if (pendingServiceOrderQuoteIds.has(item.id)) return;
       const employeeName = button.closest(".quote-record-card")?.querySelector("[data-os-employee-for]")?.value.trim() || "";
       if (!employeeName) {
         setMainFeedback("Informe o nome do funcionário responsável antes de gerar a O.S.", "warning");
@@ -11681,6 +11682,18 @@ async function initApp() {
         setMainFeedback("Não foi possível gerar a O.S. Verifique se o orçamento está aprovado, tem cliente identificado e ainda não possui O.S.", "warning");
         return;
       }
+      pendingServiceOrderQuoteIds.add(item.id);
+      try {
+        const reservation = await requestSharedState("POST", { action: "reserve_service_order_number", quoteId: item.id });
+        if (!/^\d{5,}-\d{4}$/.test(String(reservation?.number || ""))) throw new Error("invalid-service-order-number");
+        order.number = reservation.number;
+      } catch {
+        setMainFeedback("Não foi possível reservar o número da O.S. na base compartilhada. Tente novamente em instantes.", "warning");
+        return;
+      } finally {
+        pendingServiceOrderQuoteIds.delete(item.id);
+      }
+      if (state.serviceOrders.some((entry) => entry.quoteId === item.id)) return;
       state.serviceOrders.unshift(order);
       serviceOrderCreationDrafts.delete(item.id);
       persist();

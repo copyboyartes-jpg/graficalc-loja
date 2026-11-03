@@ -25,7 +25,7 @@ test("somente orçamento aprovado com cliente e funcionário gera O.S. completa"
   assert.equal(app.createServiceOrderFromQuote({ ...approvedQuote, clientName: "", clientId: "", snapshot: null }, [], [], "Ana", date, () => 0.1), null);
 
   const order = app.createServiceOrderFromQuote(approvedQuote, [client], [], " Ana ", date, () => 0.1);
-  assert.equal(order.number, "OS-20261029-10000000");
+  assert.equal(order.number, "00001-2026");
   assert.equal(order.status, "Em produção");
   assert.equal(order.employeeName, "Ana");
   assert.equal(order.clientContact, client.contact);
@@ -39,7 +39,7 @@ test("somente orçamento aprovado com cliente e funcionário gera O.S. completa"
 test("numeração evita colisão local e etapas registram pronto e retirado", () => {
   const first = app.createServiceOrderFromQuote(approvedQuote, [client], [], "Ana", date, () => 0.1);
   const second = app.createServiceOrderFromQuote({ ...approvedQuote, id: "quote-2" }, [client], [first], "Bia", date, () => 0.1);
-  assert.notEqual(first.number, second.number);
+  assert.equal(second.number, "00002-2026");
   assert.equal(app.updateServiceOrderStatus(first, "Pronto pra entrega", new Date("2026-10-30T12:00:00Z")), true);
   assert.equal(first.readyAt, "2026-10-30T12:00:00.000Z");
   assert.equal(app.updateServiceOrderStatus(first, "Retirado", new Date("2026-10-31T12:00:00Z")), true);
@@ -47,6 +47,18 @@ test("numeração evita colisão local e etapas registram pronto e retirado", ()
   assert.equal(app.updateServiceOrderStatus(first, "Em produção", new Date("2026-11-01T12:00:00Z")), true);
   assert.equal(first.readyAt, "");
   assert.equal(first.collectedAt, "");
+});
+
+test("sequência reinicia a cada ano e mantém O.S. antigas", () => {
+  const oldOrders = [
+    { number: "OS-20261029-10000000" },
+    { number: "00007-2026" },
+    { number: "00003-2025" },
+  ];
+  assert.equal(app.generateServiceOrderNumber(oldOrders, new Date("2026-12-31T20:00:00Z")), "00008-2026");
+  assert.equal(app.generateServiceOrderNumber(oldOrders, new Date("2027-01-01T02:00:00Z")), "00008-2026");
+  assert.equal(app.generateServiceOrderNumber(oldOrders, new Date("2027-01-01T04:00:00Z")), "00001-2027");
+  assert.equal(oldOrders[0].number, "OS-20261029-10000000");
 });
 
 test("O.S. permanece no estado compartilhável e mostra cliente e funcionário", () => {
@@ -57,7 +69,7 @@ test("O.S. permanece no estado compartilhável e mostra cliente e funcionário",
   assert.equal(state.serviceOrders[0].employeeName, "Ana");
   assert.equal(state.serviceOrders[0].items[0].detail, "10 unidades");
   const markup = app.createServiceOrderMarkup(order);
-  assert.match(markup, /O\.S\. nº OS-20261029-10000000/);
+  assert.match(markup, /O\.S\. nº 00001-2026/);
   assert.match(markup, /Cliente Exemplo/);
   assert.match(markup, /Ana/);
   assert.match(markup, /Adesivo/);
@@ -72,7 +84,7 @@ test("orçamento aprovado libera geração uma vez e depois mostra a O.S. vincul
   assert.doesNotMatch(after, /Gerar O\.S\./);
   assert.match(after, /Abrir O\.S\./);
   assert.match(after, /data-quote-status="quote-1" disabled/);
-  assert.match(after, /OS-20261029-10000000/);
+  assert.match(after, /00001-2026/);
 });
 
 test("comanda mantém aviso, dados e agrupa três O.S. por página A4", () => {

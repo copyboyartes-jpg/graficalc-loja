@@ -1,6 +1,7 @@
 const crypto = require("node:crypto");
 
 const SHARED_STATE_KEY = "graficalc-global";
+const SERVICE_ORDER_SEQUENCE_PREFIX = "graficalc-os-sequence-";
 const FALLBACK_SUPABASE_URL = "https://abiwcbjqlffgnrfenvwf.supabase.co";
 
 function jsonResponse(body, status = 200) {
@@ -156,6 +157,47 @@ async function writeSharedState(payload) {
   };
 }
 
+function getServiceOrderYear(date = new Date()) {
+  return Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", year: "numeric" }).format(date));
+}
+
+async function reserveServiceOrderNumber(quoteId, year = getServiceOrderYear()) {
+  const stateKey = `${SERVICE_ORDER_SEQUENCE_PREFIX}${year}`;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const rows = await supabaseRequest(
+      `/shared_app_state?state_key=eq.${encodeURIComponent(stateKey)}&select=payload,updated_at&limit=1`,
+      { method: "GET" }
+    );
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (!row) {
+      await supabaseRequest("/shared_app_state", {
+        method: "POST",
+        headers: { Prefer: "resolution=ignore-duplicates,return=representation" },
+        body: JSON.stringify({ state_key: stateKey, payload: { lastNumber: 0, quotes: {} }, updated_at: new Date().toISOString() }),
+      });
+      continue;
+    }
+
+    const current = row.payload || {};
+    if (Number.isSafeInteger(current.quotes?.[quoteId]) && current.quotes[quoteId] > 0) {
+      return `${String(current.quotes[quoteId]).padStart(5, "0")}-${year}`;
+    }
+    const lastNumber = Number.isSafeInteger(current.lastNumber) && current.lastNumber >= 0 ? current.lastNumber : 0;
+    const next = lastNumber + 1;
+    const priorTime = Date.parse(row.updated_at);
+    const updatedAt = new Date(Math.max(Date.now(), Number.isFinite(priorTime) ? priorTime + 1 : 0)).toISOString();
+    const updated = await supabaseRequest(
+      `/shared_app_state?state_key=eq.${encodeURIComponent(stateKey)}&updated_at=eq.${encodeURIComponent(row.updated_at)}&select=payload`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ payload: { lastNumber: next, quotes: { ...current.quotes, [quoteId]: next } }, updated_at: updatedAt }),
+      }
+    );
+    if (Array.isArray(updated) && updated.length === 1) return `${String(next).padStart(5, "0")}-${year}`;
+  }
+  throw new Error("Nao foi possivel reservar o numero da O.S. apos varias tentativas.");
+}
+
 function readRequestBody(request) {
   return new Promise((resolve, reject) => {
     let raw = "";
@@ -204,10 +246,11 @@ async function handleSharedState(request) {
 
   if (request.method === "POST") {
     const body = await readRequestBody(request);
-    if (!body || body.action !== "verify_config_access") {
-      return jsonResponse({ error: "Payload invalido." }, 400);
+    if (body?.action === "verify_config_access") return verifyConfigAccess(body);
+    if (body?.action === "reserve_service_order_number" && typeof body.quoteId === "string" && body.quoteId.length > 0 && body.quoteId.length <= 200) {
+      return jsonResponse({ number: await reserveServiceOrderNumber(body.quoteId) });
     }
-    return verifyConfigAccess(body);
+    return jsonResponse({ error: "Payload invalido." }, 400);
   }
 
   if (request.method === "PUT") {
