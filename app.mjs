@@ -1589,14 +1589,24 @@ function getQuoteHistoryItems(quote) {
   }));
 }
 
-function getClientQuoteStats(client, quoteHistory, clients) {
-  const quotes = quoteHistory.filter((quote) => getQuoteClient(quote, clients)?.id === client.id);
+function getClientQuoteStats(client, quoteHistory, clients, serviceOrders = []) {
+  const quotes = quoteHistory.filter((quote) => getQuoteClient(quote, clients)?.id === client.id)
+    .sort((first, second) => (Date.parse(second.approvedAt || second.createdAt) || 0) - (Date.parse(first.approvedAt || first.createdAt) || 0));
   const approvedQuotes = quotes.filter((quote) => normalizeQuoteStatus(quote.status) === "Aprovado");
+  const ordersByQuoteId = new Map(serviceOrders.map((order) => [order.quoteId, order]));
   return {
     quotes,
     quoteCount: quotes.length,
     approvedCount: approvedQuotes.length,
-    spent: approvedQuotes.reduce((sum, quote) => sum + toMoneyNumber(quote.total), 0),
+    spent: approvedQuotes.reduce((sum, quote) => sum + Math.round(toMoneyNumber(quote.total) * 100), 0) / 100,
+    purchaseRecords: approvedQuotes.map((quote) => ({
+      quoteId: quote.id,
+      title: quote.title || "Orçamento aprovado",
+      date: quote.approvedAt || quote.createdAt,
+      total: toMoneyNumber(quote.total),
+      items: getQuoteHistoryItems(quote),
+      serviceOrder: ordersByQuoteId.get(quote.id) || null,
+    })),
     purchases: approvedQuotes.flatMap((quote) => getQuoteHistoryItems(quote).map((item) => ({ ...item, quoteId: quote.id, date: quote.approvedAt || quote.createdAt }))),
   };
 }
@@ -1689,6 +1699,16 @@ function updateServiceOrderStatus(order, status, date = new Date()) {
 function buildTeamMemberOptions(members, selectedId = "") {
   return `<option value="">Selecione um colaborador</option>${members.filter((member) => member.active !== false)
     .map((member) => `<option value="${escapeHtml(member.id)}"${member.id === selectedId ? " selected" : ""}>${escapeHtml(member.name)}</option>`).join("")}`;
+}
+
+function createClientPurchaseHistoryMarkup(purchaseRecords) {
+  if (!purchaseRecords.length) return '<p class="list-meta">Nenhum orçamento aprovado para este cliente.</p>';
+  return `<div class="client-purchase-records">${purchaseRecords.map((purchase) => `
+    <article class="client-purchase-record">
+      <div class="client-purchase-heading"><div><strong>${escapeHtml(purchase.title)}</strong><small>Aprovado em ${escapeHtml(formatDateTime(purchase.date) || "data indisponível")}</small></div><strong>${formatCurrency(purchase.total)}</strong></div>
+      ${purchase.serviceOrder ? `<p class="list-meta">O.S. nº ${escapeHtml(purchase.serviceOrder.number)} · ${escapeHtml(normalizeServiceOrderStatus(purchase.serviceOrder.status))}</p>` : ""}
+      ${purchase.items.length ? `<ul class="client-purchase-list">${purchase.items.map((item) => `<li><strong>${escapeHtml(item.description || "Material")}</strong>${item.detail ? `<small>${escapeHtml(item.detail)}</small>` : ""}${item.extraDetail ? `<small>${escapeHtml(item.extraDetail)}</small>` : ""}</li>`).join("")}</ul>` : '<p class="list-meta">Este orçamento antigo não tem materiais detalhados.</p>'}
+    </article>`).join("")}</div>`;
 }
 
 function createQuoteRecordMarkup(quote, clients, { compact = false, serviceOrders = [], employeeDraft = "", teamMembers = [] } = {}) {
@@ -8476,20 +8496,21 @@ async function initApp() {
     const filteredClients = state.clients.filter((client) => normalizeClientMatchValue(`${client.name} ${client.contact} ${client.cnpj}`).includes(search));
     clientsList.innerHTML = filteredClients.length
       ? filteredClients.map((client) => {
-        const stats = getClientQuoteStats(client, state.quoteHistory, state.clients);
+        const stats = getClientQuoteStats(client, state.quoteHistory, state.clients, state.serviceOrders);
+        const otherQuotes = stats.quotes.filter((quote) => normalizeQuoteStatus(quote.status) !== "Aprovado");
         return `
           <article class="list-card client-record-card" data-client-id="${escapeHtml(client.id)}">
             <div>
               <h3>${escapeHtml(client.name || "Sem nome")}</h3>
               <p>${escapeHtml(client.contact || "Sem contato")} · ${escapeHtml(client.cnpj || "Sem CNPJ")}</p>
               ${client.notes ? `<p class="list-notes">${escapeHtml(client.notes)}</p>` : ""}
-              <div class="client-stat-row"><span>${formatInteger(stats.quoteCount)} orçamentos</span><span>${formatInteger(stats.approvedCount)} aprovados</span><strong>Total gasto: ${formatCurrency(stats.spent)}</strong></div>
-              <details class="client-history-details"><summary>Ver histórico e compras</summary>
+              <div class="client-stat-row"><span>${formatInteger(stats.quoteCount)} orçamentos</span><span>${formatInteger(stats.approvedCount)} aprovados</span><strong>Total comprado: ${formatCurrency(stats.spent)}</strong></div>
+              <details class="client-history-details"${filteredClients.length === 1 ? " open" : ""}><summary>Histórico do cliente · ${formatInteger(stats.approvedCount)} ${stats.approvedCount === 1 ? "compra" : "compras"}</summary>
                 <div class="client-detail-content">
-                  <h4>O que comprou</h4>
-                  ${stats.purchases.length ? `<ul class="client-purchase-list">${stats.purchases.map((item) => `<li><strong>${escapeHtml(item.description)}</strong>${item.detail ? `<small>${escapeHtml(item.detail)}</small>` : ""}<small>${escapeHtml(formatDateTime(item.date) || "data indisponível")}</small></li>`).join("")}</ul>` : `<p class="list-meta">Nenhum orçamento aprovado.</p>`}
-                  <h4>Orçamentos feitos</h4>
-                  ${stats.quotes.length ? `<div class="stack-list">${stats.quotes.map((quote) => createQuoteRecordMarkup(quote, state.clients, { compact: true, serviceOrders: state.serviceOrders, teamMembers })).join("")}</div>` : `<p class="list-meta">Nenhum orçamento vinculado.</p>`}
+                  <h4>Compras e orçamentos aprovados</h4>
+                  ${createClientPurchaseHistoryMarkup(stats.purchaseRecords)}
+                  <h4>Orçamentos pendentes e recusados</h4>
+                  ${otherQuotes.length ? `<div class="stack-list">${otherQuotes.map((quote) => createQuoteRecordMarkup(quote, state.clients, { compact: true, serviceOrders: state.serviceOrders, teamMembers })).join("")}</div>` : `<p class="list-meta">Nenhum outro orçamento.</p>`}
                 </div>
               </details>
             </div>
@@ -8557,9 +8578,9 @@ async function initApp() {
       quoteClientHistory.innerHTML = `<div class="empty-state"><strong>Selecione um cliente cadastrado</strong><span>Você também pode preencher o nome acima e salvar o orçamento para criar o cadastro automaticamente.</span></div>`;
       return;
     }
-    const stats = getClientQuoteStats(client, state.quoteHistory, state.clients);
+    const stats = getClientQuoteStats(client, state.quoteHistory, state.clients, state.serviceOrders);
     quoteClientHistory.innerHTML = `
-      <div class="client-stat-row"><span>${formatInteger(stats.quoteCount)} orçamentos</span><span>${formatInteger(stats.approvedCount)} aprovados</span><strong>Total gasto: ${formatCurrency(stats.spent)}</strong></div>
+      <div class="client-stat-row"><span>${formatInteger(stats.quoteCount)} orçamentos</span><span>${formatInteger(stats.approvedCount)} aprovados</span><strong>Total comprado: ${formatCurrency(stats.spent)}</strong></div>
       ${stats.quotes.length ? stats.quotes.map((quote) => createQuoteRecordMarkup(quote, state.clients, { serviceOrders: state.serviceOrders, employeeDraft: serviceOrderCreationDrafts.get(quote.id) || "", teamMembers })).join("") : `<div class="empty-state"><strong>Nenhum orçamento salvo para ${escapeHtml(client.name)}</strong><span>Salve a proposta atual para iniciar o histórico.</span></div>`}`;
   }
 

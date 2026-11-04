@@ -36,6 +36,28 @@ test("compras e total por cliente usam apenas orçamentos aprovados", () => {
   assert.deepEqual(stats.purchases.map((item) => item.description), ["Adesivo"]);
 });
 
+test("histórico separa compras por orçamento, mostra valor e O.S. e soma centavos sem arredondamento indevido", () => {
+  const quotes = [
+    { id: "q1", clientId: "client-1", title: "Primeira compra", status: "Aprovado", total: 0.1, approvedAt: "2026-10-01T10:00:00Z", items: [{ description: "Adesivo", detail: "10 unidades" }] },
+    { id: "q2", clientId: "client-1", title: "Segunda compra", status: "Aprovado", total: 0.2, approvedAt: "2026-11-01T10:00:00Z", items: [{ description: "Lona", detail: "1 m²" }] },
+    { id: "q3", clientId: "client-1", title: "Pendente", status: "Pendente", total: 100, createdAt: "2026-11-02T10:00:00Z", items: [{ description: "Panfleto" }] },
+    { id: "q4", clientId: "client-2", status: "Aprovado", total: 500, items: [{ description: "Outro cliente" }] },
+  ];
+  const orders = [{ quoteId: "q2", number: "00002-2026", status: "Em produção" }];
+  const stats = app.getClientQuoteStats(clients[0], quotes, clients, orders);
+  assert.equal(stats.quoteCount, 3);
+  assert.equal(stats.approvedCount, 2);
+  assert.equal(stats.spent, 0.3);
+  assert.deepEqual(stats.purchaseRecords.map((record) => record.quoteId), ["q2", "q1"]);
+  const markup = app.createClientPurchaseHistoryMarkup(stats.purchaseRecords);
+  assert.match(markup, /Segunda compra/);
+  assert.match(markup, /Lona/);
+  assert.match(markup, /R\$\s*0,20/);
+  assert.match(markup, /O\.S\. nº 00002-2026 · Em produção/);
+  assert.match(markup, /Primeira compra/);
+  assert.doesNotMatch(markup, /Panfleto|Outro cliente/);
+});
+
 test("novo histórico não duplica a logo e restauração mantém a logo atual", () => {
   const state = app.createDefaultState();
   state.company.logoDataUrl = "data:image/png;base64,LOGO";
