@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GrafiCalc | Orçamento Gráfico</title>
-  <link rel="stylesheet" href="./styles.css?v=os-pagamentos-20261104a">
+  <link rel="stylesheet" href="./styles.css?v=equipe-os-20261104a">
 </head>
 <body>
   <div class="page-shell">
@@ -33,6 +33,7 @@
       <button class="tab-button" data-tab-target="orcamento-livre">Orçamento livre</button>
       <button class="tab-button" data-tab-target="configuracao">Configuração</button>
       <button class="tab-button" data-tab-target="clientes">Clientes</button>
+      <button class="tab-button" data-tab-target="equipe">Equipe</button>
       <button class="tab-button" data-tab-target="historico">Histórico</button>
       <button class="tab-button" data-tab-target="os">O.S.</button>
       <button class="tab-button" data-tab-target="orcamento">Orçamento</button>
@@ -1160,6 +1161,25 @@
         </div>
       </section>
 
+      <section class="tab-panel" data-tab-panel="equipe">
+        <div class="workspace-grid">
+          <article class="panel">
+            <div class="panel-heading"><div><h2>Cadastro da equipe</h2><p class="panel-copy">Cadastre cada colaborador com nome e senha. A senha é necessária para trocar o responsável original de uma O.S.</p></div></div>
+            <form id="team-form" class="team-form">
+              <label><span>Nome do colaborador</span><input id="team-name" type="text" maxlength="80" required autocomplete="off"></label>
+              <label><span>Senha do colaborador (mínimo de 8 caracteres)</span><input id="team-password" type="password" minlength="8" required autocomplete="new-password"></label>
+              <label><span>Senha das configurações</span><input id="team-admin-password" type="password" required autocomplete="current-password"></label>
+              <button class="button button-primary" type="submit">Cadastrar colaborador</button>
+            </form>
+            <p id="team-feedback" class="helper-text status-note">Use a senha das configurações para administrar a equipe.</p>
+          </article>
+          <article class="panel">
+            <div class="panel-heading"><div><h2>Colaboradores</h2><p class="panel-copy">Atualize nomes e senhas ou desative um cadastro. A autoria das O.S. permanece registrada.</p></div></div>
+            <div id="team-list" class="stack-list"></div>
+          </article>
+        </div>
+      </section>
+
       <section class="tab-panel" data-tab-panel="os">
         <div class="summary-grid">
           <article class="summary-card"><span class="summary-label">O.S. geradas</span><strong id="os-count">0</strong></article>
@@ -1389,7 +1409,7 @@
       }
     })();
   </script>
-  <script src="./app.mjs?v=os-pagamentos-20261104a"></script>
+  <script src="./app.mjs?v=equipe-os-20261104a"></script>
 </body>
 </html>
 

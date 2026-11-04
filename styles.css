@@ -742,6 +742,22 @@ textarea:disabled {
   background: rgba(43, 155, 95, 0.08);
 }
 
+.team-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.team-member-card {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.team-member-card .list-meta {
+  display: block;
+  margin-top: 4px;
+}
+
 .service-order-card {
   grid-template-columns: minmax(0, 1fr) minmax(220px, 0.35fr);
 }

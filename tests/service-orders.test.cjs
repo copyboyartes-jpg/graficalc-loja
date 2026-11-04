@@ -104,7 +104,7 @@ test("orçamento aprovado libera geração uma vez e depois mostra a O.S. vincul
   const order = app.createServiceOrderFromQuote(approvedQuote, [client], [], "Ana", date, () => 0.1);
   const before = app.createQuoteRecordMarkup(approvedQuote, [client]);
   assert.match(before, /Gerar O\.S\./);
-  assert.match(before, /Funcionário responsável/);
+  assert.match(before, /Colaborador responsável/);
   const after = app.createQuoteRecordMarkup(approvedQuote, [client], { serviceOrders: [order] });
   assert.doesNotMatch(after, /Gerar O\.S\./);
   assert.match(after, /Abrir O\.S\./);

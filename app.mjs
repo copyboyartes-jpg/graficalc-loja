@@ -1686,7 +1686,12 @@ function updateServiceOrderStatus(order, status, date = new Date()) {
   return true;
 }
 
-function createQuoteRecordMarkup(quote, clients, { compact = false, serviceOrders = [], employeeDraft = "" } = {}) {
+function buildTeamMemberOptions(members, selectedId = "") {
+  return `<option value="">Selecione um colaborador</option>${members.filter((member) => member.active !== false)
+    .map((member) => `<option value="${escapeHtml(member.id)}"${member.id === selectedId ? " selected" : ""}>${escapeHtml(member.name)}</option>`).join("")}`;
+}
+
+function createQuoteRecordMarkup(quote, clients, { compact = false, serviceOrders = [], employeeDraft = "", teamMembers = [] } = {}) {
   const items = getQuoteHistoryItems(quote);
   const client = getQuoteClient(quote, clients);
   const status = normalizeQuoteStatus(quote.status);
@@ -1705,7 +1710,7 @@ function createQuoteRecordMarkup(quote, clients, { compact = false, serviceOrder
       </div>
       ${compact ? "" : `<div class="quote-record-controls">
         <label><span>Situação</span><select data-quote-status="${escapeHtml(quote.id)}"${serviceOrder ? " disabled" : ""}>${statusOptions}</select></label>
-        ${status === "Aprovado" && !serviceOrder ? `<div class="service-order-create"><label><span>Funcionário responsável</span><input type="text" data-os-employee-for="${escapeHtml(quote.id)}" value="${escapeHtml(employeeDraft)}" placeholder="Nome do funcionário" autocomplete="name"></label><button class="button button-primary" type="button" data-history-action="generate-os" data-quote-id="${escapeHtml(quote.id)}">Gerar O.S.</button></div>` : ""}
+        ${status === "Aprovado" && !serviceOrder ? `<div class="service-order-create"><label><span>Colaborador responsável</span><select data-os-employee-for="${escapeHtml(quote.id)}">${buildTeamMemberOptions(teamMembers, employeeDraft)}</select></label><button class="button button-primary" type="button" data-history-action="generate-os" data-quote-id="${escapeHtml(quote.id)}"${teamMembers.some((member) => member.active !== false) ? "" : " disabled"}>Gerar O.S.</button>${teamMembers.some((member) => member.active !== false) ? "" : '<small>Cadastre um colaborador na aba Equipe para gerar a O.S.</small>'}</div>` : ""}
         ${serviceOrder ? `<button class="button" type="button" data-history-action="open-os" data-quote-id="${escapeHtml(quote.id)}">Abrir O.S.</button>` : ""}
         <div class="list-actions">
           <button class="button button-primary" type="button" data-history-action="load-full" data-quote-id="${escapeHtml(quote.id)}" ${hasFullSnapshot ? "" : "disabled"}>${hasFullSnapshot ? "Abrir orçamento" : "Somente resumo"}</button>
@@ -1717,7 +1722,7 @@ function createQuoteRecordMarkup(quote, clients, { compact = false, serviceOrder
     </article>`;
 }
 
-function createServiceOrderMarkup(order, { employeeDraft = order.employeeName, selectedForPrint = false } = {}) {
+function createServiceOrderMarkup(order, { employeeDraft = order.assignedMemberId || "", selectedForPrint = false, teamMembers = [] } = {}) {
   const status = normalizeServiceOrderStatus(order.status);
   const payment = getServiceOrderPayment(order);
   const statusOptions = SERVICE_ORDER_STATUSES.map((option) => `<option value="${option}"${option === status ? " selected" : ""}>${option}</option>`).join("");
@@ -1728,7 +1733,7 @@ function createServiceOrderMarkup(order, { employeeDraft = order.employeeName, s
         <p class="list-meta">Gerada em ${escapeHtml(formatDateTime(order.createdAt) || "data indisponível")} · Orçamento: ${escapeHtml(order.quoteTitle || order.quoteId)}</p>
         <div class="service-order-info">
           <div><strong>Cliente</strong><span>${escapeHtml(order.clientName || "Cliente não informado")}</span>${order.clientContact ? `<span>${escapeHtml(order.clientContact)}</span>` : ""}${order.clientCnpj ? `<span>CNPJ: ${escapeHtml(order.clientCnpj)}</span>` : ""}</div>
-          <div><strong>Funcionário responsável</strong><span>${escapeHtml(order.employeeName || "Não informado")}</span>${order.productionDeadline ? `<small>Prazo informado: ${escapeHtml(order.productionDeadline)}</small>` : ""}</div>
+          <div><strong>Funcionário responsável</strong><span>${escapeHtml(order.employeeName || "Não informado")}</span><small>Criado por: ${escapeHtml(order.createdByName || order.employeeName || "Não informado")}</small>${order.productionDeadline ? `<small>Prazo informado: ${escapeHtml(order.productionDeadline)}</small>` : ""}</div>
         </div>
         <div class="service-order-items"><strong>Itens do pedido</strong>${order.items.length ? `<ul>${order.items.map((item) => `<li><strong>${escapeHtml(item.description)}</strong>${item.detail ? `<span>${escapeHtml(item.detail)}</span>` : ""}${item.extraDetail ? `<small>${escapeHtml(item.extraDetail)}</small>` : ""}</li>`).join("")}</ul>` : `<p class="list-meta">Consulte o orçamento original para os detalhes dos itens.</p>`}</div>
         <div class="service-order-payment-summary">
@@ -1741,10 +1746,11 @@ function createServiceOrderMarkup(order, { employeeDraft = order.employeeName, s
       </div>
       <div class="service-order-controls">
         <label><span>Etapa da O.S.</span><select data-os-status="${escapeHtml(order.id)}">${statusOptions}</select></label>
-        <label><span>Funcionário responsável</span><input type="text" data-os-employee="${escapeHtml(order.id)}" value="${escapeHtml(employeeDraft)}"></label>
+        <label><span>Novo responsável</span><select data-os-employee="${escapeHtml(order.id)}">${buildTeamMemberOptions(teamMembers, employeeDraft)}</select></label>
+        <label><span>Senha de quem criou a O.S. (${escapeHtml(order.createdByName || order.employeeName || "responsável original")})</span><input type="password" data-os-creator-password autocomplete="off"></label>
         <label><span>Valor já pago (R$)</span><input type="number" min="0" max="${payment.total}" step="0.01" inputmode="decimal" data-os-paid="${escapeHtml(order.id)}" value="${payment.paidAmount}"></label>
         <p class="list-meta">Falta pagar: <output data-os-balance="${escapeHtml(order.id)}">${formatCurrency(payment.balanceDue)}</output></p>
-        <div class="list-actions"><button class="button" type="button" data-os-action="save-employee" data-order-id="${escapeHtml(order.id)}">Salvar nome</button><button class="button" type="button" data-os-action="open-quote" data-order-id="${escapeHtml(order.id)}">Abrir orçamento</button><button class="button button-primary" type="button" data-os-action="print" data-order-id="${escapeHtml(order.id)}">Imprimir O.S.</button></div>
+        <div class="list-actions"><button class="button" type="button" data-os-action="save-employee" data-order-id="${escapeHtml(order.id)}">Alterar responsável</button><button class="button" type="button" data-os-action="open-quote" data-order-id="${escapeHtml(order.id)}">Abrir orçamento</button><button class="button button-primary" type="button" data-os-action="print" data-order-id="${escapeHtml(order.id)}">Imprimir O.S.</button></div>
       </div>
     </article>`;
 }
@@ -2334,6 +2340,9 @@ function mergeState(candidate) {
           clientContact: String(order.clientContact || ""),
           clientCnpj: String(order.clientCnpj || ""),
           employeeName: String(order.employeeName || ""),
+          createdByMemberId: String(order.createdByMemberId || ""),
+          createdByName: String(order.createdByName || order.employeeName || ""),
+          assignedMemberId: String(order.assignedMemberId || ""),
           items: Array.isArray(order.items) ? order.items.filter((item) => item && typeof item === "object").map((item) => ({
             description: String(item.description || ""),
             detail: String(item.detail || ""),
@@ -7773,6 +7782,8 @@ async function initApp() {
   const linearMeterWarningList = document.getElementById("linear-meter-warning-list");
   const configSections = document.getElementById("config-sections");
   const clientsList = document.getElementById("clients-list");
+  const teamList = document.getElementById("team-list");
+  const teamFeedback = document.getElementById("team-feedback");
   const historyList = document.getElementById("history-list");
   const serviceOrdersList = document.getElementById("os-list");
   const serviceOrdersFeedback = document.getElementById("os-feedback");
@@ -7817,8 +7828,10 @@ async function initApp() {
   let serviceOrderSearchQuery = "";
   let serviceOrderStatusFilter = "all";
   const serviceOrderCreationDrafts = new Map();
+  let teamMembers = [];
   const pendingServiceOrderQuoteIds = new Set();
   const serviceOrderEmployeeDrafts = new Map();
+  const pendingEmployeeChanges = new Set();
   const selectedServiceOrderIds = new Set();
 
   function setStatusMessage(element, message, tone = "neutral") {
@@ -8013,7 +8026,13 @@ async function initApp() {
 
     try {
       const result = await requestSharedState("PUT", payload);
-      lastSharedSnapshot = serialized;
+      const savedPayload = result.payload || payload;
+      lastSharedSnapshot = JSON.stringify(savedPayload);
+      if (!sharedSyncQueued && JSON.stringify(savedPayload.state?.serviceOrders) !== JSON.stringify(payload.state.serviceOrders)) {
+        applySharedStateSnapshot({ serviceOrders: savedPayload.state.serviceOrders });
+        persistLocalOnly();
+        renderServiceOrdersTab();
+      }
       sharedUpdatedAt = result.updatedAt || new Date().toISOString();
       setSyncStatus("Tudo salvo e compartilhado entre os computadores.", "success");
     } catch {
@@ -8112,10 +8131,12 @@ async function initApp() {
         return;
       }
       void refreshSharedState(false);
+      void refreshTeamMembers().catch(() => {});
     }, SHARED_SYNC_INTERVAL_MS);
 
     window.addEventListener("focus", () => {
       void refreshSharedState(true);
+      void refreshTeamMembers().catch(() => {});
     });
   }
 
@@ -8213,6 +8234,35 @@ async function initApp() {
   function persist() {
     persistLocalOnly();
     queueSharedSave(false);
+  }
+
+  async function requestTeamAction(action, fields) {
+    const response = await fetch(SHARED_API_PATH, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ...fields }),
+      cache: "no-store",
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || "Não foi possível atualizar a equipe.");
+    return result;
+  }
+
+  function applyTeamMembers(members) {
+    teamMembers = members;
+    renderTeamTab();
+    renderHistoryTab();
+    renderServiceOrdersTab();
+    renderQuoteClientHistory();
+  }
+
+  async function refreshTeamMembers() {
+    const response = await fetch(`${SHARED_API_PATH}?resource=team`, { cache: "no-store" });
+    if (!response.ok) throw new Error("team-unavailable");
+    const result = await response.json();
+    const members = Array.isArray(result.members) ? result.members : [];
+    if (JSON.stringify(members) === JSON.stringify(teamMembers)) return;
+    applyTeamMembers(members);
   }
 
   function renderPresetControls() {
@@ -8439,7 +8489,7 @@ async function initApp() {
                   <h4>O que comprou</h4>
                   ${stats.purchases.length ? `<ul class="client-purchase-list">${stats.purchases.map((item) => `<li><strong>${escapeHtml(item.description)}</strong>${item.detail ? `<small>${escapeHtml(item.detail)}</small>` : ""}<small>${escapeHtml(formatDateTime(item.date) || "data indisponível")}</small></li>`).join("")}</ul>` : `<p class="list-meta">Nenhum orçamento aprovado.</p>`}
                   <h4>Orçamentos feitos</h4>
-                  ${stats.quotes.length ? `<div class="stack-list">${stats.quotes.map((quote) => createQuoteRecordMarkup(quote, state.clients, { compact: true, serviceOrders: state.serviceOrders })).join("")}</div>` : `<p class="list-meta">Nenhum orçamento vinculado.</p>`}
+                  ${stats.quotes.length ? `<div class="stack-list">${stats.quotes.map((quote) => createQuoteRecordMarkup(quote, state.clients, { compact: true, serviceOrders: state.serviceOrders, teamMembers })).join("")}</div>` : `<p class="list-meta">Nenhum orçamento vinculado.</p>`}
                 </div>
               </details>
             </div>
@@ -8451,6 +8501,16 @@ async function initApp() {
           </article>`;
       }).join("")
       : `<div class="empty-state"><strong>${state.clients.length ? "Nenhum cliente encontrado" : "Nenhum cliente salvo ainda"}</strong><span>Cadastre um cliente ou ajuste a busca.</span></div>`;
+  }
+
+  function renderTeamTab() {
+    teamList.innerHTML = teamMembers.length ? teamMembers.map((member) => `
+      <article class="list-card team-member-card" data-team-id="${escapeHtml(member.id)}">
+        <div><strong>${escapeHtml(member.name)}</strong><span class="list-meta">${member.active === false ? "Inativo" : "Ativo"}</span></div>
+        <label><span>Nome</span><input data-team-name value="${escapeHtml(member.name)}" maxlength="80"></label>
+        <label><span>Nova senha (opcional)</span><input data-team-password type="password" minlength="8" autocomplete="new-password" placeholder="Deixe vazio para manter"></label>
+        <div class="list-actions"><button class="button" type="button" data-team-action="save">Salvar alterações</button><button class="button" type="button" data-team-action="toggle">${member.active === false ? "Ativar" : "Desativar"}</button></div>
+      </article>`).join("") : '<div class="empty-state"><strong>Nenhum colaborador cadastrado</strong><span>Cadastre a equipe para selecionar responsáveis nas O.S.</span></div>';
   }
 
   function renderHistoryTab() {
@@ -8468,7 +8528,7 @@ async function initApp() {
       return normalizeClientMatchValue(searchable).includes(search);
     });
     historyList.innerHTML = filteredQuotes.length
-      ? filteredQuotes.map((item) => createQuoteRecordMarkup(item, state.clients, { serviceOrders: state.serviceOrders, employeeDraft: serviceOrderCreationDrafts.get(item.id) || "" })).join("")
+      ? filteredQuotes.map((item) => createQuoteRecordMarkup(item, state.clients, { serviceOrders: state.serviceOrders, employeeDraft: serviceOrderCreationDrafts.get(item.id) || "", teamMembers })).join("")
       : `<div class="empty-state"><strong>${totalQuotes ? "Nenhum orçamento encontrado" : "Nenhum orçamento salvo ainda"}</strong><span>${totalQuotes ? "Ajuste a busca ou a situação selecionada." : "Salve o orçamento atual para começar o histórico."}</span></div>`;
   }
 
@@ -8484,7 +8544,7 @@ async function initApp() {
       return normalizeClientMatchValue(searchable).includes(search);
     });
     serviceOrdersList.innerHTML = filteredOrders.length
-      ? filteredOrders.map((order) => createServiceOrderMarkup(order, { employeeDraft: serviceOrderEmployeeDrafts.get(order.id) ?? order.employeeName, selectedForPrint: selectedServiceOrderIds.has(order.id) })).join("")
+      ? filteredOrders.map((order) => createServiceOrderMarkup(order, { employeeDraft: serviceOrderEmployeeDrafts.get(order.id) || order.assignedMemberId || teamMembers.find((member) => member.name === order.employeeName)?.id || "", selectedForPrint: selectedServiceOrderIds.has(order.id), teamMembers })).join("")
       : `<div class="empty-state"><strong>${state.serviceOrders.length ? "Nenhuma O.S. encontrada" : "Nenhuma O.S. gerada"}</strong><span>${state.serviceOrders.length ? "Ajuste a busca ou a etapa selecionada." : "Aprove um orçamento, informe o funcionário responsável e clique em Gerar O.S."}</span></div>`;
     printSelectedServiceOrdersButton.disabled = selectedServiceOrderIds.size === 0;
     printSelectedServiceOrdersButton.textContent = `Imprimir selecionadas (${selectedServiceOrderIds.size})`;
@@ -8500,7 +8560,7 @@ async function initApp() {
     const stats = getClientQuoteStats(client, state.quoteHistory, state.clients);
     quoteClientHistory.innerHTML = `
       <div class="client-stat-row"><span>${formatInteger(stats.quoteCount)} orçamentos</span><span>${formatInteger(stats.approvedCount)} aprovados</span><strong>Total gasto: ${formatCurrency(stats.spent)}</strong></div>
-      ${stats.quotes.length ? stats.quotes.map((quote) => createQuoteRecordMarkup(quote, state.clients, { serviceOrders: state.serviceOrders, employeeDraft: serviceOrderCreationDrafts.get(quote.id) || "" })).join("") : `<div class="empty-state"><strong>Nenhum orçamento salvo para ${escapeHtml(client.name)}</strong><span>Salve a proposta atual para iniciar o histórico.</span></div>`}`;
+      ${stats.quotes.length ? stats.quotes.map((quote) => createQuoteRecordMarkup(quote, state.clients, { serviceOrders: state.serviceOrders, employeeDraft: serviceOrderCreationDrafts.get(quote.id) || "", teamMembers })).join("") : `<div class="empty-state"><strong>Nenhum orçamento salvo para ${escapeHtml(client.name)}</strong><span>Salve a proposta atual para iniciar o histórico.</span></div>`}`;
   }
 
   function renderRowsAndSummary() {
@@ -9631,6 +9691,7 @@ async function initApp() {
       renderClientFields,
       renderConfig,
       renderClientsTab,
+      renderTeamTab,
       renderHistoryTab,
       renderServiceOrdersTab,
       renderQuoteClientHistory,
@@ -11697,16 +11758,20 @@ async function initApp() {
 
     if (button.dataset.historyAction === "generate-os") {
       if (pendingServiceOrderQuoteIds.has(item.id)) return;
-      const employeeName = button.closest(".quote-record-card")?.querySelector("[data-os-employee-for]")?.value.trim() || "";
-      if (!employeeName) {
-        setMainFeedback("Informe o nome do funcionário responsável antes de gerar a O.S.", "warning");
+      const memberId = button.closest(".quote-record-card")?.querySelector("[data-os-employee-for]")?.value || "";
+      const creator = teamMembers.find((member) => member.id === memberId && member.active !== false);
+      if (!creator) {
+        setMainFeedback("Selecione um colaborador cadastrado na equipe antes de gerar a O.S.", "warning");
         return;
       }
-      const order = createServiceOrderFromQuote(item, state.clients, state.serviceOrders, employeeName);
+      const order = createServiceOrderFromQuote(item, state.clients, state.serviceOrders, creator.name);
       if (!order) {
         setMainFeedback("Não foi possível gerar a O.S. Verifique se o orçamento está aprovado, tem cliente identificado e ainda não possui O.S.", "warning");
         return;
       }
+      order.createdByMemberId = creator.id;
+      order.createdByName = creator.name;
+      order.assignedMemberId = creator.id;
       pendingServiceOrderQuoteIds.add(item.id);
       try {
         const reservation = await requestSharedState("POST", { action: "reserve_service_order_number", quoteId: item.id });
@@ -11786,7 +11851,9 @@ async function initApp() {
     if (quoteId) serviceOrderCreationDrafts.set(quoteId, event.target.value);
   };
   historyList.addEventListener("input", rememberServiceOrderCreationDraft);
+  historyList.addEventListener("change", rememberServiceOrderCreationDraft);
   quoteClientHistory.addEventListener("input", rememberServiceOrderCreationDraft);
+  quoteClientHistory.addEventListener("change", rememberServiceOrderCreationDraft);
 
   function handleQuoteStatusChange(event) {
     const quoteId = event.target.dataset.quoteStatus;
@@ -11824,7 +11891,57 @@ async function initApp() {
     printServiceOrders(state.serviceOrders.filter((order) => selectedServiceOrderIds.has(order.id)));
   });
 
+  document.getElementById("team-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const fields = {
+      name: document.getElementById("team-name").value,
+      password: document.getElementById("team-password").value,
+      adminPassword: document.getElementById("team-admin-password").value,
+    };
+    try {
+      const result = await requestTeamAction("save_team_member", fields);
+      applyTeamMembers(result.members);
+      form.reset();
+      setStatusMessage(teamFeedback, "Colaborador cadastrado na equipe.", "success");
+    } catch (error) {
+      setStatusMessage(teamFeedback, error.message, "error");
+    }
+  });
+
+  teamList.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-team-action]");
+    if (!button) return;
+    const card = button.closest("[data-team-id]");
+    const member = teamMembers.find((entry) => entry.id === card?.dataset.teamId);
+    const adminInput = document.getElementById("team-admin-password");
+    if (!member || !adminInput.value) {
+      setStatusMessage(teamFeedback, "Informe a senha das configurações para administrar a equipe.", "warning");
+      return;
+    }
+    try {
+      const result = button.dataset.teamAction === "toggle"
+        ? await requestTeamAction("toggle_team_member", { memberId: member.id, active: member.active === false, adminPassword: adminInput.value })
+        : await requestTeamAction("save_team_member", {
+          memberId: member.id,
+          name: card.querySelector("[data-team-name]").value,
+          password: card.querySelector("[data-team-password]").value,
+          adminPassword: adminInput.value,
+        });
+      adminInput.value = "";
+      applyTeamMembers(result.members);
+      setStatusMessage(teamFeedback, "Cadastro da equipe atualizado.", "success");
+    } catch (error) {
+      setStatusMessage(teamFeedback, error.message, "error");
+    }
+  });
+
   serviceOrdersList.addEventListener("change", (event) => {
+    const selectedEmployeeId = event.target.dataset.osEmployee;
+    if (selectedEmployeeId) {
+      serviceOrderEmployeeDrafts.set(selectedEmployeeId, event.target.value);
+      return;
+    }
     const selectedId = event.target.dataset.osSelect;
     if (selectedId) {
       if (event.target.checked) selectedServiceOrderIds.add(selectedId);
@@ -11875,23 +11992,40 @@ async function initApp() {
     }
   });
 
-  serviceOrdersList.addEventListener("click", (event) => {
+  serviceOrdersList.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-os-action]");
     if (!button) return;
     const order = state.serviceOrders.find((item) => item.id === button.dataset.orderId);
     if (!order) return;
     if (button.dataset.osAction === "save-employee") {
-      const employeeName = button.closest(".service-order-card")?.querySelector("[data-os-employee]")?.value.trim() || "";
-      if (!employeeName) {
-        setStatusMessage(serviceOrdersFeedback, "Informe o nome do funcionário responsável.", "warning");
+      if (pendingEmployeeChanges.has(order.id)) return;
+      const card = button.closest(".service-order-card");
+      const memberId = card?.querySelector("[data-os-employee]")?.value || "";
+      const creatorPassword = card?.querySelector("[data-os-creator-password]")?.value || "";
+      if (!memberId || !creatorPassword) {
+        setStatusMessage(serviceOrdersFeedback, "Selecione o novo responsável e informe a senha de quem criou a O.S.", "warning");
         return;
       }
-      order.employeeName = employeeName;
-      order.updatedAt = new Date().toISOString();
-      serviceOrderEmployeeDrafts.delete(order.id);
-      persist();
-      renderServiceOrdersTab();
-      setStatusMessage(serviceOrdersFeedback, `Funcionário da O.S. nº ${order.number} atualizado.`, "success");
+      pendingEmployeeChanges.add(order.id);
+      button.disabled = true;
+      try {
+        const result = await requestTeamAction("change_os_employee", { orderId: order.id, memberId, creatorPassword });
+        order.employeeName = result.order.employeeName;
+        order.assignedMemberId = result.order.assignedMemberId;
+        order.createdByMemberId = result.order.createdByMemberId;
+        order.createdByName = result.order.createdByName;
+        order.updatedAt = result.order.updatedAt;
+        serviceOrderEmployeeDrafts.delete(order.id);
+        persist();
+        renderServiceOrdersTab();
+        setStatusMessage(serviceOrdersFeedback, `Responsável da O.S. nº ${order.number} atualizado.`, "success");
+      } catch (error) {
+        setStatusMessage(serviceOrdersFeedback, error.message, "error");
+      } finally {
+        pendingEmployeeChanges.delete(order.id);
+        button.disabled = false;
+        if (card) card.querySelector("[data-os-creator-password]").value = "";
+      }
     } else if (button.dataset.osAction === "open-quote") {
       const quote = state.quoteHistory.find((item) => item.id === order.quoteId);
       const snapshot = getQuoteHistorySnapshot(quote);
@@ -11936,6 +12070,7 @@ async function initApp() {
 
   renderAll();
   window.setTimeout(refreshCredentialRowsFromBrowserRestore, 250);
+  void refreshTeamMembers().catch(() => setStatusMessage(teamFeedback, "Não foi possível carregar a equipe agora.", "warning"));
   bootstrapSharedState()
     .catch(() => {
       sharedBootstrapComplete = true;
