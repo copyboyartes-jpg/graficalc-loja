@@ -75,6 +75,31 @@ test("O.S. permanece no estado compartilhável e mostra cliente e funcionário",
   assert.match(markup, /Adesivo/);
 });
 
+test("pagamento parcial atualiza saldo, persiste e aparece na comanda", () => {
+  const order = app.createServiceOrderFromQuote(approvedQuote, [client], [], "Ana", date);
+  assert.equal(app.getServiceOrderPayment(order).balanceDue, 145);
+  assert.equal(app.updateServiceOrderPayment(order, "50.25", date), true);
+  assert.equal(app.getServiceOrderPayment(order).paidAmount, 50.25);
+  assert.equal(app.getServiceOrderPayment(order).balanceDue, 94.75);
+  assert.equal(app.updateServiceOrderPayment(order, "150", date), false);
+  assert.equal(app.getServiceOrderPayment(order).paidAmount, 50.25);
+
+  const restored = app.mergeState({ serviceOrders: [order] }).serviceOrders[0];
+  assert.equal(restored.paidAmount, 50.25);
+  const screen = app.createServiceOrderMarkup(restored);
+  assert.match(screen, /Valor já pago \(R\$\)/);
+  assert.match(screen, /R\$\s*94,75/);
+  const print = app.createServiceOrderPrintMarkup([restored], { name: "Copy Boy" });
+  assert.match(print, /<b>pago<\/b><strong>R\$\s*50,25<\/strong>/);
+  assert.match(print, /<b>falta pagar<\/b><strong>R\$\s*94,75<\/strong>/);
+
+  assert.equal(app.updateServiceOrderPayment(restored, "145", date), true);
+  assert.equal(app.getServiceOrderPayment(restored).balanceDue, 0);
+  const legacy = app.mergeState({ serviceOrders: [{ ...order, paidAmount: undefined }] }).serviceOrders[0];
+  assert.equal(app.getServiceOrderPayment(legacy).paidAmount, 0);
+  assert.equal(app.getServiceOrderPayment(legacy).balanceDue, 145);
+});
+
 test("orçamento aprovado libera geração uma vez e depois mostra a O.S. vinculada", () => {
   const order = app.createServiceOrderFromQuote(approvedQuote, [client], [], "Ana", date, () => 0.1);
   const before = app.createQuoteRecordMarkup(approvedQuote, [client]);

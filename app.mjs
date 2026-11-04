@@ -1607,6 +1607,21 @@ function normalizeServiceOrderStatus(value) {
   return SERVICE_ORDER_STATUSES.includes(value) ? value : SERVICE_ORDER_STATUSES[0];
 }
 
+function getServiceOrderPayment(order) {
+  const total = Math.round(toMoneyNumber(order?.total) * 100) / 100;
+  const paidAmount = Math.min(total, Math.round(toMoneyNumber(order?.paidAmount) * 100) / 100);
+  return { total, paidAmount, balanceDue: Math.max(0, Math.round((total - paidAmount) * 100) / 100) };
+}
+
+function updateServiceOrderPayment(order, value, date = new Date()) {
+  const amount = value === "" ? 0 : Number(value);
+  const total = getServiceOrderPayment(order).total;
+  if (!Number.isFinite(amount) || amount < 0 || amount > total) return false;
+  order.paidAmount = Math.round(amount * 100) / 100;
+  order.updatedAt = date.toISOString();
+  return true;
+}
+
 function generateServiceOrderNumber(orders, date = new Date()) {
   const year = new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", year: "numeric" }).format(date);
   const highest = orders.reduce((maximum, order) => {
@@ -1642,6 +1657,7 @@ function createServiceOrderFromQuote(quote, clients, orders, employeeName, date 
       total: toMoneyNumber(item.total),
     })),
     total: toMoneyNumber(quote.total),
+    paidAmount: 0,
     productionDeadline: String(getQuoteHistorySnapshot(quote)?.productionDeadline || ""),
     notes: String(getQuoteHistorySnapshot(quote)?.quoteNotes || ""),
     status: SERVICE_ORDER_STATUSES[0],
@@ -1703,6 +1719,7 @@ function createQuoteRecordMarkup(quote, clients, { compact = false, serviceOrder
 
 function createServiceOrderMarkup(order, { employeeDraft = order.employeeName, selectedForPrint = false } = {}) {
   const status = normalizeServiceOrderStatus(order.status);
+  const payment = getServiceOrderPayment(order);
   const statusOptions = SERVICE_ORDER_STATUSES.map((option) => `<option value="${option}"${option === status ? " selected" : ""}>${option}</option>`).join("");
   return `
     <article class="list-card service-order-card" data-order-id="${escapeHtml(order.id)}">
@@ -1714,13 +1731,19 @@ function createServiceOrderMarkup(order, { employeeDraft = order.employeeName, s
           <div><strong>Funcionário responsável</strong><span>${escapeHtml(order.employeeName || "Não informado")}</span>${order.productionDeadline ? `<small>Prazo informado: ${escapeHtml(order.productionDeadline)}</small>` : ""}</div>
         </div>
         <div class="service-order-items"><strong>Itens do pedido</strong>${order.items.length ? `<ul>${order.items.map((item) => `<li><strong>${escapeHtml(item.description)}</strong>${item.detail ? `<span>${escapeHtml(item.detail)}</span>` : ""}${item.extraDetail ? `<small>${escapeHtml(item.extraDetail)}</small>` : ""}</li>`).join("")}</ul>` : `<p class="list-meta">Consulte o orçamento original para os detalhes dos itens.</p>`}</div>
-        <p class="service-order-total"><strong>Total aprovado:</strong> ${formatCurrency(order.total)}</p>
+        <div class="service-order-payment-summary">
+          <div><span>Total aprovado</span><strong>${formatCurrency(payment.total)}</strong></div>
+          <div><span>Já pago</span><strong data-os-paid-display="${escapeHtml(order.id)}">${formatCurrency(payment.paidAmount)}</strong></div>
+          <div><span>Falta pagar</span><strong data-os-balance-display="${escapeHtml(order.id)}">${formatCurrency(payment.balanceDue)}</strong></div>
+        </div>
         ${order.readyAt ? `<p class="list-meta">Pronto em ${escapeHtml(formatDateTime(order.readyAt))}</p>` : ""}
         ${order.collectedAt ? `<p class="list-meta">Retirado em ${escapeHtml(formatDateTime(order.collectedAt))}</p>` : ""}
       </div>
       <div class="service-order-controls">
         <label><span>Etapa da O.S.</span><select data-os-status="${escapeHtml(order.id)}">${statusOptions}</select></label>
         <label><span>Funcionário responsável</span><input type="text" data-os-employee="${escapeHtml(order.id)}" value="${escapeHtml(employeeDraft)}"></label>
+        <label><span>Valor já pago (R$)</span><input type="number" min="0" max="${payment.total}" step="0.01" inputmode="decimal" data-os-paid="${escapeHtml(order.id)}" value="${payment.paidAmount}"></label>
+        <p class="list-meta">Falta pagar: <output data-os-balance="${escapeHtml(order.id)}">${formatCurrency(payment.balanceDue)}</output></p>
         <div class="list-actions"><button class="button" type="button" data-os-action="save-employee" data-order-id="${escapeHtml(order.id)}">Salvar nome</button><button class="button" type="button" data-os-action="open-quote" data-order-id="${escapeHtml(order.id)}">Abrir orçamento</button><button class="button button-primary" type="button" data-os-action="print" data-order-id="${escapeHtml(order.id)}">Imprimir O.S.</button></div>
       </div>
     </article>`;
@@ -1734,6 +1757,7 @@ function formatServiceOrderDate(value) {
 const SERVICE_ORDER_NOTICE = "Confirmo ter conferido todo o pedido retirado na presente data. Não obstante, abdico o direito de reclamações quanto à cor, tamanho, quantidade ou quaisquer outros possíveis motivos para solicitação de re-produção após a retirada deste material.";
 
 function createServiceOrderSlipMarkup(order, company = {}) {
+  const payment = getServiceOrderPayment(order);
   const logo = company.logoDataUrl
     ? `<img class="os-slip-logo" src="${escapeHtml(company.logoDataUrl)}" alt="${escapeHtml(company.name || "Logo da empresa")}">`
     : `<span class="os-slip-company">${escapeHtml(company.name || "Copy Boy")}</span>`;
@@ -1751,7 +1775,7 @@ function createServiceOrderSlipMarkup(order, company = {}) {
       <div class="os-slip-employee"><b>Funcionário:</b> ${escapeHtml(order.employeeName || "")}</div>
       <div class="os-slip-description"><b>Descrição dos materiais:</b><div class="os-slip-materials" data-columns="${columns.length}">${materials}</div></div>
       <div class="os-slip-notes"><b>Observação:</b> ${escapeHtml(order.notes || "")}</div>
-      <div class="os-slip-payments"><span><b>total</b><strong>${formatCurrency(order.total)}</strong></span><span><b>entrada</b></span><span><b>falta pagar</b></span></div>
+      <div class="os-slip-payments"><span><b>total</b><strong>${formatCurrency(payment.total)}</strong></span><span><b>pago</b><strong>${formatCurrency(payment.paidAmount)}</strong></span><span><b>falta pagar</b><strong>${formatCurrency(payment.balanceDue)}</strong></span></div>
     </div>
     <aside class="os-slip-right"><p>${escapeHtml(SERVICE_ORDER_NOTICE)}</p><div class="os-slip-signatures"><div>Nome: <i></i></div><div>Ass: <i></i></div><div>Data: <i></i></div></div></aside>
   </article>`;
@@ -2317,6 +2341,7 @@ function mergeState(candidate) {
             total: toMoneyNumber(item.total),
           })) : [],
           total: toMoneyNumber(order.total),
+          paidAmount: Math.min(toMoneyNumber(order.total), toMoneyNumber(order.paidAmount)),
           productionDeadline: String(order.productionDeadline || ""),
           notes: String(order.notes || ""),
           status: normalizeServiceOrderStatus(order.status),
@@ -11808,6 +11833,28 @@ async function initApp() {
       printSelectedServiceOrdersButton.textContent = `Imprimir selecionadas (${selectedServiceOrderIds.size})`;
       return;
     }
+    const paymentOrderId = event.target.dataset.osPaid;
+    if (paymentOrderId) {
+      const order = state.serviceOrders.find((item) => item.id === paymentOrderId);
+      if (!order) return;
+      if (!updateServiceOrderPayment(order, event.target.value)) {
+        const payment = getServiceOrderPayment(order);
+        event.target.value = payment.paidAmount;
+        const balanceOutput = event.target.closest(".service-order-card")?.querySelector("[data-os-balance]");
+        if (balanceOutput) balanceOutput.textContent = formatCurrency(payment.balanceDue);
+        setStatusMessage(serviceOrdersFeedback, "Informe um valor pago entre zero e o total da O.S.", "warning");
+        return;
+      }
+      const payment = getServiceOrderPayment(order);
+      const card = event.target.closest(".service-order-card");
+      event.target.value = payment.paidAmount;
+      card.querySelector("[data-os-paid-display]").textContent = formatCurrency(payment.paidAmount);
+      card.querySelector("[data-os-balance-display]").textContent = formatCurrency(payment.balanceDue);
+      card.querySelector("[data-os-balance]").textContent = formatCurrency(payment.balanceDue);
+      persist();
+      setStatusMessage(serviceOrdersFeedback, `Pagamento da O.S. nº ${order.number} atualizado.`, "success");
+      return;
+    }
     const orderId = event.target.dataset.osStatus;
     if (!orderId) return;
     const order = state.serviceOrders.find((item) => item.id === orderId);
@@ -11820,6 +11867,12 @@ async function initApp() {
   serviceOrdersList.addEventListener("input", (event) => {
     const orderId = event.target.dataset.osEmployee;
     if (orderId) serviceOrderEmployeeDrafts.set(orderId, event.target.value);
+    const paymentOrderId = event.target.dataset.osPaid;
+    if (paymentOrderId) {
+      const order = state.serviceOrders.find((item) => item.id === paymentOrderId);
+      const output = event.target.closest(".service-order-card")?.querySelector("[data-os-balance]");
+      if (order && output) output.textContent = formatCurrency(getServiceOrderPayment({ ...order, paidAmount: Number(event.target.value) }).balanceDue);
+    }
   });
 
   serviceOrdersList.addEventListener("click", (event) => {
