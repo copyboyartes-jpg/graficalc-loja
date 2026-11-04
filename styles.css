@@ -2603,7 +2603,7 @@ textarea {
     min-height: 9.5cm;
     max-height: 9.5cm;
     overflow: hidden;
-    border: 0.7pt solid #222;
+    border: 0;
     color: #111;
     background: #fff;
     font-family: Arial, sans-serif;
@@ -2611,6 +2611,10 @@ textarea {
     line-height: 1.16;
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  body.printing-os .os-slip + .os-slip {
+    border-top: 0.7pt dotted #222;
   }
 
   .os-slip-left {
