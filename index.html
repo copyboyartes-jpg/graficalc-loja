@@ -1303,6 +1303,11 @@
                 <textarea id="quote-notes" rows="4"></textarea>
               </label>
             </div>
+            <div class="toolbar">
+              <button id="save-quote-client-button" class="button" type="button">Salvar cliente</button>
+              <button id="save-quote-button" class="button button-primary" type="button">Salvar orçamento</button>
+            </div>
+            <p class="helper-text status-note" id="quote-save-feedback" role="status" aria-live="polite">Salve o cliente para reutilizar seus dados ou salve o orçamento para acompanhar a proposta no histórico.</p>
           </article>
 
           <article class="panel quote-urgency-panel">
@@ -1399,7 +1404,6 @@
               <p class="panel-copy">Salve esta proposta, consulte as anteriores e acompanhe as aprovações.</p>
             </div>
           </div>
-          <div class="toolbar"><button id="save-quote-button" class="button button-primary" type="button">Salvar orçamento atual</button></div>
           <div id="quote-client-history" class="stack-list"></div>
         </article>
       </section>
@@ -1445,7 +1449,7 @@
       }
     })();
   </script>
-  <script src="./app.mjs?v=os-sequencia-geral-20261105a"></script>
+  <script src="./app.mjs?v=orcamento-salvar-20261105a"></script>
 </body>
 </html>
 

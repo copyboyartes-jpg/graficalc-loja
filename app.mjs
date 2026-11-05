@@ -7843,6 +7843,7 @@ async function initApp() {
   const serviceOrderPrintRoot = document.getElementById("os-print-root");
   const printSelectedServiceOrdersButton = document.getElementById("os-print-selected");
   const quoteClientHistory = document.getElementById("quote-client-history");
+  const quoteSaveFeedback = document.getElementById("quote-save-feedback");
   const m2RowsTableBody = document.getElementById("m2-rows-table-body");
   const quotePreview = document.getElementById("quote-preview");
   const feedback = document.getElementById("import-feedback");
@@ -11702,20 +11703,25 @@ async function initApp() {
     });
   }
 
-  document.getElementById("save-client-button").addEventListener("click", () => {
-    const formValues = readClientRecordForm();
+  function saveClientRecord(formValues, source = "clients") {
     const clientName = formValues.name;
     if (!clientName) {
-      setClientsFeedback("Digite o nome do contato antes de salvar.", "warning");
+      const message = "Digite o nome do contato antes de salvar.";
+      if (source === "quote") setStatusMessage(quoteSaveFeedback, message, "warning");
+      else setClientsFeedback(message, "warning");
       return;
     }
 
-    const existingIndex = state.clients.findIndex((client) =>
-      activeClientEditorId ? client.id === activeClientEditorId : client.name.trim().toLowerCase() === clientName.toLowerCase()
-    );
+    const existingId = source === "quote"
+      ? state.client.id || findUniqueClientMatch(state.clients, formValues)?.id || ""
+      : activeClientEditorId;
+    const existingIndex = state.clients.findIndex((client) => existingId
+      ? client.id === existingId
+      : source === "clients" && client.name.trim().toLowerCase() === clientName.toLowerCase());
     const payload = {
       id: existingIndex >= 0 ? state.clients[existingIndex].id : `client-${Date.now()}`,
       ...formValues,
+      notes: source === "quote" ? state.clients[existingIndex]?.notes || "" : formValues.notes,
       createdAt: existingIndex >= 0 ? state.clients[existingIndex].createdAt : new Date().toISOString(),
     };
 
@@ -11724,7 +11730,7 @@ async function initApp() {
       state.quoteHistory.forEach((quote) => {
         if (!quote.clientId && getQuoteClient(quote, state.clients)?.id === previous.id) quote.clientId = previous.id;
       });
-      if (state.client.id === previous.id) {
+      if (source === "quote" || state.client.id === previous.id) {
         state.client = { id: payload.id, name: payload.name, contact: payload.contact, cnpj: payload.cnpj };
       }
     }
@@ -11735,14 +11741,32 @@ async function initApp() {
       state.clients.unshift(payload);
     }
 
-    activeClientEditorId = payload.id;
-    fillClientRecordForm(payload);
+    if (source === "quote") {
+      state.client = { id: payload.id, name: payload.name, contact: payload.contact, cnpj: payload.cnpj };
+    } else {
+      activeClientEditorId = payload.id;
+      fillClientRecordForm(payload);
+    }
     persist();
     renderClientFields();
     renderClientsTab();
     renderHistoryTab();
     renderQuoteClientHistory();
-    setClientsFeedback(existingIndex >= 0 ? "Contato atualizado com sucesso." : "Contato salvo com sucesso.", "success");
+    const message = existingIndex >= 0 ? "Cliente atualizado com sucesso." : "Cliente salvo com sucesso.";
+    if (source === "quote") setStatusMessage(quoteSaveFeedback, message, "success");
+    else setClientsFeedback(message, "success");
+  }
+
+  document.getElementById("save-client-button").addEventListener("click", () => {
+    saveClientRecord(readClientRecordForm());
+  });
+
+  document.getElementById("save-quote-client-button").addEventListener("click", () => {
+    saveClientRecord({
+      name: state.client.name.trim(),
+      contact: state.client.contact.trim(),
+      cnpj: state.client.cnpj.trim(),
+    }, "quote");
   });
 
   document.getElementById("new-client-button").addEventListener("click", () => {
@@ -11778,6 +11802,7 @@ async function initApp() {
     const entries = collectQuoteEntries(workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, linearMeterWorkbook, m2Workbook, resinWorkbook);
     if (!entries.length) {
       setMainFeedback("Adicione ao menos um item antes de salvar o orçamento.", "warning");
+      setStatusMessage(quoteSaveFeedback, "Adicione ao menos um item antes de salvar o orçamento.", "warning");
       return;
     }
     const clientName = state.client.name.trim();
@@ -11815,6 +11840,7 @@ async function initApp() {
     renderHistoryTab();
     renderQuoteClientHistory();
     setMainFeedback("Orçamento salvo no histórico compartilhado.", "success");
+    setStatusMessage(quoteSaveFeedback, "Orçamento salvo no histórico compartilhado.", "success");
   }
 
   document.getElementById("save-history-button").addEventListener("click", saveCurrentQuote);
