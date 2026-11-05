@@ -436,7 +436,7 @@ function collectSales(globalPayload, counterPayload, members) {
   }
   for (const sale of Array.isArray(counterPayload?.sales) ? counterPayload.sales : []) {
     if (!validDate(sale.date) || !sale.memberId || !moneyCents(sale.amount)) continue;
-    records.push({ id: sale.id, date: sale.date, memberId: sale.memberId, source: "Balcão", description: String(sale.description || "Venda de balcão"), clientName: String(sale.customerName || ""), orderNumber: "", amountCents: moneyCents(sale.amount) });
+    records.push({ id: sale.id, date: sale.date, memberId: sale.memberId, source: "Balcão", description: String(sale.description || "Venda de balcão"), clientName: String(sale.customerName || ""), orderNumber: "", amountCents: moneyCents(sale.amount), deletionRequest: sale.deletionRequest || null });
   }
   return records;
 }
@@ -463,6 +463,22 @@ async function getSalesDashboard(body) {
   const recentMonths = Array.from({ length: 12 }, (_, index) => new Date(Date.UTC(currentYear, currentNumber - 1 - index, 1)).toISOString().slice(0, 7));
   const months = [...new Set([month, ...recentMonths, ...records.map((record) => record.date.slice(0, 7))])]
     .sort().reverse().map((key) => ({ month: key, ...summarizeSales(records.filter((record) => record.date.startsWith(key))) }));
+  const counterSales = Array.isArray(counterRow?.payload?.sales) ? counterRow.payload.sales : [];
+  const pendingDeletionRequests = auth.mode === "admin" ? counterSales
+    .filter((sale) => sale.deletionRequest?.status === "pending")
+    .map((sale) => ({
+      id: sale.id,
+      date: sale.date,
+      description: sale.description,
+      customerName: sale.customerName || "",
+      amount: sale.amount,
+      requestedByName: sale.deletionRequest.requestedByName || members.find((member) => member.id === sale.memberId)?.name || "Colaborador",
+      reason: sale.deletionRequest.reason,
+      requestedAt: sale.deletionRequest.requestedAt,
+    })).sort((first, second) => String(second.requestedAt).localeCompare(String(first.requestedAt))) : undefined;
+  const reviewedDeletions = (Array.isArray(counterRow?.payload?.deletedSales) ? counterRow.payload.deletedSales : [])
+    .filter((sale) => sale.date.startsWith(month) && (auth.mode === "admin" || sale.memberId === auth.member.id))
+    .map((sale) => ({ id: sale.id, date: sale.date, description: sale.description, amount: sale.amount, requestedByName: sale.deletionRequest?.requestedByName || "Colaborador", reason: sale.deletionRequest?.reason || "", reviewedAt: sale.deletionRequest?.reviewedAt || "" }));
   return {
     mode: auth.mode,
     member: auth.member ? { id: auth.member.id, name: auth.member.name } : null,
@@ -471,6 +487,8 @@ async function getSalesDashboard(body) {
     selected: summarizeSales(selectedRecords),
     months,
     entries: selectedRecords.map((record) => ({ ...record, amount: record.amountCents / 100, amountCents: undefined, memberName: members.find((member) => member.id === record.memberId)?.name || "Sem colaborador" })),
+    pendingDeletionRequests,
+    reviewedDeletions,
     team: auth.mode === "admin" ? [
       ...members.map((member) => ({ id: member.id, name: member.name, ...summarizeSales(selectedRecords.filter((record) => record.memberId === member.id)) })),
       { id: "", name: "Sem colaborador", ...summarizeSales(selectedRecords.filter((record) => !record.memberId)) },
@@ -496,16 +514,50 @@ async function addCounterSale(body) {
   return { id: sale.id };
 }
 
-async function deleteCounterSale(body) {
-  requireAdminPassword(body.password);
+async function requestCounterSaleDeletion(body) {
+  const teamRow = await readStateRow(TEAM_STATE_KEY);
+  const members = Array.isArray(teamRow?.payload?.members) ? teamRow.payload.members : [];
+  const auth = await authenticateSales(body, members);
+  if (auth.mode !== "member") requestError(403, "Entre como colaborador para solicitar a exclusao.");
   const saleId = String(body.saleId || "");
+  const reason = String(body.reason || "").trim();
+  if (reason.length < 3 || reason.length > 300) requestError(400, "Explique o motivo em 3 a 300 caracteres.");
   await updateStateRow(COUNTER_SALES_STATE_KEY, { sales: [] }, (current) => {
     const sales = Array.isArray(current.sales) ? current.sales : [];
-    const sale = sales.find((entry) => entry.id === saleId);
-    if (!sale) requestError(404, "Venda nao encontrada.");
-    return { ...current, sales: sales.filter((entry) => entry.id !== saleId) };
+    const index = sales.findIndex((entry) => entry.id === saleId);
+    if (index < 0) requestError(404, "Venda de balcao nao encontrada.");
+    const sale = sales[index];
+    if (sale.memberId !== auth.member.id) requestError(403, "Esta venda pertence a outro colaborador.");
+    if (sale.deletionRequest) requestError(409, "Esta venda ja teve uma solicitacao analisada ou pendente.");
+    const next = [...sales];
+    next[index] = { ...sale, deletionRequest: { status: "pending", reason, requestedByMemberId: auth.member.id, requestedByName: auth.member.name, requestedAt: new Date().toISOString() } };
+    return { ...current, sales: next };
   });
-  return { deleted: true };
+  return { requested: true };
+}
+
+async function reviewCounterSaleDeletion(body) {
+  requireAdminPassword(body.password);
+  const saleId = String(body.saleId || "");
+  const decision = String(body.decision || "");
+  if (decision !== "delete" && decision !== "keep") requestError(400, "Escolha excluir ou manter a venda.");
+  await updateStateRow(COUNTER_SALES_STATE_KEY, { sales: [] }, (current) => {
+    const sales = Array.isArray(current.sales) ? current.sales : [];
+    const index = sales.findIndex((entry) => entry.id === saleId);
+    if (index < 0) requestError(404, "Venda de balcao nao encontrada.");
+    const sale = sales[index];
+    if (sale.deletionRequest?.status !== "pending") requestError(409, "Esta venda nao tem solicitacao pendente.");
+    const reviewed = { ...sale, deletionRequest: { ...sale.deletionRequest, status: decision === "delete" ? "deleted" : "kept", reviewedAt: new Date().toISOString() } };
+    if (decision === "delete") return {
+      ...current,
+      sales: sales.filter((entry) => entry.id !== saleId),
+      deletedSales: [...(Array.isArray(current.deletedSales) ? current.deletedSales : []), reviewed],
+    };
+    const next = [...sales];
+    next[index] = reviewed;
+    return { ...current, sales: next };
+  });
+  return { decision };
 }
 
 function verifyConfigAccess(body) {
@@ -538,7 +590,8 @@ async function handleSharedState(request) {
     if (body?.action === "change_os_employee") return jsonResponse(await changeServiceOrderEmployee(body));
     if (body?.action === "get_sales_dashboard") return jsonResponse(await getSalesDashboard(body));
     if (body?.action === "add_counter_sale") return jsonResponse(await addCounterSale(body));
-    if (body?.action === "delete_counter_sale") return jsonResponse(await deleteCounterSale(body));
+    if (body?.action === "request_counter_sale_deletion") return jsonResponse(await requestCounterSaleDeletion(body));
+    if (body?.action === "review_counter_sale_deletion") return jsonResponse(await reviewCounterSaleDeletion(body));
     return jsonResponse({ error: "Payload invalido." }, 400);
   }
 

@@ -823,7 +823,8 @@ textarea:disabled {
 
 .team-sales-months,
 .team-sales-entries,
-.team-sales-members {
+.team-sales-members,
+.team-sales-requests {
   display: grid;
   gap: 8px;
   margin: 10px 0 20px;
@@ -831,7 +832,8 @@ textarea:disabled {
 
 .team-sales-month-row,
 .team-sales-entry,
-.team-sales-member-row {
+.team-sales-member-row,
+.team-sales-request {
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -844,10 +846,35 @@ textarea:disabled {
 }
 
 .team-sales-entry small,
-.team-sales-month-row small {
+.team-sales-month-row small,
+.team-sales-request small {
   display: block;
   color: var(--muted);
   margin-top: 3px;
+}
+
+.team-sales-request p {
+  margin: 8px 0;
+  overflow-wrap: anywhere;
+}
+
+.team-sale-action {
+  display: flex;
+  flex: 1 0 100%;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.team-sale-action input {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.team-sale-review-status {
+  flex: 1 0 100%;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 0.85rem;
 }
 
 .team-counter-sale-section {

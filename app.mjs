@@ -1722,6 +1722,17 @@ function createTeamSalesDashboardMarkup(report) {
   const team = Array.isArray(report.team) ? report.team : [];
   const entries = Array.isArray(report.entries) ? report.entries : [];
   const months = Array.isArray(report.months) ? report.months : [];
+  const requests = Array.isArray(report.pendingDeletionRequests) ? report.pendingDeletionRequests : [];
+  const reviewed = Array.isArray(report.reviewedDeletions) ? report.reviewedDeletions : [];
+  const saleEntry = (entry) => {
+    const request = entry.deletionRequest;
+    const canRequest = report.mode === "member" && entry.source === "Balcão" && !request;
+    return `<div class="team-sales-entry"><div><strong>${escapeHtml(entry.description)}</strong><small>${escapeHtml(entry.date.split("-").reverse().join("/"))} · ${escapeHtml(entry.source)}${entry.clientName ? ` · ${escapeHtml(entry.clientName)}` : ""}${entry.orderNumber ? ` · O.S. ${escapeHtml(entry.orderNumber)}` : ""}${report.mode === "admin" ? ` · ${escapeHtml(entry.memberName)}` : ""}</small></div><strong>${formatCurrency(entry.amount)}</strong>
+      ${canRequest ? `<div class="team-sale-action"><input type="text" data-counter-sale-reason="${escapeHtml(entry.id)}" maxlength="300" placeholder="Motivo da exclusão (obrigatório)" aria-label="Motivo para excluir ${escapeHtml(entry.description)}"><button class="button" type="button" data-counter-sale-request="${escapeHtml(entry.id)}">Solicitar exclusão</button></div>` : ""}
+      ${request?.status === "pending" ? '<span class="team-sale-review-status">Exclusão solicitada · aguardando ADM</span>' : ""}
+      ${request?.status === "kept" ? '<span class="team-sale-review-status">Venda mantida pelo ADM</span>' : ""}
+    </div>`;
+  };
   return `
     <div class="summary-grid">
       <article class="summary-card"><span class="summary-label">Vendas do GrafiCalc</span><strong>${formatCurrency(selected.systemTotal)}</strong></article>
@@ -1729,11 +1740,13 @@ function createTeamSalesDashboardMarkup(report) {
       <article class="summary-card"><span class="summary-label">Total de ${escapeHtml(formatSalesMonth(report.month))}</span><strong>${formatCurrency(selected.total)}</strong></article>
       <article class="summary-card"><span class="summary-label">Vendas no mês</span><strong>${formatInteger(selected.count || 0)}</strong></article>
     </div>
+    ${report.mode === "admin" ? `<h3>Solicitações de exclusão (${formatInteger(requests.length)})</h3><p class="list-meta">As vendas solicitadas continuam nos totais até a decisão do ADM. Solicitações de todos os meses aparecem aqui.</p><div class="team-sales-requests">${requests.length ? requests.map((request) => `<article class="team-sales-request"><div><strong>${escapeHtml(request.description)}</strong><small>${escapeHtml(request.date.split("-").reverse().join("/"))} · ${escapeHtml(request.requestedByName)}${request.customerName ? ` · ${escapeHtml(request.customerName)}` : ""} · ${formatCurrency(request.amount)}</small><small>Solicitado em ${escapeHtml(formatDateTime(request.requestedAt) || "data indisponível")}</small><p>Motivo: ${escapeHtml(request.reason)}</p></div><div class="list-actions"><button class="button button-danger" type="button" data-counter-review="delete" data-sale-id="${escapeHtml(request.id)}">Excluir venda</button><button class="button" type="button" data-counter-review="keep" data-sale-id="${escapeHtml(request.id)}">Manter venda</button></div></article>`).join("") : '<p class="list-meta">Nenhuma solicitação pendente.</p>'}</div>` : ""}
     ${report.mode === "admin" ? `<h3>Equipe no mês</h3><div class="team-sales-members">${team.map((member) => `<div class="team-sales-member-row"><span>${escapeHtml(member.name)}</span><small>${formatInteger(member.count)} vendas · GrafiCalc ${formatCurrency(member.systemTotal)} · Balcão ${formatCurrency(member.counterTotal)}</small><strong>${formatCurrency(member.total)}</strong></div>`).join("")}</div>` : ""}
     <h3>Evolução mês a mês</h3>
     <div class="team-sales-months">${months.map((item) => `<button class="button team-sales-month-row" type="button" data-sales-month="${escapeHtml(item.month)}"><span>${escapeHtml(formatSalesMonth(item.month))}<small>${formatInteger(item.count)} vendas · GrafiCalc ${formatCurrency(item.systemTotal)} · Balcão ${formatCurrency(item.counterTotal)}</small></span><strong>${formatCurrency(item.total)}</strong></button>`).join("")}</div>
     <h3>Vendas de ${escapeHtml(formatSalesMonth(report.month))}</h3>
-    <div class="team-sales-entries">${entries.length ? entries.map((entry) => `<div class="team-sales-entry"><div><strong>${escapeHtml(entry.description)}</strong><small>${escapeHtml(entry.date.split("-").reverse().join("/"))} · ${escapeHtml(entry.source)}${entry.clientName ? ` · ${escapeHtml(entry.clientName)}` : ""}${entry.orderNumber ? ` · O.S. ${escapeHtml(entry.orderNumber)}` : ""}${report.mode === "admin" ? ` · ${escapeHtml(entry.memberName)}` : ""}</small></div><strong>${formatCurrency(entry.amount)}</strong>${report.mode === "admin" && entry.source === "Balcão" ? `<button class="button button-danger" type="button" data-counter-sale-delete="${escapeHtml(entry.id)}">Excluir</button>` : ""}</div>`).join("") : '<p class="list-meta">Nenhuma venda registrada neste mês.</p>'}</div>`;
+    <div class="team-sales-entries">${entries.length ? entries.map(saleEntry).join("") : '<p class="list-meta">Nenhuma venda registrada neste mês.</p>'}</div>
+    ${reviewed.length ? `<h3>Exclusões aprovadas neste mês</h3><div class="team-sales-entries">${reviewed.map((sale) => `<div class="team-sales-entry"><div><strong>${escapeHtml(sale.description)}</strong><small>${escapeHtml(sale.date.split("-").reverse().join("/"))} · ${escapeHtml(sale.requestedByName)} · Motivo: ${escapeHtml(sale.reason)}</small></div><span>Excluída do total: ${formatCurrency(sale.amount)}</span></div>`).join("")}</div>` : ""}`;
 }
 
 function createQuoteRecordMarkup(quote, clients, { compact = false, serviceOrders = [], employeeDraft = "", teamMembers = [] } = {}) {
@@ -8318,7 +8331,15 @@ async function initApp() {
     document.getElementById("team-sales-view-label").textContent = salesReport.mode === "admin"
       ? "Acompanhamento geral da equipe" : `Vendas de ${salesReport.member.name}`;
     document.getElementById("team-sales-month").value = salesReport.month;
+    const reasonDrafts = new Map([...teamSalesDashboard.querySelectorAll("[data-counter-sale-reason]")]
+      .map((input) => [input.dataset.counterSaleReason, { value: input.value, focused: document.activeElement === input }]));
     teamSalesDashboard.innerHTML = createTeamSalesDashboardMarkup(salesReport);
+    teamSalesDashboard.querySelectorAll("[data-counter-sale-reason]").forEach((input) => {
+      const draft = reasonDrafts.get(input.dataset.counterSaleReason);
+      if (!draft) return;
+      input.value = draft.value;
+      if (draft.focused) input.focus();
+    });
     teamCounterSaleSection.hidden = salesReport.mode !== "member";
     const saleDateInput = document.getElementById("team-counter-sale-date");
     if (!saleDateInput.value) saleDateInput.value = salesReport.today;
@@ -12104,21 +12125,44 @@ async function initApp() {
       }
       return;
     }
-    const deleteButton = event.target.closest("[data-counter-sale-delete]");
-    if (!deleteButton || salesAccess?.mode !== "admin") return;
+    const requestButton = event.target.closest("[data-counter-sale-request]");
+    if (requestButton && salesAccess?.mode === "member") {
+      const saleId = requestButton.dataset.counterSaleRequest;
+      const reason = requestButton.closest(".team-sales-entry")?.querySelector("[data-counter-sale-reason]")?.value.trim() || "";
+      if (reason.length < 3) {
+        setStatusMessage(teamSalesFeedback, "Explique o motivo da solicitação em pelo menos 3 caracteres.", "warning");
+        return;
+      }
+      requestButton.disabled = true;
+      try {
+        await requestTeamAction("request_counter_sale_deletion", { ...salesAccess, saleId, reason });
+        await loadSalesDashboard(salesAccess, salesReport?.month);
+        setStatusMessage(teamSalesFeedback, "Solicitação enviada ao ADM. A venda continua nos totais até a análise.", "success");
+      } catch (error) {
+        requestButton.disabled = false;
+        if (error.status === 401) clearSalesAccess();
+        setStatusMessage(teamSalesFeedback, error.message, "error");
+      }
+      return;
+    }
+    const reviewButton = event.target.closest("[data-counter-review]");
+    if (!reviewButton || salesAccess?.mode !== "admin") return;
+    const decision = reviewButton.dataset.counterReview;
     const confirmed = await confirmAppAction({
-      kicker: "Venda de balcão",
-      title: "Excluir lançamento",
-      message: "Deseja excluir esta venda de balcão do acompanhamento?",
-      confirmLabel: "Excluir",
-      danger: true,
+      kicker: "Solicitação de exclusão",
+      title: decision === "delete" ? "Excluir venda de balcão" : "Manter venda de balcão",
+      message: decision === "delete" ? "A venda será retirada dos totais mensais. Confirma a exclusão?" : "A solicitação será encerrada e a venda continuará nos totais. Confirma?",
+      confirmLabel: decision === "delete" ? "Excluir venda" : "Manter venda",
+      danger: decision === "delete",
     });
     if (!confirmed) return;
+    reviewButton.disabled = true;
     try {
-      await requestTeamAction("delete_counter_sale", { ...salesAccess, saleId: deleteButton.dataset.counterSaleDelete });
+      await requestTeamAction("review_counter_sale_deletion", { ...salesAccess, saleId: reviewButton.dataset.saleId, decision });
       await loadSalesDashboard(salesAccess, salesReport?.month);
-      setStatusMessage(teamSalesFeedback, "Venda de balcão excluída.", "success");
+      setStatusMessage(teamSalesFeedback, decision === "delete" ? "Venda excluída dos totais." : "Venda mantida; solicitação encerrada.", "success");
     } catch (error) {
+      reviewButton.disabled = false;
       if (error.status === 401) clearSalesAccess();
       setStatusMessage(teamSalesFeedback, error.message, "error");
     }
