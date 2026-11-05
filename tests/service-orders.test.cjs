@@ -87,6 +87,29 @@ test("pagamento parcial atualiza saldo, persiste e aparece na comanda", () => {
   assert.equal(app.getServiceOrderPayment(legacy).balanceDue, 145);
 });
 
+test("campo de pagamento da O.S. mantém centavos e saldo corretos", () => {
+  for (const [typed, display, amount] of [
+    ["420", "R$ 4,20", 4.2],
+    ["32205", "R$ 322,05", 322.05],
+    ["134500", "R$ 1.345,00", 1345],
+  ]) {
+    const formatted = app.formatCurrencyCentsInput(typed).replace(/\s/g, " ");
+    assert.equal(formatted, display);
+    assert.equal(app.parseCurrencyCentsInput(formatted), amount);
+  }
+  const order = app.createServiceOrderFromQuote({ ...approvedQuote, total: 2000 }, [client], [], "Ana", date);
+  assert.equal(app.updateServiceOrderPayment(order, app.parseCurrencyCentsInput("R$ 1.345,00"), date), true);
+  assert.equal(app.getServiceOrderPayment(order).balanceDue, 655);
+  assert.match(app.createServiceOrderMarkup(order), /data-os-paid="[^"]+" value="R\$\s*1\.345,00"/);
+});
+
+test("contato do cliente recebe máscara de celular e telefone fixo", () => {
+  assert.equal(app.formatClientContact("48984278468"), "48 98427.8468");
+  assert.equal(app.formatClientContact("4832441234"), "48 3244.1234");
+  assert.equal(app.formatClientContact("+55 (48) 98427-8468"), "48 98427.8468");
+  assert.equal(app.formatClientContact("48 98427.8468"), "48 98427.8468");
+});
+
 test("orçamento aprovado libera geração uma vez e depois mostra a O.S. vinculada", () => {
   const order = app.createServiceOrderFromQuote(approvedQuote, [client], [], "Ana", date, "00001-2026");
   const before = app.createQuoteRecordMarkup(approvedQuote, [client]);

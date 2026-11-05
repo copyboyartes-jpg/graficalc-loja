@@ -1632,6 +1632,42 @@ function updateServiceOrderPayment(order, value, date = new Date()) {
   return true;
 }
 
+function formatClientContact(value) {
+  const text = String(value || "");
+  if (/[a-z@]/i.test(text)) return text;
+  let digits = text.replace(/\D/g, "");
+  if (/^55\d{10,11}$/.test(digits)) digits = digits.slice(2);
+  digits = digits.slice(0, 11);
+  if (digits.length <= 2) return digits;
+  const local = digits.slice(2);
+  const firstGroupLength = digits.length === 11 || digits[2] === "9" ? 5 : 4;
+  return `${digits.slice(0, 2)} ${local.slice(0, firstGroupLength)}${local.length > firstGroupLength ? `.${local.slice(firstGroupLength)}` : ""}`;
+}
+
+function maskClientContactInput(input) {
+  const current = input.value;
+  const formatted = formatClientContact(current);
+  if (formatted === current) return;
+  const digitsBeforeCursor = current.slice(0, input.selectionStart ?? current.length).replace(/\D/g, "").length;
+  input.value = formatted;
+  let cursor = 0;
+  let seenDigits = 0;
+  while (cursor < formatted.length && seenDigits < digitsBeforeCursor) {
+    if (/\d/.test(formatted[cursor])) seenDigits += 1;
+    cursor += 1;
+  }
+  input.setSelectionRange(cursor, cursor);
+}
+
+function parseCurrencyCentsInput(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  return digits ? Number(digits) / 100 : 0;
+}
+
+function formatCurrencyCentsInput(value) {
+  return formatCurrency(parseCurrencyCentsInput(value));
+}
+
 function createServiceOrderFromQuote(quote, clients, orders, employeeName, date = new Date(), reservedNumber = "") {
   const employee = String(employeeName || "").trim();
   if (!quote || normalizeQuoteStatus(quote.status) !== "Aprovado" || !employee || orders.some((order) => order.quoteId === quote.id)) return null;
@@ -1796,7 +1832,7 @@ function createServiceOrderMarkup(order, { employeeDraft = order.assignedMemberI
         <label><span>Etapa da O.S.</span><select data-os-status="${escapeHtml(order.id)}">${statusOptions}</select></label>
         <label><span>Novo responsável</span><select data-os-employee="${escapeHtml(order.id)}">${buildTeamMemberOptions(teamMembers, employeeDraft)}</select></label>
         <label><span>Senha de quem criou a O.S. (${escapeHtml(order.createdByName || order.employeeName || "responsável original")})</span><input type="password" data-os-creator-password autocomplete="off"></label>
-        <label><span>Valor já pago (R$)</span><input type="number" min="0" max="${payment.total}" step="0.01" inputmode="decimal" data-os-paid="${escapeHtml(order.id)}" value="${payment.paidAmount}"></label>
+        <label><span>Valor já pago (R$)</span><input type="text" inputmode="numeric" data-os-paid="${escapeHtml(order.id)}" value="${formatCurrency(payment.paidAmount)}" aria-label="Valor já pago em reais"></label>
         <p class="list-meta">Falta pagar: <output data-os-balance="${escapeHtml(order.id)}">${formatCurrency(payment.balanceDue)}</output></p>
         <div class="list-actions"><button class="button" type="button" data-os-action="save-employee" data-order-id="${escapeHtml(order.id)}">Alterar responsável</button><button class="button" type="button" data-os-action="open-quote" data-order-id="${escapeHtml(order.id)}">Abrir orçamento</button><button class="button button-primary" type="button" data-os-action="print" data-order-id="${escapeHtml(order.id)}">Imprimir O.S.</button></div>
       </div>
@@ -7954,7 +7990,7 @@ async function initApp() {
   function readClientRecordForm() {
     return {
       name: clientRecordName?.value.trim() || "",
-      contact: clientRecordContact?.value.trim() || "",
+      contact: formatClientContact(clientRecordContact?.value.trim()),
       cnpj: clientRecordCnpj?.value.trim() || "",
       notes: clientRecordNotes?.value.trim() || "",
     };
@@ -7965,7 +8001,7 @@ async function initApp() {
       clientRecordName.value = client.name || "";
     }
     if (clientRecordContact) {
-      clientRecordContact.value = client.contact || "";
+      clientRecordContact.value = formatClientContact(client.contact);
     }
     if (clientRecordCnpj) {
       clientRecordCnpj.value = client.cnpj || "";
@@ -8420,7 +8456,7 @@ async function initApp() {
       || findUniqueClientMatch(state.clients, state.client);
     document.getElementById("quote-client-select").innerHTML = `<option value="">Novo cliente ou não cadastrado</option>${state.clients.map((client) => `<option value="${escapeHtml(client.id)}"${selectedClient?.id === client.id ? " selected" : ""}>${escapeHtml(client.name)}</option>`).join("")}`;
     document.getElementById("client-name").value = state.client.name;
-    document.getElementById("client-contact").value = state.client.contact;
+    document.getElementById("client-contact").value = formatClientContact(state.client.contact);
     document.getElementById("client-cnpj").value = state.client.cnpj;
     document.getElementById("payment-terms").value = state.paymentTerms;
     document.getElementById("production-deadline").value = state.productionDeadline;
@@ -11499,6 +11535,7 @@ async function initApp() {
   ].forEach(([elementId, section, field]) => {
     const element = document.getElementById(elementId);
     const updateField = (event) => {
+      if (elementId === "client-contact") maskClientContactInput(event.target);
       if (section) {
         state[section][field] = event.target.value;
         if (section === "client" && state.client.id) {
@@ -11526,6 +11563,8 @@ async function initApp() {
       element.addEventListener("change", updateField);
     }
   });
+
+  clientRecordContact.addEventListener("input", (event) => maskClientContactInput(event.target));
 
   document.getElementById("quote-client-select").addEventListener("change", (event) => {
     const client = state.clients.find((item) => item.id === event.target.value);
@@ -11764,7 +11803,7 @@ async function initApp() {
   document.getElementById("save-quote-client-button").addEventListener("click", () => {
     saveClientRecord({
       name: state.client.name.trim(),
-      contact: state.client.contact.trim(),
+      contact: formatClientContact(state.client.contact.trim()),
       cnpj: state.client.cnpj.trim(),
     }, "quote");
   });
@@ -12225,9 +12264,9 @@ async function initApp() {
     if (paymentOrderId) {
       const order = state.serviceOrders.find((item) => item.id === paymentOrderId);
       if (!order) return;
-      if (!updateServiceOrderPayment(order, event.target.value)) {
+      if (!updateServiceOrderPayment(order, parseCurrencyCentsInput(event.target.value))) {
         const payment = getServiceOrderPayment(order);
-        event.target.value = payment.paidAmount;
+        event.target.value = formatCurrency(payment.paidAmount);
         const balanceOutput = event.target.closest(".service-order-card")?.querySelector("[data-os-balance]");
         if (balanceOutput) balanceOutput.textContent = formatCurrency(payment.balanceDue);
         setStatusMessage(serviceOrdersFeedback, "Informe um valor pago entre zero e o total da O.S.", "warning");
@@ -12235,7 +12274,7 @@ async function initApp() {
       }
       const payment = getServiceOrderPayment(order);
       const card = event.target.closest(".service-order-card");
-      event.target.value = payment.paidAmount;
+      event.target.value = formatCurrency(payment.paidAmount);
       card.querySelector("[data-os-paid-display]").textContent = formatCurrency(payment.paidAmount);
       card.querySelector("[data-os-balance-display]").textContent = formatCurrency(payment.balanceDue);
       card.querySelector("[data-os-balance]").textContent = formatCurrency(payment.balanceDue);
@@ -12257,9 +12296,11 @@ async function initApp() {
     if (orderId) serviceOrderEmployeeDrafts.set(orderId, event.target.value);
     const paymentOrderId = event.target.dataset.osPaid;
     if (paymentOrderId) {
+      event.target.value = formatCurrencyCentsInput(event.target.value);
+      event.target.setSelectionRange(event.target.value.length, event.target.value.length);
       const order = state.serviceOrders.find((item) => item.id === paymentOrderId);
       const output = event.target.closest(".service-order-card")?.querySelector("[data-os-balance]");
-      if (order && output) output.textContent = formatCurrency(getServiceOrderPayment({ ...order, paidAmount: Number(event.target.value) }).balanceDue);
+      if (order && output) output.textContent = formatCurrency(getServiceOrderPayment({ ...order, paidAmount: parseCurrencyCentsInput(event.target.value) }).balanceDue);
     }
   });
 
