@@ -3,6 +3,7 @@ const { promisify } = require("node:util");
 
 const SHARED_STATE_KEY = "graficalc-global";
 const TEAM_STATE_KEY = "graficalc-team";
+const COUNTER_SALES_STATE_KEY = "graficalc-counter-sales";
 const SERVICE_ORDER_SEQUENCE_PREFIX = "graficalc-os-sequence-";
 const FALLBACK_SUPABASE_URL = "https://abiwcbjqlffgnrfenvwf.supabase.co";
 const scrypt = promisify(crypto.scrypt);
@@ -366,6 +367,147 @@ async function changeServiceOrderEmployee(body) {
   return { order: changedOrder, updatedAt: result.updatedAt };
 }
 
+function businessDate(value = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(value);
+  const find = (type) => parts.find((part) => part.type === type)?.value;
+  return `${find("year")}-${find("month")}-${find("day")}`;
+}
+
+function saleDate(value) {
+  if (!value) return "";
+  const raw = String(value);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? "" : businessDate(date);
+}
+
+function validDate(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T12:00:00Z`))
+    && new Date(`${value}T12:00:00Z`).toISOString().slice(0, 10) === value;
+}
+
+function validMonth(value) {
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
+}
+
+function moneyCents(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? Math.round(number * 100) : 0;
+}
+
+async function authenticateSales(body, members) {
+  if (body.mode === "admin") {
+    requireAdminPassword(body.password);
+    return { mode: "admin", member: null };
+  }
+  const member = members.find((entry) => entry.id === body.memberId && entry.active !== false);
+  if (!member || !(await memberPasswordMatches(String(body.password || ""), member))) {
+    requestError(401, "Colaborador ou senha incorretos.");
+  }
+  return { mode: "member", member };
+}
+
+function collectSales(globalPayload, counterPayload, members) {
+  const state = globalPayload?.state || {};
+  const quotes = Array.isArray(state.quoteHistory) ? state.quoteHistory : [];
+  const orders = Array.isArray(state.serviceOrders) ? state.serviceOrders : [];
+  const approved = new Map(quotes.filter((quote) => quote.status === "Aprovado").map((quote) => [quote.id, quote]));
+  const usedQuotes = new Set();
+  const records = [];
+  for (const order of orders) {
+    if (order.quoteId && usedQuotes.has(order.quoteId)) continue;
+    if (order.quoteId) usedQuotes.add(order.quoteId);
+    const quote = approved.get(order.quoteId);
+    const member = members.find((entry) => entry.id === order.createdByMemberId)
+      || members.find((entry) => entry.name.toLocaleLowerCase("pt-BR") === String(order.createdByName || order.employeeName || "").toLocaleLowerCase("pt-BR"));
+    const date = saleDate(quote?.approvedAt || order.createdAt || quote?.createdAt);
+    const cents = moneyCents(quote?.total ?? order.total);
+    if (!date || !cents) continue;
+    records.push({ id: `os-${order.id}`, date, memberId: member?.id || "", source: "GrafiCalc", description: String(quote?.title || order.quoteTitle || "O.S."), clientName: String(quote?.clientName || order.clientName || ""), orderNumber: String(order.number || ""), amountCents: cents });
+  }
+  for (const quote of approved.values()) {
+    if (usedQuotes.has(quote.id)) continue;
+    const date = saleDate(quote.approvedAt || quote.createdAt);
+    const cents = moneyCents(quote.total);
+    if (!date || !cents) continue;
+    records.push({ id: `quote-${quote.id}`, date, memberId: "", source: "GrafiCalc", description: String(quote.title || "Orçamento aprovado"), clientName: String(quote.clientName || ""), orderNumber: "", amountCents: cents });
+  }
+  for (const sale of Array.isArray(counterPayload?.sales) ? counterPayload.sales : []) {
+    if (!validDate(sale.date) || !sale.memberId || !moneyCents(sale.amount)) continue;
+    records.push({ id: sale.id, date: sale.date, memberId: sale.memberId, source: "Balcão", description: String(sale.description || "Venda de balcão"), clientName: String(sale.customerName || ""), orderNumber: "", amountCents: moneyCents(sale.amount) });
+  }
+  return records;
+}
+
+function summarizeSales(records) {
+  const systemCents = records.filter((record) => record.source === "GrafiCalc").reduce((sum, record) => sum + record.amountCents, 0);
+  const counterCents = records.filter((record) => record.source === "Balcão").reduce((sum, record) => sum + record.amountCents, 0);
+  return { count: records.length, systemTotal: systemCents / 100, counterTotal: counterCents / 100, total: (systemCents + counterCents) / 100 };
+}
+
+async function getSalesDashboard(body) {
+  const teamRow = await readStateRow(TEAM_STATE_KEY);
+  const members = Array.isArray(teamRow?.payload?.members) ? teamRow.payload.members : [];
+  const auth = await authenticateSales(body, members);
+  const month = String(body.month || businessDate().slice(0, 7));
+  if (!validMonth(month)) requestError(400, "Informe um mes valido.");
+  const [globalRow, counterRow] = await Promise.all([readStateRow(SHARED_STATE_KEY), readStateRow(COUNTER_SALES_STATE_KEY)]);
+  const records = collectSales(globalRow?.payload, counterRow?.payload, members)
+    .filter((record) => auth.mode === "admin" || record.memberId === auth.member.id);
+  const selectedRecords = records.filter((record) => record.date.startsWith(month))
+    .sort((first, second) => second.date.localeCompare(first.date) || second.id.localeCompare(first.id));
+  const currentMonth = businessDate().slice(0, 7);
+  const [currentYear, currentNumber] = currentMonth.split("-").map(Number);
+  const recentMonths = Array.from({ length: 12 }, (_, index) => new Date(Date.UTC(currentYear, currentNumber - 1 - index, 1)).toISOString().slice(0, 7));
+  const months = [...new Set([month, ...recentMonths, ...records.map((record) => record.date.slice(0, 7))])]
+    .sort().reverse().map((key) => ({ month: key, ...summarizeSales(records.filter((record) => record.date.startsWith(key))) }));
+  return {
+    mode: auth.mode,
+    member: auth.member ? { id: auth.member.id, name: auth.member.name } : null,
+    month,
+    today: businessDate(),
+    selected: summarizeSales(selectedRecords),
+    months,
+    entries: selectedRecords.map((record) => ({ ...record, amount: record.amountCents / 100, amountCents: undefined, memberName: members.find((member) => member.id === record.memberId)?.name || "Sem colaborador" })),
+    team: auth.mode === "admin" ? [
+      ...members.map((member) => ({ id: member.id, name: member.name, ...summarizeSales(selectedRecords.filter((record) => record.memberId === member.id)) })),
+      { id: "", name: "Sem colaborador", ...summarizeSales(selectedRecords.filter((record) => !record.memberId)) },
+    ] : undefined,
+  };
+}
+
+async function addCounterSale(body) {
+  const teamRow = await readStateRow(TEAM_STATE_KEY);
+  const members = Array.isArray(teamRow?.payload?.members) ? teamRow.payload.members : [];
+  const auth = await authenticateSales(body, members);
+  if (auth.mode !== "member") requestError(403, "Entre como colaborador para lancar vendas de balcao.");
+  const date = String(body.date || "");
+  const description = String(body.description || "").trim();
+  const customerName = String(body.customerName || "").trim();
+  const amount = Number(body.amount);
+  if (!validDate(date) || !description || description.length > 160 || customerName.length > 120
+    || !Number.isFinite(amount) || amount <= 0 || amount > 1000000000 || Math.abs(amount * 100 - Math.round(amount * 100)) > 0.000001) {
+    requestError(400, "Informe data, descricao e valor positivo com ate duas casas decimais.");
+  }
+  const sale = { id: crypto.randomUUID(), memberId: auth.member.id, date, description, customerName, amount: Math.round(amount * 100) / 100, createdAt: new Date().toISOString() };
+  await updateStateRow(COUNTER_SALES_STATE_KEY, { sales: [] }, (current) => ({ ...current, sales: [...(Array.isArray(current.sales) ? current.sales : []), sale] }));
+  return { id: sale.id };
+}
+
+async function deleteCounterSale(body) {
+  requireAdminPassword(body.password);
+  const saleId = String(body.saleId || "");
+  await updateStateRow(COUNTER_SALES_STATE_KEY, { sales: [] }, (current) => {
+    const sales = Array.isArray(current.sales) ? current.sales : [];
+    const sale = sales.find((entry) => entry.id === saleId);
+    if (!sale) requestError(404, "Venda nao encontrada.");
+    return { ...current, sales: sales.filter((entry) => entry.id !== saleId) };
+  });
+  return { deleted: true };
+}
+
 function verifyConfigAccess(body) {
   const expectedPassword = String(process.env.CONFIG_ACCESS_PASSWORD || "");
 
@@ -394,6 +536,9 @@ async function handleSharedState(request) {
     if (body?.action === "save_team_member") return jsonResponse({ members: await saveTeamMember(body) });
     if (body?.action === "toggle_team_member") return jsonResponse({ members: await toggleTeamMember(body) });
     if (body?.action === "change_os_employee") return jsonResponse(await changeServiceOrderEmployee(body));
+    if (body?.action === "get_sales_dashboard") return jsonResponse(await getSalesDashboard(body));
+    if (body?.action === "add_counter_sale") return jsonResponse(await addCounterSale(body));
+    if (body?.action === "delete_counter_sale") return jsonResponse(await deleteCounterSale(body));
     return jsonResponse({ error: "Payload invalido." }, 400);
   }
 

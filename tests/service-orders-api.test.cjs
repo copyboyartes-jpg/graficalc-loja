@@ -129,6 +129,65 @@ test("O.S. antiga usa a senha do primeiro nome cadastrado para trocar responsáv
   });
 });
 
+test("métricas mensais exigem senha e separam vendas da O.S., balcão e orçamentos sem colaborador", async () => {
+  await withMockDatabase(async (database) => {
+    const register = async (name, password) => {
+      const response = await callApi("POST", { action: "save_team_member", name, password, adminPassword: "admin-test-password" });
+      assert.equal(response.statusCode, 200);
+      return response.body.members.find((member) => member.name === name).id;
+    };
+    const anaId = await register("Ana", "senha-ana-123");
+    const biaId = await register("Bia", "senha-bia-456");
+    const quotes = [
+      { id: "q1", title: "Adesivos", clientName: "Cliente A", status: "Aprovado", total: 100, approvedAt: "2026-11-04T14:00:00Z" },
+      { id: "q2", title: "Lona", status: "Aprovado", total: 50, approvedAt: "2026-11-04T14:00:00Z" },
+      { id: "q3", title: "Pendente", status: "Pendente", total: 300, createdAt: "2026-11-04T14:00:00Z" },
+      { id: "q4", title: "Virada de mês", status: "Aprovado", total: 30, approvedAt: "2026-11-01T01:00:00Z" },
+      { id: "q5", title: "O.S. antiga", status: "Aprovado", total: 40, approvedAt: "2026-11-03T14:00:00Z" },
+    ];
+    const orders = [
+      { id: "os1", quoteId: "q1", createdByMemberId: anaId, createdByName: "Ana", assignedMemberId: biaId, employeeName: "Bia", number: "00001-2026" },
+      { id: "os-old", quoteId: "q5", employeeName: "Bia", number: "OS-ANTIGA" },
+      { id: "os-duplicate", quoteId: "q1", employeeName: "Bia", number: "DUPLICADA" },
+    ];
+    database.set("graficalc-global", { state_key: "graficalc-global", payload: { state: { quoteHistory: quotes, serviceOrders: orders } }, updated_at: "2026-11-04T00:00:00Z" });
+    const anaAccess = { mode: "member", memberId: anaId, password: "senha-ana-123" };
+    const biaAccess = { mode: "member", memberId: biaId, password: "senha-bia-456" };
+    const denied = await callApi("POST", { action: "get_sales_dashboard", mode: "member", memberId: anaId, password: "errada", month: "2026-11" });
+    assert.equal(denied.statusCode, 401);
+    const badDate = await callApi("POST", { action: "add_counter_sale", ...anaAccess, date: "2026-02-30", description: "Teste", amount: 10 });
+    assert.equal(badDate.statusCode, 400);
+    const anaSale = await callApi("POST", { action: "add_counter_sale", ...anaAccess, date: "2026-11-05", description: "Cópias de balcão", customerName: "Cliente B", amount: "12.50" });
+    assert.equal(anaSale.statusCode, 200);
+    const biaSale = await callApi("POST", { action: "add_counter_sale", ...biaAccess, date: "2026-10-31", description: "Papel", amount: 9.99 });
+    assert.equal(biaSale.statusCode, 200);
+    const ana = await callApi("POST", { action: "get_sales_dashboard", ...anaAccess, month: "2026-11" });
+    assert.equal(ana.statusCode, 200);
+    assert.equal(ana.body.selected.systemTotal, 100);
+    assert.equal(ana.body.selected.counterTotal, 12.5);
+    assert.equal(ana.body.selected.total, 112.5);
+    assert.equal(ana.body.entries.length, 2);
+    assert.equal(ana.body.team, undefined);
+    assert.ok(ana.body.entries.some((entry) => entry.orderNumber === "00001-2026"));
+    const adminDenied = await callApi("POST", { action: "get_sales_dashboard", mode: "admin", password: "errada", month: "2026-11" });
+    assert.equal(adminDenied.statusCode, 401);
+    const admin = await callApi("POST", { action: "get_sales_dashboard", mode: "admin", password: "admin-test-password", month: "2026-11" });
+    assert.equal(admin.statusCode, 200);
+    assert.equal(admin.body.selected.total, 202.5);
+    assert.equal(admin.body.team.find((member) => member.id === anaId).total, 112.5);
+    assert.equal(admin.body.team.find((member) => member.id === biaId).total, 40);
+    assert.equal(admin.body.team.find((member) => member.name === "Sem colaborador").total, 50);
+    const october = await callApi("POST", { action: "get_sales_dashboard", mode: "admin", password: "admin-test-password", month: "2026-10" });
+    assert.equal(october.body.selected.total, 39.99);
+    const memberDelete = await callApi("POST", { action: "delete_counter_sale", ...anaAccess, saleId: biaSale.body.id });
+    assert.equal(memberDelete.statusCode, 401);
+    const adminDelete = await callApi("POST", { action: "delete_counter_sale", mode: "admin", password: "admin-test-password", saleId: anaSale.body.id });
+    assert.equal(adminDelete.statusCode, 200);
+    const after = await callApi("POST", { action: "get_sales_dashboard", ...anaAccess, month: "2026-11" });
+    assert.equal(after.body.selected.total, 100);
+  });
+});
+
 test("reserva números sequenciais mesmo com pedidos simultâneos e reutiliza o número do orçamento", async () => {
   const priorToken = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const priorFetch = global.fetch;

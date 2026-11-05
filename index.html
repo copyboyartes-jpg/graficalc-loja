@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GrafiCalc | Orçamento Gráfico</title>
-  <link rel="stylesheet" href="./styles.css?v=historico-clientes-20261104a">
+  <link rel="stylesheet" href="./styles.css?v=vendas-equipe-20261105a">
 </head>
 <body>
   <div class="page-shell">
@@ -1178,6 +1178,42 @@
             <div id="team-list" class="stack-list"></div>
           </article>
         </div>
+        <article class="panel team-sales-panel">
+          <div class="panel-heading"><div><h2>Acompanhamento mensal de vendas</h2><p class="panel-copy">Vendas do GrafiCalc usam o valor total aprovado e são atribuídas a quem criou a O.S., mesmo com pagamento parcial. Vendas de balcão são lançadas pelo próprio colaborador; o ADM pode excluir lançamentos feitos por engano. Orçamentos aprovados sem O.S. aparecem no acompanhamento geral.</p></div></div>
+          <div id="team-sales-login" class="team-sales-login">
+            <form id="team-sales-member-form" class="team-form">
+              <h3>Minhas vendas</h3>
+              <label><span>Colaborador</span><select id="team-sales-member" required><option value="">Selecione seu nome</option></select></label>
+              <label><span>Minha senha</span><input id="team-sales-member-password" type="password" required autocomplete="current-password"></label>
+              <button class="button button-primary" type="submit">Acessar minhas métricas</button>
+            </form>
+            <form id="team-sales-admin-form" class="team-form">
+              <h3>Visão geral</h3>
+              <label><span>Senha do ADM (configurações)</span><input id="team-sales-admin-password" type="password" required autocomplete="current-password"></label>
+              <button class="button" type="submit">Acompanhamento geral</button>
+            </form>
+          </div>
+          <div id="team-sales-area" class="team-sales-area" hidden>
+            <div class="team-sales-toolbar">
+              <strong id="team-sales-view-label"></strong>
+              <label><span>Mês</span><input id="team-sales-month" type="month"></label>
+              <button id="team-sales-refresh" class="button" type="button">Atualizar</button>
+              <button id="team-sales-logout" class="button" type="button">Sair</button>
+            </div>
+            <div id="team-sales-dashboard"></div>
+            <section id="team-counter-sale-section" class="team-counter-sale-section" hidden>
+              <h3>Lançar venda de balcão</h3>
+              <form id="team-counter-sale-form" class="team-counter-sale-form">
+                <label><span>Data da venda</span><input id="team-counter-sale-date" type="date" required></label>
+                <label><span>Descrição</span><input id="team-counter-sale-description" type="text" maxlength="160" required placeholder="Produto ou serviço vendido"></label>
+                <label><span>Cliente (opcional)</span><input id="team-counter-sale-customer" type="text" maxlength="120"></label>
+                <label><span>Valor da venda (R$)</span><input id="team-counter-sale-amount" type="number" min="0.01" max="1000000000" step="0.01" required inputmode="decimal"></label>
+                <button class="button button-primary" type="submit">Registrar venda</button>
+              </form>
+            </section>
+          </div>
+          <p id="team-sales-feedback" class="helper-text status-note">Use sua senha para consultar as vendas e registrar vendas de balcão.</p>
+        </article>
       </section>
 
       <section class="tab-panel" data-tab-panel="os">
@@ -1409,7 +1445,7 @@
       }
     })();
   </script>
-  <script src="./app.mjs?v=historico-clientes-20261104a"></script>
+  <script src="./app.mjs?v=vendas-equipe-20261105a"></script>
 </body>
 </html>
 

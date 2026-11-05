@@ -784,6 +784,92 @@ textarea:disabled {
   margin-top: 4px;
 }
 
+.team-sales-panel {
+  margin-top: 18px;
+}
+
+.team-sales-login {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.team-sales-login .team-form {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.team-sales-area[hidden],
+.team-sales-login[hidden],
+.team-counter-sale-section[hidden] {
+  display: none;
+}
+
+.team-sales-toolbar,
+.team-sales-month-row,
+.team-sales-entry,
+.team-sales-member-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.team-sales-toolbar {
+  margin: 18px 0;
+}
+
+.team-sales-months,
+.team-sales-entries,
+.team-sales-members {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 20px;
+}
+
+.team-sales-month-row,
+.team-sales-entry,
+.team-sales-member-row {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.team-sales-entry > div:first-child,
+.team-sales-member-row > span:first-child {
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.team-sales-entry small,
+.team-sales-month-row small {
+  display: block;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+.team-counter-sale-section {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.team-counter-sale-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+@media (max-width: 720px) {
+  .team-sales-login,
+  .team-counter-sale-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .service-order-card {
   grid-template-columns: minmax(0, 1fr) minmax(220px, 0.35fr);
 }

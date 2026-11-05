@@ -1711,6 +1711,31 @@ function createClientPurchaseHistoryMarkup(purchaseRecords) {
     </article>`).join("")}</div>`;
 }
 
+function formatSalesMonth(month) {
+  const [year, number] = String(month || "").split("-").map(Number);
+  if (!year || !number || number < 1 || number > 12) return String(month || "");
+  return new Date(Date.UTC(year, number - 1, 1)).toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" });
+}
+
+function createTeamSalesDashboardMarkup(report) {
+  const selected = report.selected || {};
+  const team = Array.isArray(report.team) ? report.team : [];
+  const entries = Array.isArray(report.entries) ? report.entries : [];
+  const months = Array.isArray(report.months) ? report.months : [];
+  return `
+    <div class="summary-grid">
+      <article class="summary-card"><span class="summary-label">Vendas do GrafiCalc</span><strong>${formatCurrency(selected.systemTotal)}</strong></article>
+      <article class="summary-card"><span class="summary-label">Vendas de balcão</span><strong>${formatCurrency(selected.counterTotal)}</strong></article>
+      <article class="summary-card"><span class="summary-label">Total de ${escapeHtml(formatSalesMonth(report.month))}</span><strong>${formatCurrency(selected.total)}</strong></article>
+      <article class="summary-card"><span class="summary-label">Vendas no mês</span><strong>${formatInteger(selected.count || 0)}</strong></article>
+    </div>
+    ${report.mode === "admin" ? `<h3>Equipe no mês</h3><div class="team-sales-members">${team.map((member) => `<div class="team-sales-member-row"><span>${escapeHtml(member.name)}</span><small>${formatInteger(member.count)} vendas · GrafiCalc ${formatCurrency(member.systemTotal)} · Balcão ${formatCurrency(member.counterTotal)}</small><strong>${formatCurrency(member.total)}</strong></div>`).join("")}</div>` : ""}
+    <h3>Evolução mês a mês</h3>
+    <div class="team-sales-months">${months.map((item) => `<button class="button team-sales-month-row" type="button" data-sales-month="${escapeHtml(item.month)}"><span>${escapeHtml(formatSalesMonth(item.month))}<small>${formatInteger(item.count)} vendas · GrafiCalc ${formatCurrency(item.systemTotal)} · Balcão ${formatCurrency(item.counterTotal)}</small></span><strong>${formatCurrency(item.total)}</strong></button>`).join("")}</div>
+    <h3>Vendas de ${escapeHtml(formatSalesMonth(report.month))}</h3>
+    <div class="team-sales-entries">${entries.length ? entries.map((entry) => `<div class="team-sales-entry"><div><strong>${escapeHtml(entry.description)}</strong><small>${escapeHtml(entry.date.split("-").reverse().join("/"))} · ${escapeHtml(entry.source)}${entry.clientName ? ` · ${escapeHtml(entry.clientName)}` : ""}${entry.orderNumber ? ` · O.S. ${escapeHtml(entry.orderNumber)}` : ""}${report.mode === "admin" ? ` · ${escapeHtml(entry.memberName)}` : ""}</small></div><strong>${formatCurrency(entry.amount)}</strong>${report.mode === "admin" && entry.source === "Balcão" ? `<button class="button button-danger" type="button" data-counter-sale-delete="${escapeHtml(entry.id)}">Excluir</button>` : ""}</div>`).join("") : '<p class="list-meta">Nenhuma venda registrada neste mês.</p>'}</div>`;
+}
+
 function createQuoteRecordMarkup(quote, clients, { compact = false, serviceOrders = [], employeeDraft = "", teamMembers = [] } = {}) {
   const items = getQuoteHistoryItems(quote);
   const client = getQuoteClient(quote, clients);
@@ -7804,6 +7829,11 @@ async function initApp() {
   const clientsList = document.getElementById("clients-list");
   const teamList = document.getElementById("team-list");
   const teamFeedback = document.getElementById("team-feedback");
+  const teamSalesLogin = document.getElementById("team-sales-login");
+  const teamSalesArea = document.getElementById("team-sales-area");
+  const teamSalesDashboard = document.getElementById("team-sales-dashboard");
+  const teamSalesFeedback = document.getElementById("team-sales-feedback");
+  const teamCounterSaleSection = document.getElementById("team-counter-sale-section");
   const historyList = document.getElementById("history-list");
   const serviceOrdersList = document.getElementById("os-list");
   const serviceOrdersFeedback = document.getElementById("os-feedback");
@@ -7849,6 +7879,9 @@ async function initApp() {
   let serviceOrderStatusFilter = "all";
   const serviceOrderCreationDrafts = new Map();
   let teamMembers = [];
+  let salesAccess = null;
+  let salesReport = null;
+  let salesRequestId = 0;
   const pendingServiceOrderQuoteIds = new Set();
   const serviceOrderEmployeeDrafts = new Map();
   const pendingEmployeeChanges = new Set();
@@ -8152,11 +8185,13 @@ async function initApp() {
       }
       void refreshSharedState(false);
       void refreshTeamMembers().catch(() => {});
+      void refreshSalesDashboard();
     }, SHARED_SYNC_INTERVAL_MS);
 
     window.addEventListener("focus", () => {
       void refreshSharedState(true);
       void refreshTeamMembers().catch(() => {});
+      void refreshSalesDashboard();
     });
   }
 
@@ -8264,8 +8299,61 @@ async function initApp() {
       cache: "no-store",
     });
     const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.error || "Não foi possível atualizar a equipe.");
+    if (!response.ok) {
+      const error = new Error(result.error || "Não foi possível atualizar a equipe.");
+      error.status = response.status;
+      throw error;
+    }
     return result;
+  }
+
+  function renderSalesDashboard() {
+    teamSalesLogin.hidden = Boolean(salesAccess);
+    teamSalesArea.hidden = !salesAccess;
+    if (!salesAccess || !salesReport) {
+      teamSalesDashboard.innerHTML = "";
+      teamCounterSaleSection.hidden = true;
+      return;
+    }
+    document.getElementById("team-sales-view-label").textContent = salesReport.mode === "admin"
+      ? "Acompanhamento geral da equipe" : `Vendas de ${salesReport.member.name}`;
+    document.getElementById("team-sales-month").value = salesReport.month;
+    teamSalesDashboard.innerHTML = createTeamSalesDashboardMarkup(salesReport);
+    teamCounterSaleSection.hidden = salesReport.mode !== "member";
+    const saleDateInput = document.getElementById("team-counter-sale-date");
+    if (!saleDateInput.value) saleDateInput.value = salesReport.today;
+  }
+
+  function clearSalesAccess() {
+    salesRequestId += 1;
+    salesAccess = null;
+    salesReport = null;
+    document.getElementById("team-counter-sale-form").reset();
+    renderSalesDashboard();
+  }
+
+  async function loadSalesDashboard(access, month = "") {
+    const requestId = ++salesRequestId;
+    try {
+      const report = await requestTeamAction("get_sales_dashboard", { ...access, month });
+      if (requestId !== salesRequestId) return null;
+      salesAccess = access;
+      salesReport = report;
+      renderSalesDashboard();
+      return report;
+    } catch (error) {
+      if (requestId === salesRequestId && error.status === 401 && salesAccess === access) clearSalesAccess();
+      throw error;
+    }
+  }
+
+  async function refreshSalesDashboard() {
+    if (!salesAccess) return;
+    try {
+      await loadSalesDashboard(salesAccess, salesReport?.month);
+    } catch (error) {
+      setStatusMessage(teamSalesFeedback, error.message, "error");
+    }
   }
 
   function applyTeamMembers(members) {
@@ -8525,6 +8613,9 @@ async function initApp() {
   }
 
   function renderTeamTab() {
+    const salesMemberSelect = document.getElementById("team-sales-member");
+    const selectedMemberId = salesMemberSelect.value;
+    salesMemberSelect.innerHTML = buildTeamMemberOptions(teamMembers, selectedMemberId);
     teamList.innerHTML = teamMembers.length ? teamMembers.map((member) => `
       <article class="list-card team-member-card" data-team-id="${escapeHtml(member.id)}">
         <div><strong>${escapeHtml(member.name)}</strong><span class="list-meta">${member.active === false ? "Inativo" : "Ativo"}</span></div>
@@ -11954,6 +12045,105 @@ async function initApp() {
       setStatusMessage(teamFeedback, "Cadastro da equipe atualizado.", "success");
     } catch (error) {
       setStatusMessage(teamFeedback, error.message, "error");
+    }
+  });
+
+  document.getElementById("team-sales-member-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const access = {
+      mode: "member",
+      memberId: document.getElementById("team-sales-member").value,
+      password: document.getElementById("team-sales-member-password").value,
+    };
+    try {
+      await loadSalesDashboard(access);
+      document.getElementById("team-sales-member-password").value = "";
+      setStatusMessage(teamSalesFeedback, "Métricas carregadas.", "success");
+    } catch (error) {
+      setStatusMessage(teamSalesFeedback, error.message, "error");
+    }
+  });
+
+  document.getElementById("team-sales-admin-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const access = { mode: "admin", password: document.getElementById("team-sales-admin-password").value };
+    try {
+      await loadSalesDashboard(access);
+      document.getElementById("team-sales-admin-password").value = "";
+      setStatusMessage(teamSalesFeedback, "Acompanhamento geral carregado.", "success");
+    } catch (error) {
+      setStatusMessage(teamSalesFeedback, error.message, "error");
+    }
+  });
+
+  document.getElementById("team-sales-logout").addEventListener("click", () => {
+    clearSalesAccess();
+    setStatusMessage(teamSalesFeedback, "Acesso encerrado.", "success");
+  });
+
+  document.getElementById("team-sales-refresh").addEventListener("click", () => {
+    void refreshSalesDashboard();
+  });
+
+  document.getElementById("team-sales-month").addEventListener("change", async (event) => {
+    if (!salesAccess) return;
+    try {
+      await loadSalesDashboard(salesAccess, event.target.value);
+    } catch (error) {
+      setStatusMessage(teamSalesFeedback, error.message, "error");
+    }
+  });
+
+  teamSalesDashboard.addEventListener("click", async (event) => {
+    const monthButton = event.target.closest("[data-sales-month]");
+    if (monthButton && salesAccess) {
+      try {
+        await loadSalesDashboard(salesAccess, monthButton.dataset.salesMonth);
+      } catch (error) {
+        setStatusMessage(teamSalesFeedback, error.message, "error");
+      }
+      return;
+    }
+    const deleteButton = event.target.closest("[data-counter-sale-delete]");
+    if (!deleteButton || salesAccess?.mode !== "admin") return;
+    const confirmed = await confirmAppAction({
+      kicker: "Venda de balcão",
+      title: "Excluir lançamento",
+      message: "Deseja excluir esta venda de balcão do acompanhamento?",
+      confirmLabel: "Excluir",
+      danger: true,
+    });
+    if (!confirmed) return;
+    try {
+      await requestTeamAction("delete_counter_sale", { ...salesAccess, saleId: deleteButton.dataset.counterSaleDelete });
+      await loadSalesDashboard(salesAccess, salesReport?.month);
+      setStatusMessage(teamSalesFeedback, "Venda de balcão excluída.", "success");
+    } catch (error) {
+      if (error.status === 401) clearSalesAccess();
+      setStatusMessage(teamSalesFeedback, error.message, "error");
+    }
+  });
+
+  document.getElementById("team-counter-sale-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (salesAccess?.mode !== "member") return;
+    const form = event.currentTarget;
+    const date = document.getElementById("team-counter-sale-date").value;
+    try {
+      await requestTeamAction("add_counter_sale", {
+        ...salesAccess,
+        date,
+        description: document.getElementById("team-counter-sale-description").value,
+        customerName: document.getElementById("team-counter-sale-customer").value,
+        amount: document.getElementById("team-counter-sale-amount").value,
+      });
+      await loadSalesDashboard(salesAccess, date.slice(0, 7));
+      form.reset();
+      document.getElementById("team-counter-sale-date").value = salesReport.today;
+      setStatusMessage(teamSalesFeedback, "Venda de balcão registrada.", "success");
+    } catch (error) {
+      if (error.status === 401) clearSalesAccess();
+      setStatusMessage(teamSalesFeedback, error.message, "error");
     }
   });
 
