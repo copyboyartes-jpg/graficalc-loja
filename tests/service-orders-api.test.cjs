@@ -53,9 +53,10 @@ test("cliente antigo não apaga O.S. ao salvar o estado compartilhado", async ()
   await withMockDatabase(async (database) => {
     const order = { id: "os-1", quoteId: "q-1", number: "00001-2026", employeeName: "Ana", createdByMemberId: "member-1", createdByName: "Ana", assignedMemberId: "member-1" };
     database.set("graficalc-global", { state_key: "graficalc-global", payload: { state: { serviceOrders: [order] } }, updated_at: "2026-10-29T00:00:00.000Z" });
-    const response = await callApi("PUT", { state: { clients: [], quoteHistory: [], serviceOrders: [{ ...order, employeeName: "Invasor", createdByMemberId: "invasor", createdByName: "Invasor", assignedMemberId: "invasor" }] }, config: {} });
+    const response = await callApi("PUT", { state: { clients: [], quoteHistory: [], serviceOrders: [{ ...order, number: "99999-2026", employeeName: "Invasor", createdByMemberId: "invasor", createdByName: "Invasor", assignedMemberId: "invasor" }] }, config: {} });
     assert.equal(response.statusCode, 200);
     assert.equal(response.body.payload.state.serviceOrders[0].employeeName, "Ana");
+    assert.equal(response.body.payload.state.serviceOrders[0].number, order.number);
     assert.equal(response.body.payload.state.serviceOrders[0].createdByMemberId, "member-1");
     assert.equal(database.get("graficalc-global").payload.state.serviceOrders[0].assignedMemberId, "member-1");
     const stale = await callApi("PUT", { state: { clients: [], quoteHistory: [] }, config: {} });
@@ -219,11 +220,20 @@ test("métricas mensais exigem senha e separam vendas da O.S., balcão e orçame
   });
 });
 
-test("reserva números sequenciais mesmo com pedidos simultâneos e reutiliza o número do orçamento", async () => {
+test("reserva uma sequência geral entre colaboradores e continua após a maior O.S. existente", async () => {
   const priorToken = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const priorFetch = global.fetch;
   process.env.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_test";
   const database = new Map();
+  const year = new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", year: "numeric" }).format(new Date());
+  database.set("graficalc-global", {
+    state_key: "graficalc-global",
+    payload: { state: { serviceOrders: [
+      { id: "old-os", quoteId: "old-quote", number: `00007-${year}` },
+      { id: "legacy-os", quoteId: "legacy-quote", number: "OS-20261029-10000000" },
+    ] } },
+    updated_at: "2026-11-05T00:00:00.000Z",
+  });
   let collisions = 0;
   global.fetch = async (url, options) => {
     const requestUrl = new URL(url);
@@ -248,8 +258,8 @@ test("reserva números sequenciais mesmo com pedidos simultâneos e reutiliza o 
     throw new Error(`Unexpected method: ${options.method}`);
   };
 
-  async function reserve(quoteId) {
-    const request = Readable.from([JSON.stringify({ action: "reserve_service_order_number", quoteId })]);
+  async function reserve(quoteId, memberId) {
+    const request = Readable.from([JSON.stringify({ action: "reserve_service_order_number", quoteId, memberId })]);
     request.method = "POST";
     const response = { statusCode: 0, setHeader() {}, end(value) { this.body = JSON.parse(value); } };
     await handler(request, response);
@@ -258,14 +268,35 @@ test("reserva números sequenciais mesmo com pedidos simultâneos e reutiliza o 
   }
 
   try {
-    const numbers = await Promise.all([reserve("quote-a"), reserve("quote-b")]);
-    assert.deepEqual(numbers.map((number) => number.slice(0, 5)).sort(), ["00001", "00002"]);
+    const numbers = await Promise.all([reserve("quote-a", "ana"), reserve("quote-b", "bia")]);
+    assert.deepEqual(numbers.map((number) => number.slice(0, 5)).sort(), ["00008", "00009"]);
     assert.equal(await reserve("quote-a"), numbers[0]);
-    assert.equal(database.size, 1);
+    assert.equal(database.size, 2);
     assert.ok(collisions >= 1);
+    const forged = await callApi("PUT", { state: { serviceOrders: [{ id: "new-os", quoteId: "quote-a", number: `99999-${year}` }] }, config: {} });
+    assert.equal(forged.statusCode, 409);
+    const saved = await callApi("PUT", { state: { serviceOrders: [{ id: "new-os", quoteId: "quote-a", number: numbers[0] }] }, config: {} });
+    assert.equal(saved.statusCode, 200);
+    assert.equal(saved.body.payload.state.serviceOrders.find((order) => order.id === "new-os").number, numbers[0]);
+    const savedByOtherMember = await callApi("PUT", { state: { serviceOrders: [{ id: "second-os", quoteId: "quote-b", number: numbers[1], createdByMemberId: "bia" }] }, config: {} });
+    assert.equal(savedByOtherMember.statusCode, 200);
+    assert.deepEqual(savedByOtherMember.body.payload.state.serviceOrders.filter((order) => order.id === "new-os" || order.id === "second-os").map((order) => order.number).sort(), [...numbers].sort());
   } finally {
     global.fetch = priorFetch;
     if (priorToken === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
     else process.env.SUPABASE_SERVICE_ROLE_KEY = priorToken;
   }
+});
+
+test("contador compartilhado atrasado avança após a maior O.S. sem separar por colaborador", async () => {
+  await withMockDatabase(async (database) => {
+    const year = new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", year: "numeric" }).format(new Date());
+    const key = `graficalc-os-sequence-${year}`;
+    database.set("graficalc-global", { state_key: "graficalc-global", payload: { state: { serviceOrders: [{ id: "old", quoteId: "old-q", number: `00007-${year}` }] } }, updated_at: "2026-11-05T00:00:00.000Z" });
+    database.set(key, { state_key: key, payload: { lastNumber: 3, quotes: {} }, updated_at: "2026-11-05T00:00:00.000Z" });
+    const reserved = await callApi("POST", { action: "reserve_service_order_number", quoteId: "next-q", memberId: "qualquer-colaborador" });
+    assert.equal(reserved.statusCode, 200);
+    assert.equal(reserved.body.number, `00008-${year}`);
+    assert.equal(database.get(key).payload.lastNumber, 8);
+  });
 });

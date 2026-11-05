@@ -20,11 +20,11 @@ const approvedQuote = {
 
 test("somente orçamento aprovado com cliente e funcionário gera O.S. completa", () => {
   const pending = { ...approvedQuote, status: "Pendente" };
-  assert.equal(app.createServiceOrderFromQuote(pending, [client], [], "Ana", date, () => 0.1), null);
-  assert.equal(app.createServiceOrderFromQuote(approvedQuote, [client], [], "", date, () => 0.1), null);
-  assert.equal(app.createServiceOrderFromQuote({ ...approvedQuote, clientName: "", clientId: "", snapshot: null }, [], [], "Ana", date, () => 0.1), null);
+  assert.equal(app.createServiceOrderFromQuote(pending, [client], [], "Ana", date, "00001-2026"), null);
+  assert.equal(app.createServiceOrderFromQuote(approvedQuote, [client], [], "", date, "00001-2026"), null);
+  assert.equal(app.createServiceOrderFromQuote({ ...approvedQuote, clientName: "", clientId: "", snapshot: null }, [], [], "Ana", date, "00001-2026"), null);
 
-  const order = app.createServiceOrderFromQuote(approvedQuote, [client], [], " Ana ", date, () => 0.1);
+  const order = app.createServiceOrderFromQuote(approvedQuote, [client], [], " Ana ", date, "00001-2026");
   assert.equal(order.number, "00001-2026");
   assert.equal(order.status, "Em produção");
   assert.equal(order.employeeName, "Ana");
@@ -33,13 +33,12 @@ test("somente orçamento aprovado com cliente e funcionário gera O.S. completa"
   assert.equal(order.productionDeadline, "3 dias úteis");
   assert.equal(order.items[0].description, "Adesivo");
   assert.equal(order.total, 145);
-  assert.equal(app.createServiceOrderFromQuote(approvedQuote, [client], [order], "Bia", date, () => 0.2), null);
+  assert.equal(app.createServiceOrderFromQuote(approvedQuote, [client], [order], "Bia", date, "00002-2026"), null);
 });
 
-test("numeração evita colisão local e etapas registram pronto e retirado", () => {
-  const first = app.createServiceOrderFromQuote(approvedQuote, [client], [], "Ana", date, () => 0.1);
-  const second = app.createServiceOrderFromQuote({ ...approvedQuote, id: "quote-2" }, [client], [first], "Bia", date, () => 0.1);
-  assert.equal(second.number, "00002-2026");
+test("rascunho não recebe numeração local e etapas registram pronto e retirado", () => {
+  const first = app.createServiceOrderFromQuote(approvedQuote, [client], [], "Ana", date);
+  assert.equal(first.number, "");
   assert.equal(app.updateServiceOrderStatus(first, "Pronto pra entrega", new Date("2026-10-30T12:00:00Z")), true);
   assert.equal(first.readyAt, "2026-10-30T12:00:00.000Z");
   assert.equal(app.updateServiceOrderStatus(first, "Retirado", new Date("2026-10-31T12:00:00Z")), true);
@@ -49,20 +48,8 @@ test("numeração evita colisão local e etapas registram pronto e retirado", ()
   assert.equal(first.collectedAt, "");
 });
 
-test("sequência reinicia a cada ano e mantém O.S. antigas", () => {
-  const oldOrders = [
-    { number: "OS-20261029-10000000" },
-    { number: "00007-2026" },
-    { number: "00003-2025" },
-  ];
-  assert.equal(app.generateServiceOrderNumber(oldOrders, new Date("2026-12-31T20:00:00Z")), "00008-2026");
-  assert.equal(app.generateServiceOrderNumber(oldOrders, new Date("2027-01-01T02:00:00Z")), "00008-2026");
-  assert.equal(app.generateServiceOrderNumber(oldOrders, new Date("2027-01-01T04:00:00Z")), "00001-2027");
-  assert.equal(oldOrders[0].number, "OS-20261029-10000000");
-});
-
 test("O.S. permanece no estado compartilhável e mostra cliente e funcionário", () => {
-  const order = app.createServiceOrderFromQuote(approvedQuote, [client], [], "Ana", date, () => 0.1);
+  const order = app.createServiceOrderFromQuote(approvedQuote, [client], [], "Ana", date, "00001-2026");
   const state = app.mergeState({ serviceOrders: [order] });
   assert.equal(state.serviceOrders.length, 1);
   assert.equal(state.serviceOrders[0].number, order.number);
@@ -101,7 +88,7 @@ test("pagamento parcial atualiza saldo, persiste e aparece na comanda", () => {
 });
 
 test("orçamento aprovado libera geração uma vez e depois mostra a O.S. vinculada", () => {
-  const order = app.createServiceOrderFromQuote(approvedQuote, [client], [], "Ana", date, () => 0.1);
+  const order = app.createServiceOrderFromQuote(approvedQuote, [client], [], "Ana", date, "00001-2026");
   const before = app.createQuoteRecordMarkup(approvedQuote, [client]);
   assert.match(before, /Gerar O\.S\./);
   assert.match(before, /Colaborador responsável/);

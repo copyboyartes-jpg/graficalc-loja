@@ -1632,15 +1632,6 @@ function updateServiceOrderPayment(order, value, date = new Date()) {
   return true;
 }
 
-function generateServiceOrderNumber(orders, date = new Date()) {
-  const year = new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", year: "numeric" }).format(date);
-  const highest = orders.reduce((maximum, order) => {
-    const match = String(order.number || "").match(/^(\d{4,})-(\d{4})$/);
-    return match?.[2] === year ? Math.max(maximum, Number(match[1])) : maximum;
-  }, 0);
-  return `${String(highest + 1).padStart(5, "0")}-${year}`;
-}
-
 function createServiceOrderFromQuote(quote, clients, orders, employeeName, date = new Date(), reservedNumber = "") {
   const employee = String(employeeName || "").trim();
   if (!quote || normalizeQuoteStatus(quote.status) !== "Aprovado" || !employee || orders.some((order) => order.quoteId === quote.id)) return null;
@@ -1651,8 +1642,7 @@ function createServiceOrderFromQuote(quote, clients, orders, employeeName, date 
   const createdAt = date.toISOString();
   return {
     id: `service-order-${quote.id}`,
-    number: typeof reservedNumber === "string" && /^\d{5,}-\d{4}$/.test(reservedNumber)
-      ? reservedNumber : generateServiceOrderNumber(orders, date),
+    number: typeof reservedNumber === "string" && /^\d{5,}-\d{4}$/.test(reservedNumber) ? reservedNumber : "",
     quoteId: quote.id,
     quoteTitle: quote.title || "Orçamento aprovado",
     clientId: client?.id || quote.clientId || "",

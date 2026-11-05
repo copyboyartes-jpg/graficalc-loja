@@ -167,6 +167,7 @@ function keepProtectedServiceOrderFields(existingOrders, incomingOrders) {
     const original = originals.get(String(order.id));
     return original ? {
       ...order,
+      number: original.number,
       employeeName: original.employeeName,
       createdByMemberId: original.createdByMemberId || "",
       createdByName: original.createdByName || original.employeeName || "",
@@ -178,14 +179,40 @@ function keepProtectedServiceOrderFields(existingOrders, incomingOrders) {
   return merged;
 }
 
+async function validateNewServiceOrders(existingOrders, incomingOrders) {
+  const current = Array.isArray(existingOrders) ? existingOrders : [];
+  const proposed = Array.isArray(incomingOrders) ? incomingOrders : [];
+  const currentIds = new Set(current.map((order) => String(order.id)));
+  const usedNumbers = new Set(current.map((order) => String(order.number)));
+  const usedQuotes = new Set(current.map((order) => String(order.quoteId)));
+  for (const order of proposed) {
+    if (currentIds.has(String(order.id))) continue;
+    const match = String(order.number || "").match(/^(\d{5,})-(\d{4})$/);
+    const quoteId = String(order.quoteId || "");
+    if (!match || !quoteId || usedNumbers.has(order.number) || usedQuotes.has(quoteId)) {
+      requestError(409, "A O.S. precisa de um numero unico reservado na sequencia geral.");
+    }
+    const number = Number(match[1]);
+    const row = await readStateRow(`${SERVICE_ORDER_SEQUENCE_PREFIX}${match[2]}`);
+    if (!Number.isSafeInteger(number) || row?.payload?.quotes?.[quoteId] !== number) {
+      requestError(409, "Reserve o numero da O.S. na sequencia geral antes de salvar.");
+    }
+    usedNumbers.add(order.number);
+    usedQuotes.add(quoteId);
+  }
+}
+
 async function writeSharedState(payload) {
-  const result = await updateStateRow(SHARED_STATE_KEY, { state: {}, config: {} }, (current) => ({
-    ...payload,
-    state: {
-      ...payload.state,
-      serviceOrders: keepProtectedServiceOrderFields(current.state?.serviceOrders, payload.state?.serviceOrders),
-    },
-  }));
+  const result = await updateStateRow(SHARED_STATE_KEY, { state: {}, config: {} }, async (current) => {
+    await validateNewServiceOrders(current.state?.serviceOrders, payload.state?.serviceOrders);
+    return {
+      ...payload,
+      state: {
+        ...payload.state,
+        serviceOrders: keepProtectedServiceOrderFields(current.state?.serviceOrders, payload.state?.serviceOrders),
+      },
+    };
+  });
   return { exists: true, ...result };
 }
 
@@ -195,6 +222,13 @@ function getServiceOrderYear(date = new Date()) {
 
 async function reserveServiceOrderNumber(quoteId, year = getServiceOrderYear()) {
   const stateKey = `${SERVICE_ORDER_SEQUENCE_PREFIX}${year}`;
+  const shared = await readSharedState();
+  const highestSharedNumber = (Array.isArray(shared.payload?.state?.serviceOrders) ? shared.payload.state.serviceOrders : [])
+    .reduce((highest, order) => {
+      const match = String(order.number || "").match(/^(\d{5,})-(\d{4})$/);
+      const number = match?.[2] === String(year) ? Number(match[1]) : 0;
+      return Number.isSafeInteger(number) ? Math.max(highest, number) : highest;
+    }, 0);
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const rows = await supabaseRequest(
       `/shared_app_state?state_key=eq.${encodeURIComponent(stateKey)}&select=payload,updated_at&limit=1`,
@@ -205,7 +239,7 @@ async function reserveServiceOrderNumber(quoteId, year = getServiceOrderYear()) 
       await supabaseRequest("/shared_app_state", {
         method: "POST",
         headers: { Prefer: "resolution=ignore-duplicates,return=representation" },
-        body: JSON.stringify({ state_key: stateKey, payload: { lastNumber: 0, quotes: {} }, updated_at: new Date().toISOString() }),
+        body: JSON.stringify({ state_key: stateKey, payload: { lastNumber: highestSharedNumber, quotes: {} }, updated_at: new Date().toISOString() }),
       });
       continue;
     }
@@ -214,7 +248,7 @@ async function reserveServiceOrderNumber(quoteId, year = getServiceOrderYear()) 
     if (Number.isSafeInteger(current.quotes?.[quoteId]) && current.quotes[quoteId] > 0) {
       return `${String(current.quotes[quoteId]).padStart(5, "0")}-${year}`;
     }
-    const lastNumber = Number.isSafeInteger(current.lastNumber) && current.lastNumber >= 0 ? current.lastNumber : 0;
+    const lastNumber = Math.max(Number.isSafeInteger(current.lastNumber) && current.lastNumber >= 0 ? current.lastNumber : 0, highestSharedNumber);
     const next = lastNumber + 1;
     const priorTime = Date.parse(row.updated_at);
     const updatedAt = new Date(Math.max(Date.now(), Number.isFinite(priorTime) ? priorTime + 1 : 0)).toISOString();
