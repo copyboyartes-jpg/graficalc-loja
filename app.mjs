@@ -7926,6 +7926,90 @@ async function initApp() {
   const serviceOrderEmployeeDrafts = new Map();
   const pendingEmployeeChanges = new Set();
   const selectedServiceOrderIds = new Set();
+  const editableSelector = "input:not([type='hidden']), select, textarea, button";
+  let pointerIsDown = false;
+  let pointerFocusBookmark = null;
+  let tabIsMovingFocus = false;
+  let renderingAll = false;
+  let sharedRenderPending = false;
+
+  function captureFocusBookmark(element, keepDraft = false) {
+    if (!(element instanceof HTMLElement) || !element.matches(editableSelector)) return null;
+    const row = element.closest("tr, [data-free-quote-row-index]");
+    const rowSelector = row?.matches("tr") ? "tr" : "[data-free-quote-row-index]";
+    const root = row?.closest("[id]") || element.closest("[id]");
+    if (!root) return null;
+    const scope = row && root !== element ? row : root;
+    const controls = [...scope.querySelectorAll(editableSelector)];
+    const index = controls.indexOf(element);
+    if (!element.id && index < 0) return null;
+    const isTextField = element instanceof HTMLTextAreaElement
+      || element instanceof HTMLInputElement && !["checkbox", "radio", "file"].includes(element.type);
+    return {
+      element,
+      id: element.id || "",
+      rootId: root.id,
+      rowSelector,
+      rowIndex: row ? [...root.querySelectorAll(rowSelector)].indexOf(row) : -1,
+      index,
+      name: element.name || "",
+      draft: keepDraft && isTextField ? element.value : null,
+      selectionStart: isTextField ? element.selectionStart : null,
+      selectionEnd: isTextField ? element.selectionEnd : null,
+    };
+  }
+
+  function restoreFocusBookmark(bookmark) {
+    if (!bookmark || bookmark.element.isConnected) return;
+    let replacement = bookmark.id ? document.getElementById(bookmark.id) : null;
+    if (!replacement) {
+      const root = document.getElementById(bookmark.rootId);
+      const scope = bookmark.rowIndex >= 0 ? root?.querySelectorAll(bookmark.rowSelector)[bookmark.rowIndex] : root;
+      const controls = scope ? [...scope.querySelectorAll(editableSelector)] : [];
+      replacement = bookmark.name ? controls.find((field) => field.name === bookmark.name) : null;
+      replacement ||= controls[bookmark.index];
+    }
+    if (!(replacement instanceof HTMLElement) || replacement.matches(":disabled") || replacement.offsetParent === null) return;
+    if (bookmark.draft !== null && "value" in replacement) replacement.value = bookmark.draft;
+    replacement.focus({ preventScroll: true });
+    if (bookmark.selectionStart !== null && bookmark.selectionEnd !== null && replacement.setSelectionRange) {
+      replacement.setSelectionRange(bookmark.selectionStart, bookmark.selectionEnd);
+    }
+  }
+
+  function focusBookmarkForRender() {
+    if (tabIsMovingFocus) return null;
+    return pointerIsDown ? pointerFocusBookmark : captureFocusBookmark(document.activeElement, true);
+  }
+
+  function restoreFocusAfterRender(bookmark) {
+    if (!bookmark) return;
+    if (pointerIsDown) requestAnimationFrame(() => restoreFocusBookmark(bookmark));
+    else restoreFocusBookmark(bookmark);
+  }
+
+  function isUserEditing() {
+    return document.activeElement instanceof HTMLElement
+      && document.activeElement.matches("input:not([type='hidden']), select, textarea");
+  }
+
+  document.addEventListener("pointerdown", (event) => {
+    pointerIsDown = true;
+    const target = event.target instanceof Element
+      ? event.target.closest(editableSelector) || event.target.closest("label")?.querySelector(editableSelector)
+      : null;
+    pointerFocusBookmark = captureFocusBookmark(target);
+  }, true);
+  const finishPointerFocus = () => requestAnimationFrame(() => {
+    pointerIsDown = false;
+    pointerFocusBookmark = null;
+    if (sharedRenderPending && !isUserEditing()) {
+      sharedRenderPending = false;
+      renderAll();
+    }
+  });
+  document.addEventListener("pointerup", finishPointerFocus, true);
+  document.addEventListener("pointercancel", finishPointerFocus, true);
 
   function setStatusMessage(element, message, tone = "neutral") {
     if (!element) {
@@ -8092,7 +8176,8 @@ async function initApp() {
     applySharedStateSnapshot(payload.state);
     Object.assign(config, mergeConfig(payload.config));
     persistLocalOnly();
-    renderAll();
+    if (isUserEditing()) sharedRenderPending = true;
+    else renderAll();
     if (successMessage) {
       setSyncStatus(successMessage, "success");
     }
@@ -8124,7 +8209,8 @@ async function initApp() {
       if (!sharedSyncQueued && JSON.stringify(savedPayload.state?.serviceOrders) !== JSON.stringify(payload.state.serviceOrders)) {
         applySharedStateSnapshot({ serviceOrders: savedPayload.state.serviceOrders });
         persistLocalOnly();
-        renderServiceOrdersTab();
+        if (isUserEditing()) sharedRenderPending = true;
+        else renderServiceOrdersTab();
       }
       sharedUpdatedAt = result.updatedAt || new Date().toISOString();
       setSyncStatus("Tudo salvo e compartilhado entre os computadores.", "success");
@@ -8160,7 +8246,7 @@ async function initApp() {
   }
 
   async function refreshSharedState(showMessage = false) {
-    if (!sharedBootstrapComplete || sharedSyncInFlight) {
+    if (!sharedBootstrapComplete || sharedSyncInFlight || isUserEditing()) {
       return;
     }
 
@@ -8232,6 +8318,17 @@ async function initApp() {
       void refreshSharedState(true);
       void refreshTeamMembers().catch(() => {});
       void refreshSalesDashboard();
+    });
+    document.addEventListener("focusout", () => {
+      setTimeout(() => {
+        if (isUserEditing() || tabIsMovingFocus || pointerIsDown) return;
+        if (sharedRenderPending) {
+          sharedRenderPending = false;
+          renderAll();
+        }
+        void refreshSharedState(false);
+        void refreshTeamMembers().catch(() => {});
+      }, 0);
     });
   }
 
@@ -8406,6 +8503,10 @@ async function initApp() {
 
   function applyTeamMembers(members) {
     teamMembers = members;
+    if (isUserEditing()) {
+      sharedRenderPending = true;
+      return;
+    }
     renderTeamTab();
     renderHistoryTab();
     renderServiceOrdersTab();
@@ -8413,6 +8514,7 @@ async function initApp() {
   }
 
   async function refreshTeamMembers() {
+    if (isUserEditing()) return;
     const response = await fetch(`${SHARED_API_PATH}?resource=team`, { cache: "no-store" });
     if (!response.ok) throw new Error("team-unavailable");
     const result = await response.json();
@@ -8723,7 +8825,8 @@ async function initApp() {
       ${stats.quotes.length ? stats.quotes.map((quote) => createQuoteRecordMarkup(quote, state.clients, { serviceOrders: state.serviceOrders, employeeDraft: serviceOrderCreationDrafts.get(quote.id) || "", teamMembers })).join("") : `<div class="empty-state"><strong>Nenhum orçamento salvo para ${escapeHtml(client.name)}</strong><span>Salve a proposta atual para iniciar o histórico.</span></div>`}`;
   }
 
-  function renderRowsAndSummary() {
+  function renderRowsAndSummary({ preserveEditingTableId = "" } = {}) {
+    const focusBookmark = renderingAll ? null : focusBookmarkForRender();
     const workbook = calculateWorkbook(state, config);
     const pageSummary = summarizeApostilaPages(workbook.activeRows);
     const colorWorkbook = calculateColorPrintWorkbook(state, config);
@@ -8876,6 +8979,8 @@ async function initApp() {
       )
       .join("");
 
+    // During typing, update calculated cells without replacing the active input.
+    if (preserveEditingTableId !== credentialRowsTableBody.id) {
     credentialRowsTableBody.innerHTML = credentialWorkbook.rows
       .map(
         (row, index) => `
@@ -8918,6 +9023,17 @@ async function initApp() {
         }
       });
     });
+    } else {
+      credentialRowsTableBody.querySelectorAll("tr").forEach((element, index) => {
+        const row = credentialWorkbook.rows[index];
+        if (!row) return;
+        element.classList.toggle("is-empty", !row.active);
+        const values = [formatAreaM2(row.areaM2), row.itemsPerSheet > 0 ? formatInteger(row.itemsPerSheet) : "-", row.sheetsNeeded > 0 ? formatInteger(row.sheetsNeeded) : "-", formatCurrency(row.baseTotal), formatCurrency(row.laminationTotal), formatCurrency(row.lanyardTotal), formatCurrency(row.total), formatCurrency(row.unitValue)];
+        element.querySelectorAll(".readonly-value").forEach((output, outputIndex) => {
+          output.textContent = values[outputIndex];
+        });
+      });
+    }
     warningList.innerHTML = workbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("");
     colorWarningList.innerHTML = colorWorkbook.warnings.map((warning) => `<div class="warning-item">${escapeHtml(warning)}</div>`).join("");
     credentialWarningList.innerHTML = credentialWorkbook.warnings.length
@@ -8930,6 +9046,7 @@ async function initApp() {
       credentialWorkbook.activeRows.length > 0 ? "success" : "neutral"
     );
 
+    if (preserveEditingTableId !== readyRowsTableBody.id) {
     readyRowsTableBody.innerHTML = readyWorkbook.rows
       .map(
         (row, index) => `
@@ -8947,6 +9064,16 @@ async function initApp() {
         `
       )
       .join("");
+    } else {
+      readyRowsTableBody.querySelectorAll("tr").forEach((element, index) => {
+        const row = readyWorkbook.rows[index];
+        if (!row) return;
+        element.classList.toggle("is-empty", !row.active);
+        const outputs = element.querySelectorAll(".readonly-value");
+        if (outputs[0]) outputs[0].textContent = formatUnitCurrency(row.unitPrice);
+        if (outputs[1]) outputs[1].textContent = formatCurrency(row.total);
+      });
+    }
 
     const customReadyProducts = normalizeCustomReadyProducts(config.customReadyProducts);
     readyCustomCatalog.innerHTML = customReadyProducts.length
@@ -9257,6 +9384,7 @@ async function initApp() {
         </div>
       `;
     }
+    restoreFocusAfterRender(focusBookmark);
     return { workbook, colorWorkbook, credentialWorkbook, readyWorkbook, freeQuoteWorkbook, businessCardWorkbook, flyerWorkbook, blockSulfiteWorkbook, blockAutocopiativoWorkbook, linearMeterWorkbook, m2Workbook, resinWorkbook };
   }
 
@@ -9846,44 +9974,51 @@ async function initApp() {
   }
 
   function renderAll() {
-    const sections = [
-      renderPresetControls,
-      renderClientFields,
-      renderConfig,
-      renderClientsTab,
-      renderTeamTab,
-      renderHistoryTab,
-      renderServiceOrdersTab,
-      renderQuoteClientHistory,
-    ];
-
-    for (const renderSection of sections) {
-      try {
-        renderSection();
-      } catch (error) {
-        console.warn("Falha ao atualizar uma area do GrafiCalc.", error);
-      }
-    }
-
+    const focusBookmark = focusBookmarkForRender();
+    renderingAll = true;
     try {
-      const rendered = renderRowsAndSummary();
-      saveSessionFlag(SESSION_KEYS.renderRecovery, false);
-      return rendered;
-    } catch (error) {
-      console.error("Falha ao atualizar as linhas de orcamento.", error);
-      if (!loadSessionFlag(SESSION_KEYS.renderRecovery)) {
-        saveSessionFlag(SESSION_KEYS.renderRecovery, true);
+      const sections = [
+        renderPresetControls,
+        renderClientFields,
+        renderConfig,
+        renderClientsTab,
+        renderTeamTab,
+        renderHistoryTab,
+        renderServiceOrdersTab,
+        renderQuoteClientHistory,
+      ];
+
+      for (const renderSection of sections) {
         try {
-          resetLocalCalculationAreas();
-          const recovered = renderRowsAndSummary();
-          setSyncStatus("Encontramos dados antigos nesta máquina e restauramos as linhas locais automaticamente.", "warning");
-          return recovered;
-        } catch (recoveryError) {
-          console.error("Falha ao recuperar as linhas locais desta máquina.", recoveryError);
+          renderSection();
+        } catch (error) {
+          console.warn("Falha ao atualizar uma area do GrafiCalc.", error);
         }
       }
-      setSyncStatus("Algumas linhas nao puderam ser exibidas. Atualize a pagina; se continuar, chame o Codi.", "error");
-      return null;
+
+      try {
+        const rendered = renderRowsAndSummary();
+        saveSessionFlag(SESSION_KEYS.renderRecovery, false);
+        return rendered;
+      } catch (error) {
+        console.error("Falha ao atualizar as linhas de orcamento.", error);
+        if (!loadSessionFlag(SESSION_KEYS.renderRecovery)) {
+          saveSessionFlag(SESSION_KEYS.renderRecovery, true);
+          try {
+            resetLocalCalculationAreas();
+            const recovered = renderRowsAndSummary();
+            setSyncStatus("Encontramos dados antigos nesta máquina e restauramos as linhas locais automaticamente.", "warning");
+            return recovered;
+          } catch (recoveryError) {
+            console.error("Falha ao recuperar as linhas locais desta máquina.", recoveryError);
+          }
+        }
+        setSyncStatus("Algumas linhas nao puderam ser exibidas. Atualize a pagina; se continuar, chame o Codi.", "error");
+        return null;
+      }
+    } finally {
+      renderingAll = false;
+      restoreFocusAfterRender(focusBookmark);
     }
   }
 
@@ -10333,11 +10468,16 @@ async function initApp() {
     }
 
     event.preventDefault();
+    const nextBookmark = captureFocusBookmark(fields[nextIndex]);
+    tabIsMovingFocus = true;
     target.blur();
     requestAnimationFrame(() => {
       const updatedTableBody = document.getElementById(tableBody.id);
       const updatedFields = updatedTableBody ? getCalculationTabFields(updatedTableBody) : [];
-      updatedFields[nextIndex]?.focus();
+      if (nextBookmark?.element.isConnected) nextBookmark.element.focus();
+      else if (nextBookmark) restoreFocusBookmark(nextBookmark);
+      if (document.activeElement === document.body) updatedFields[nextIndex]?.focus();
+      tabIsMovingFocus = false;
     });
   });
 
@@ -10505,32 +10645,6 @@ async function initApp() {
     return true;
   }
 
-  function rerenderCredentialRowsPreservingFocus(target) {
-    const rowElement = target.closest("tr[data-credential-row-index]");
-    const rowIndex = rowElement?.dataset.credentialRowIndex || "";
-    const fieldName = target.name || "";
-    const selectionStart = typeof target.selectionStart === "number" ? target.selectionStart : null;
-    const selectionEnd = typeof target.selectionEnd === "number" ? target.selectionEnd : null;
-
-    renderRowsAndSummary();
-
-    if (!rowIndex || !fieldName) {
-      return;
-    }
-
-    const nextTarget = credentialRowsTableBody.querySelector(
-      `tr[data-credential-row-index="${rowIndex}"] [name="${fieldName}"]`
-    );
-    if (!(nextTarget instanceof HTMLInputElement || nextTarget instanceof HTMLTextAreaElement)) {
-      return;
-    }
-
-    nextTarget.focus();
-    if (selectionStart !== null && selectionEnd !== null) {
-      nextTarget.setSelectionRange(selectionStart, selectionEnd);
-    }
-  }
-
   function isCredentialEditableField(target) {
     return target instanceof HTMLInputElement
       && ["widthCm", "heightCm", "quantity", "artCreationFee", "discountValue", "description"].includes(target.name);
@@ -10565,7 +10679,7 @@ async function initApp() {
     synchronizeCredentialRowsFromDom();
     persistLocalOnly();
     if (preserveFocus && target instanceof HTMLInputElement) {
-      rerenderCredentialRowsPreservingFocus(target);
+      renderRowsAndSummary({ preserveEditingTableId: credentialRowsTableBody.id });
       return;
     }
     renderRowsAndSummary();
@@ -10581,7 +10695,7 @@ async function initApp() {
 
 
   function updateReadyProductRowField(target, options = {}) {
-    const { rerender = true } = options;
+    const { rerender = true, preserveEditor = false } = options;
     const rowElement = target.closest("tr[data-ready-row-index]");
     if (!rowElement) {
       return false;
@@ -10602,7 +10716,7 @@ async function initApp() {
     }
     persistLocalOnly();
     if (rerender) {
-      renderRowsAndSummary();
+      renderRowsAndSummary(preserveEditor ? { preserveEditingTableId: readyRowsTableBody.id } : {});
     }
     return true;
   }
@@ -10615,7 +10729,7 @@ async function initApp() {
     if (!["description", "quantity", "artCreationFee", "discountValue"].includes(target.name)) {
       return;
     }
-    updateReadyProductRowField(target);
+    updateReadyProductRowField(target, { preserveEditor: true });
   });
 
   readyRowsTableBody.addEventListener("change", (event) => {
@@ -12377,7 +12491,8 @@ async function initApp() {
   });
 
   const refreshCredentialRowsFromBrowserRestore = () => {
-    renderRowsAndSummary();
+    if (isUserEditing()) sharedRenderPending = true;
+    else renderRowsAndSummary();
   };
 
   renderAll();
@@ -12389,7 +12504,8 @@ async function initApp() {
       setSyncStatus("Não foi possível conectar a base compartilhada agora. O app segue disponível nesta máquina.", "error");
     })
     .finally(() => {
-      renderAll();
+      if (isUserEditing()) sharedRenderPending = true;
+      else renderAll();
       window.setTimeout(refreshCredentialRowsFromBrowserRestore, 100);
     });
   startSharedRefresh();
