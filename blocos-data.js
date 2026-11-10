@@ -241,5 +241,9 @@
   { tab: "autocopiativo", format: "20,4x9,2cm", measure: "20,4x9,2cm", vias: 3, quantity: 4, price: 0 },
   { tab: "autocopiativo", format: "14,4x10cm", measure: "14,4x10cm", vias: 2, quantity: 6, price: 0 },
   { tab: "autocopiativo", format: "14,4x10cm", measure: "14,4x10cm", vias: 3, quantity: 6, price: 0 },
-].map((item, index) => ({ id: `block-price-`, ...item }));
+].map((item, index) => ({
+  id: `block-price-`,
+  ...item,
+  price: item.price > 0 ? Math.round(Math.round(item.price * 100) * 1.1 + Number.EPSILON) / 100 : item.price,
+}));
 

@@ -63,7 +63,7 @@ test("páginas coloridas mistas no laser usam o papel escolhido", () => {
   const row = quote({ innerPaper: "Offset 120g", pages: 2, colorPages: 1 }, config).rows[0];
   assert.equal(row.blackWhiteImpressions, 1);
   assert.equal(row.colorImpressions, 1);
-  assert.equal(row.innerTotal, 22);
+  assert.equal(row.innerTotal, 22.2);
   assert.match(app.buildApostilaPrintDetail(row), /Miolo: Offset 120g/);
 });
 

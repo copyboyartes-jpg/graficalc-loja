@@ -16,6 +16,31 @@ const SHARED_SYNC_INTERVAL_MS = 20000;
 const M2_LASER_CUT_FINISH_ID = "corte-lazer";
 const INITIAL_BUDGET_ROWS = 2;
 
+function raisePriceTenPercent(value) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return value;
+  return Math.round(Math.round(value * 100) * 1.1 + Number.EPSILON) / 100;
+}
+
+function raiseConfiguredPricesTenPercent(config) {
+  const priceKeys = new Set([
+    "value", "total", "unitPrice", "price", "minimumPrice", "minimumOrderPrice",
+    "minimumOrder", "minimumHalfMeter", "oneMeterTotal", "rate", "applicationRate",
+    "rateUpTo3m", "rateAbove3m", "aboveFiveSheetsPerCut", "plainBadge", "roundWhite2mm",
+  ]);
+  const visit = (object, path = []) => {
+    for (const [key, value] of Object.entries(object)) {
+      if (value && typeof value === "object") visit(value, [...path, key]);
+      else if (typeof value === "number" && (
+        priceKeys.has(key)
+        || (path[0] === "spiralPricing" && path.includes("rates"))
+        || (path[0] === "resinPricing" && path.includes("pricingByMaterial") && /^tier\d+$/.test(key))
+      )) object[key] = raisePriceTenPercent(value);
+    }
+  };
+  visit(config);
+  return config;
+}
+
 const OPTIONS = {
   printTypes: ["Preto e branco", "Colorido jato de tinta", "Colorido laser"],
   sizes: ["A4", "A3", "A5", "A6"],
@@ -167,7 +192,7 @@ const M2_PRODUCTS = [
       { maxArea: Infinity, value: 124 },
     ],
   },
-];
+].map((product) => ({ ...product, tiers: product.tiers.map((tier) => ({ ...tier, value: raisePriceTenPercent(tier.value) })) }));
 
 const M2_CATALOG = [
   { id: "digital-cut", label: "Adesivo impressão digital com corte especial", configKey: "digitalCut", bleedMm: 2 },
@@ -331,7 +356,12 @@ const BUSINESS_CARD_CATALOG = [
       ],
     },
   },
-];
+].map((product) => ({
+  ...product,
+  modes: Object.fromEntries(Object.entries(product.modes).map(([mode, tiers]) => [
+    mode, tiers.map((tier) => ({ ...tier, total: raisePriceTenPercent(tier.total) })),
+  ])),
+}));
 
 const FLYER_CATALOG = [
   ...["Couche 120g", "Offset 120g"].flatMap((paper) => [
@@ -359,7 +389,7 @@ const FLYER_CATALOG = [
   ...item,
   modes: Object.fromEntries(Object.entries(item.modes).map(([mode, tiers]) => [
     mode,
-    tiers.map(([quantity, total]) => ({ quantity, total })),
+    tiers.map(([quantity, total]) => ({ quantity, total: raisePriceTenPercent(total) })),
   ])),
 }));
 
@@ -742,7 +772,7 @@ function createDefaultLinearMeterPricing() {
 }
 
 function createDefaultConfig() {
-  return {
+  return raiseConfiguredPricesTenPercent({
     printPricing: {
       blackWhite: [
         { min: 1, value: 2.0, mode: "fixed" },
@@ -1073,7 +1103,7 @@ function createDefaultConfig() {
     m2Media: DEFAULT_M2_MEDIA.map((media) => ({ ...media })),
     catalogSections: [],
     spiralPlasticDiscount: 1.5,
-  };
+  });
 }
 
 function createDefaultRow(index) {
@@ -1316,7 +1346,7 @@ const LINEAR_METER_CATALOG = [
     rate: 34,
     minimumOrder: 34,
   },
-];
+].map((product) => raiseConfiguredPricesTenPercent(product));
 
 function createDefaultBusinessCardRow(index) {
   return {

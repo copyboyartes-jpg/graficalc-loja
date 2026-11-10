@@ -44,7 +44,7 @@ test("duas medidas de magneto compartilham o encaixe quando selecionado", () => 
     }
   }
   assert.equal(joined.activeRows.reduce((sum, row) => sum + row.total, 0), joined.totals.totalGeneral);
-  assert.equal(joined.totals.totalGeneral, 106.6);
+  assert.ok(Math.abs(joined.totals.totalGeneral - 117.26) < 0.00001);
   const html = app.createLinearMeterLayoutsMarkup(joined.rows, joined.groupLayouts);
   assert.match(html, /Base compartilhada/);
   assert.match(html, /Item 01/);
@@ -53,11 +53,11 @@ test("duas medidas de magneto compartilham o encaixe quando selecionado", () => 
 
 test("valor mínimo é cobrado uma vez no grupo", () => {
   const items = Array.from({ length: 2 }, () => ({ widthCm: 10, heightCm: 10, quantity: 1 }));
-  assert.equal(quote(items).totals.totalGeneral, 110);
+  assert.equal(quote(items).totals.totalGeneral, 121);
   const joined = quote(items, true);
   assert.equal(joined.totals.totalQuantity, 0.1);
-  assert.equal(joined.totals.totalGeneral, 55);
-  assert.equal(joined.activeRows[0].baseTotal + joined.activeRows[1].baseTotal, 55);
+  assert.equal(joined.totals.totalGeneral, 60.5);
+  assert.equal(joined.activeRows[0].baseTotal + joined.activeRows[1].baseTotal, 60.5);
 });
 
 test("itens de materiais e tabelas diferentes permanecem separados", () => {
@@ -78,7 +78,7 @@ test("itens de materiais e tabelas diferentes permanecem separados", () => {
 test("metragem direta compartilha faixa e preço sem perder edição da linha", () => {
   const joined = quote([{ linearMeters: 0.25 }, { linearMeters: 0.25 }], true);
   assert.equal(joined.totals.totalQuantity, 0.5);
-  assert.equal(joined.totals.totalGeneral, 82);
+  assert.equal(joined.totals.totalGeneral, 90.2);
   assert.equal(joined.rows[0].linearMeters, 0.25);
   assert.equal(joined.rows[1].linearMeters, 0.25);
 });
@@ -89,8 +89,8 @@ test("DTF usa a tabela da metragem conjunta e mantém arte e desconto por item",
     { productType: "dtf-textil", variantType: "2-dias", linearMeters: 0.5, discountValue: 10 },
   ], true);
   assert.equal(joined.totals.totalQuantity, 1);
-  assert.equal(joined.activeRows[0].baseTotal + joined.activeRows[1].baseTotal, 50);
-  assert.equal(joined.totals.totalGeneral, 45);
+  assert.equal(joined.activeRows[0].baseTotal + joined.activeRows[1].baseTotal, 55);
+  assert.equal(joined.totals.totalGeneral, 50);
 });
 
 test("modo de cálculo é salvo no histórico e orçamentos antigos continuam independentes", () => {

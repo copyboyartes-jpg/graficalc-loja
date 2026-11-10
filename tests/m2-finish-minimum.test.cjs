@@ -27,28 +27,28 @@ function quote({ rows = [{ width: 60, height: 40, quantity: 1, finishIds: ["lami
 test("mínimo do adesivo e mínimo da laminação são cobrados separadamente", () => {
   const result = quote();
   assert.equal(result.activeRows[0].minimumApplied, true);
-  assert.equal(result.activeRows[0].configuredFinishExtraTotal, 10);
-  assert.equal(result.totals.totalGeneral, 40);
+  assert.equal(result.activeRows[0].configuredFinishExtraTotal, 11);
+  assert.equal(result.totals.totalGeneral, 44);
 });
 
 test("acabamentos adicionais são somados depois do mínimo do material", () => {
   const result = quote({ rows: [{ width: 60, height: 40, quantity: 1, finishIds: ["laminacao", "corte-lazer"] }] });
-  assert.equal(result.activeRows[0].configuredFinishExtraTotal, 12.4);
-  assert.equal(result.totals.totalGeneral, 42.4);
+  assert.equal(result.activeRows[0].configuredFinishExtraTotal, 13.64);
+  assert.equal(result.totals.totalGeneral, 46.64);
 });
 
 test("mínimo da laminação vale para a linha inteira e não para cada unidade", () => {
   const result = quote({ rows: [{ width: 60, height: 40, quantity: 2, finishIds: ["laminacao"] }] });
-  assert.equal(result.activeRows[0].configuredFinishExtraTotal, 12);
-  assert.equal(result.totals.totalGeneral, 45.6);
+  assert.equal(result.activeRows[0].configuredFinishExtraTotal, 13.2);
+  assert.equal(result.totals.totalGeneral, 50.16);
 });
 
 test("materiais iguais compartilham mínimo do material, mantendo acabamento de cada linha", () => {
   const rows = Array.from({ length: 2 }, () => ({ width: 20, height: 50, quantity: 1, finishIds: ["laminacao"] }));
   const result = quote({ rows, grouped: true });
-  assert.equal(result.activeRows[0].configuredFinishExtraTotal, 10);
-  assert.equal(result.activeRows[1].configuredFinishExtraTotal, 10);
-  assert.equal(result.totals.totalGeneral, 50);
+  assert.equal(result.activeRows[0].configuredFinishExtraTotal, 11);
+  assert.equal(result.activeRows[1].configuredFinishExtraTotal, 11);
+  assert.equal(result.totals.totalGeneral, 55);
 });
 
 test("configuração antiga recebe mínimo da laminação sem perder o preço configurado", () => {
@@ -59,6 +59,6 @@ test("configuração antiga recebe mínimo da laminação sem perder o preço co
   const merged = app.mergeConfig(oldConfig);
   const restored = merged.m2Finishes.find((finish) => finish.id === "laminacao");
   assert.equal(restored.price, 35);
-  assert.equal(restored.minimumPrice, 10);
-  assert.equal(quote({ config: merged }).totals.totalGeneral, 40);
+  assert.equal(restored.minimumPrice, 11);
+  assert.equal(quote({ config: merged }).totals.totalGeneral, 44);
 });

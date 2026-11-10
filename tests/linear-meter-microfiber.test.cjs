@@ -28,9 +28,9 @@ test("microfibra extra aparece com largura fixa e preços configuráveis", () =>
   const product = app.getLinearMeterProduct("tecido-microfibra-extra", config);
   assert.equal(product.label, "Tecido microfibra extra 155g/m");
   assert.equal(product.widthLabel, "1,55 m");
-  assert.equal(product.minimumOrder, 25);
-  assert.equal(product.rateUpTo3m, 71.5);
-  assert.equal(product.rateAbove3m, 60.5);
+  assert.equal(product.minimumOrder, 27.5);
+  assert.equal(product.rateUpTo3m, 78.65);
+  assert.equal(product.rateAbove3m, 66.55);
   assert.match(app.buildLinearMeterProductOptions(product.id, config), /value="tecido-microfibra-extra" selected/);
   const settings = app.createConfigSectionsMarkup(config, "advanced", "metro-linear");
   assert.match(settings, /products\.tecido-microfibra-extra\.minimumOrder/);
@@ -39,10 +39,10 @@ test("microfibra extra aparece com largura fixa e preços configuráveis", () =>
 });
 
 test("microfibra respeita mínimo e faixas até e acima de 3 metros", () => {
-  assert.equal(quote({ meters: 0.2 }).totals.totalGeneral, 25);
-  assert.equal(quote({ meters: 1 }).totals.totalGeneral, 71.5);
-  assert.equal(quote({ meters: 3 }).totals.totalGeneral, 214.5);
-  assert.equal(quote({ meters: 4 }).totals.totalGeneral, 242);
+  assert.equal(quote({ meters: 0.2 }).totals.totalGeneral, 27.5);
+  assert.equal(quote({ meters: 1 }).totals.totalGeneral, 78.65);
+  assert.ok(Math.abs(quote({ meters: 3 }).totals.totalGeneral - 235.95) < 0.00001);
+  assert.equal(quote({ meters: 4 }).totals.totalGeneral, 266.2);
 });
 
 test("microfibra aproveita peças na largura fixa antes de selecionar a faixa", () => {
@@ -52,14 +52,14 @@ test("microfibra aproveita peças na largura fixa antes de selecionar a faixa", 
   assert.equal(row.columns, 3);
   assert.equal(row.rows, 1);
   assert.equal(row.linearMeters, 1);
-  assert.equal(row.baseTotal, 71.5);
+  assert.equal(row.baseTotal, 78.65);
   assert.equal(quote({ widthCm: 160, heightCm: 200, quantity: 1 }).activeRows.length, 0);
 });
 
 test("configuração antiga recebe a microfibra e preços editados entram no cálculo", () => {
   const oldConfig = app.createDefaultConfig();
   delete oldConfig.linearMeterPricing.products["tecido-microfibra-extra"];
-  assert.equal(quote({ meters: 1, config: app.mergeConfig(oldConfig) }).totals.totalGeneral, 71.5);
+  assert.equal(quote({ meters: 1, config: app.mergeConfig(oldConfig) }).totals.totalGeneral, 78.65);
 
   const config = app.createDefaultConfig();
   config.linearMeterPricing.products["tecido-microfibra-extra"].rateAbove3m = 65;

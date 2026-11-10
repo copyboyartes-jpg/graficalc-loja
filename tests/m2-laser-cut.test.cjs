@@ -24,34 +24,34 @@ function quote({ width = 100, height = 100, quantity = 1, grouped = false, rows 
   return app.calculateM2WorkbookFromConfig(state, app.createDefaultConfig());
 }
 
-test("Corte lazer aparece como acabamento de área a R$ 10,00 por m²", () => {
+test("Corte lazer aparece como acabamento de área a R$ 11,00 por m²", () => {
   const config = app.createDefaultConfig();
   const finish = config.m2Finishes.find((item) => item.id === "corte-lazer");
   assert.equal(finish.label, "Corte lazer");
   assert.equal(finish.type, "area");
-  assert.equal(finish.price, 10);
+  assert.equal(finish.price, 11);
   const regular = quote({ selected: false });
   const cut = quote();
-  assert.equal(cut.activeRows[0].configuredFinishExtraTotal, 10);
-  assert.equal(cut.totals.totalGeneral - regular.totals.totalGeneral, 10);
+  assert.equal(cut.activeRows[0].configuredFinishExtraTotal, 11);
+  assert.equal(cut.totals.totalGeneral - regular.totals.totalGeneral, 11);
   assert.match(cut.activeRows[0].finishSummary, /Corte lazer: 1 m²/);
 });
 
-test("corte acrescenta R$ 10,00/m² mesmo quando o produto usa valor mínimo", () => {
+test("corte acrescenta R$ 11,00/m² mesmo quando o produto usa valor mínimo", () => {
   const regular = quote({ width: 100, height: 10, selected: false });
   const cut = quote({ width: 100, height: 10 });
-  assert.equal(regular.totals.totalGeneral, 30);
-  assert.equal(cut.totals.totalGeneral, 31);
-  assert.equal(cut.activeRows[0].laserCutExtraTotal, 1);
+  assert.equal(regular.totals.totalGeneral, 33);
+  assert.equal(cut.totals.totalGeneral, 34.1);
+  assert.equal(cut.activeRows[0].laserCutExtraTotal, 1.1);
 });
 
 test("quantidade e soma de materiais iguais cobram a área total uma vez", () => {
   const multiple = quote({ width: 100, height: 10, quantity: 2 });
-  assert.equal(multiple.totals.totalGeneral, 32);
-  assert.equal(multiple.activeRows[0].laserCutExtraTotal, 2);
+  assert.equal(multiple.totals.totalGeneral, 35.2);
+  assert.equal(multiple.activeRows[0].laserCutExtraTotal, 2.2);
   const grouped = quote({ width: 100, height: 10, grouped: true, rows: 2 });
-  assert.equal(grouped.totals.totalGeneral, 32);
-  assert.equal(grouped.activeRows.reduce((sum, row) => sum + row.laserCutExtraTotal, 0), 2);
+  assert.equal(grouped.totals.totalGeneral, 35.2);
+  assert.equal(grouped.activeRows.reduce((sum, row) => sum + row.laserCutExtraTotal, 0), 2.2);
 });
 
 test("configuração antiga recebe o acabamento sem duplicar acabamentos renomeados", () => {
@@ -71,5 +71,5 @@ test("preço do corte continua editável nas configurações", () => {
   config.m2Finishes.find((finish) => finish.id === "corte-lazer").price = 12;
   const result = app.calculateM2WorkbookFromConfig(state, config);
   assert.equal(result.activeRows[0].laserCutExtraTotal, 12);
-  assert.equal(result.totals.totalGeneral, 82);
+  assert.equal(result.totals.totalGeneral, 89);
 });

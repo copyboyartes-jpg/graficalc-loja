@@ -25,8 +25,8 @@ function quote(fields, config = app.createDefaultConfig(), calcMode = "Independe
 
 test("A3 preto e branco usa todas as faixas por impressão", () => {
   for (const [quantity, unitPrice] of [
-    [1, 2.5], [2, 1.8], [10, 1.8], [11, 0.8], [50, 0.8],
-    [51, 0.55], [100, 0.55], [101, 0.5], [200, 0.5], [201, 0.45],
+    [1, 2.75], [2, 1.98], [10, 1.98], [11, 0.88], [50, 0.88],
+    [51, 0.61], [100, 0.61], [101, 0.55], [200, 0.55], [201, 0.5],
   ]) {
     const row = quote({ quantity }).rows[0];
     assert.ok(Math.abs(row.innerTotal - quantity * unitPrice) < 0.00001, `quantity ${quantity}`);
@@ -36,7 +36,7 @@ test("A3 preto e branco usa todas as faixas por impressão", () => {
 test("A3 frente e verso cobra duas impressões e usa uma folha para encadernar", () => {
   const row = quote({ pages: 2, printMode: "Frente e verso" }).rows[0];
   assert.equal(row.blackWhiteImpressions, 2);
-  assert.equal(row.innerTotal, 3.6);
+  assert.equal(row.innerTotal, 3.96);
   assert.equal(row.bindingSheetsPerCopy, 1);
 });
 
@@ -44,15 +44,15 @@ test("A3 respeita páginas por folha para impressão e encadernação", () => {
   const row = quote({ pages: 4, pagesPerSheet: 2 }).rows[0];
   assert.equal(row.blackWhiteImpressions, 2);
   assert.equal(row.bindingSheetsPerCopy, 2);
-  assert.equal(row.innerTotal, 3.6);
+  assert.equal(row.innerTotal, 3.96);
 });
 
 test("A3 laser e páginas coloridas usam a tabela A3 de sulfite", () => {
   const config = app.createDefaultConfig();
   config.colorPrintPricingA3["Sulfite 75g"] = [{ min: 1, value: 12 }];
   assert.equal(quote({ printType: "Colorido laser", pages: 2 }, config).rows[0].innerTotal, 24);
-  assert.equal(quote({ pages: 2, colorPages: 1 }, config).rows[0].innerTotal, 14.5);
-  assert.equal(quote({ printType: "Colorido laser", size: "A4", pages: 2 }, config).rows[0].innerTotal, 8);
+  assert.equal(quote({ pages: 2, colorPages: 1 }, config).rows[0].innerTotal, 14.75);
+  assert.equal(quote({ printType: "Colorido laser", size: "A4", pages: 2 }, config).rows[0].innerTotal, 8.8);
 });
 
 test("capas A3 selecionam o papel certo e verso conta como duas impressões", () => {
@@ -63,9 +63,9 @@ test("capas A3 selecionam o papel certo e verso conta como duas impressões", ()
     backCoverPaper: "Papel couche 250g",
   }).rows[0];
   assert.equal(row.coverImpressions, 2);
-  assert.equal(row.coverTotal, 16);
+  assert.equal(row.coverTotal, 17.6);
   assert.equal(row.backImpressions, 1);
-  assert.equal(row.backTotal, 8);
+  assert.equal(row.backTotal, 8.8);
 });
 
 test("espiral A3 custa o dobro do A4, inclusive em grupo", () => {
@@ -86,10 +86,10 @@ test("livreto A3 mantém o mesmo valor e cálculo A4", () => {
   const a4 = quote({ ...fields, size: "A4" }).rows[0];
   const a3 = quote(fields).rows[0];
   assert.equal(a3.finishingTotal, a4.finishingTotal);
-  assert.equal(a3.finishingTotal, 18);
+  assert.ok(Math.abs(a3.finishingTotal - 19.8) < 0.00001);
 });
 
-test("livreto A3 com 24 páginas laser couche 170 custa R$ 68", () => {
+test("livreto A3 com 24 páginas laser couche 170 usa 12 impressões", () => {
   const row = quote({
     printType: "Colorido laser",
     innerPaper: "Couche 170g",
@@ -101,9 +101,9 @@ test("livreto A3 com 24 páginas laser couche 170 custa R$ 68", () => {
   assert.equal(app.getApostilaInnerPagesPerSheet(row), 2);
   assert.equal(row.innerImpressions, 12);
   assert.equal(row.bindingSheetsPerCopy, 6);
-  assert.equal(row.innerTotal, 66);
-  assert.equal(row.finishingTotal, 2);
-  assert.equal(row.total, 68);
+  assert.equal(row.innerTotal, 72.6);
+  assert.equal(row.finishingTotal, 2.2);
+  assert.equal(row.total, 74.8);
   assert.match(app.getApostilaSizeDetail(row), /2 páginas por folha/);
 });
 
@@ -128,9 +128,9 @@ test("Somar quantidades separa A3, A4 e A5", () => {
     { size: "A4", quantity: 6 },
     { size: "A5", quantity: 4 },
   ], app.createDefaultConfig(), "Somar quantidades").rows;
-  assert.equal(rows[0].innerTotal, 2.5);
-  assert.ok(Math.abs(rows[1].innerTotal - 3.6) < 0.00001);
-  assert.equal(rows[2].innerTotal, 4);
+  assert.equal(rows[0].innerTotal, 2.75);
+  assert.ok(Math.abs(rows[1].innerTotal - 3.96) < 0.00001);
+  assert.equal(rows[2].innerTotal, 4.4);
 });
 
 test("linhas A3 somam impressões entre si sem misturar preços de capa A4", () => {
@@ -139,11 +139,11 @@ test("linhas A3 somam impressões entre si sem misturar preços de capa A4", () 
     { size: "A3", coverType: "Colorida so frente" },
     { size: "A4", quantity: 4, coverType: "Colorida so frente" },
   ], app.createDefaultConfig(), "Somar quantidades").rows;
-  assert.equal(rows[0].innerTotal, 1.8);
-  assert.equal(rows[1].innerTotal, 1.8);
-  assert.equal(rows[0].coverTotal, 7);
-  assert.equal(rows[1].coverTotal, 7);
-  assert.equal(rows[2].coverTotal, 16);
+  assert.equal(rows[0].innerTotal, 1.98);
+  assert.equal(rows[1].innerTotal, 1.98);
+  assert.equal(rows[0].coverTotal, 7.7);
+  assert.equal(rows[1].coverTotal, 7.7);
+  assert.equal(rows[2].coverTotal, 17.6);
 });
 
 test("configuração antiga ganha tabela PB A3 sem alterar A4", () => {
