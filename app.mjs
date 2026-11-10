@@ -3331,14 +3331,14 @@ function calculateHundredExtra(quantity, minimumValue, eachHundredValue) {
 function getWholeLaminationUnit(sheetId, quantity) {
   const totalQuantity = toWholeNumber(quantity);
   if (sheetId === "a3") {
-    if (totalQuantity > 50) return 8.10;
-    if (totalQuantity > 5) return 8.70;
-    return 10.40;
+    if (totalQuantity > 50) return raisePriceTenPercent(8.10);
+    if (totalQuantity > 5) return raisePriceTenPercent(8.70);
+    return raisePriceTenPercent(10.40);
   }
-  if (totalQuantity > 100) return 3.70;
-  if (totalQuantity > 50) return 3.85;
-  if (totalQuantity > 10) return 4.10;
-  return 4.65;
+  if (totalQuantity > 100) return raisePriceTenPercent(3.70);
+  if (totalQuantity > 50) return raisePriceTenPercent(3.85);
+  if (totalQuantity > 10) return raisePriceTenPercent(4.10);
+  return raisePriceTenPercent(4.65);
 }
 
 function calculatePolasealFit(widthMm, heightMm, selectedSize = "auto") {
@@ -3604,9 +3604,9 @@ function calculateBusinessCardExtraFinishTotal(quantity, extraFinish) {
     return 0;
   }
   if (quantity >= 1000) {
-    return Math.ceil(quantity / 1000) * 25;
+    return Math.ceil(quantity / 1000) * raisePriceTenPercent(25);
   }
-  return 10 + Math.ceil(quantity / 100) * 3;
+  return raisePriceTenPercent(10) + Math.ceil(quantity / 100) * raisePriceTenPercent(3);
 }
 
 function isFlyerRowActive(row) {
@@ -3669,15 +3669,15 @@ function buildFlyerQuantityOptions(item, printMode, currentValue) {
 function calculateFlyerFoldTotal(quantity, foldType) {
   if (foldType === "1 dobra") {
     if (quantity >= 1000) {
-      return Math.ceil(quantity / 1000) * 50;
+      return Math.ceil(quantity / 1000) * raisePriceTenPercent(50);
     }
-    return quantity >= 100 ? 10 + Math.ceil(quantity / 100) * 5 : 0;
+    return quantity >= 100 ? raisePriceTenPercent(10) + Math.ceil(quantity / 100) * raisePriceTenPercent(5) : 0;
   }
   if (foldType === "2 dobras") {
     if (quantity >= 1000) {
-      return Math.ceil(quantity / 1000) * 100;
+      return Math.ceil(quantity / 1000) * raisePriceTenPercent(100);
     }
-    return quantity >= 100 ? 20 + Math.ceil(quantity / 100) * 10 : 0;
+    return quantity >= 100 ? raisePriceTenPercent(20) + Math.ceil(quantity / 100) * raisePriceTenPercent(10) : 0;
   }
   return 0;
 }
@@ -3914,7 +3914,7 @@ function calculateCredentialWorkbook(state, config) {
     let baseTotal = Math.max(minimumValue, baseSubtotal);
 
     if (material.pricingKey === "ps2mm" && printMode === "Frente e verso") {
-      baseTotal += areaM2 * 70;
+      baseTotal += areaM2 * raisePriceTenPercent(70);
     } else if (printMode === "Frente e verso") {
       const flatCutPricing = config.m2Pricing?.flatCut || [];
       const flatCutBand = getM2PricingBand(flatCutPricing, areaM2);
