@@ -2168,6 +2168,37 @@ textarea {
   font-size: 0.98rem;
 }
 
+.catalog-price-group {
+  margin-top: 10px;
+  border: 1px solid rgba(31, 42, 47, 0.12);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.catalog-price-group summary {
+  padding: 12px 14px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.catalog-price-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.catalog-price-table th,
+.catalog-price-table td {
+  padding: 8px 12px;
+  border-top: 1px solid rgba(31, 42, 47, 0.08);
+  text-align: left;
+}
+
+.catalog-price-table input {
+  width: 100%;
+  min-width: 90px;
+  max-width: 180px;
+}
+
 .config-field-grid {
   display: grid;
   gap: 10px;

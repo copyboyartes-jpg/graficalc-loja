@@ -393,6 +393,38 @@ const FLYER_CATALOG = [
   ])),
 }));
 
+function createCatalogPricing(catalog) {
+  return Object.fromEntries(catalog.map((product) => [
+    product.id,
+    Object.fromEntries(Object.entries(product.modes).map(([mode, tiers]) => [
+      mode,
+      Object.fromEntries(tiers.map((tier) => [tier.quantity, tier.total])),
+    ])),
+  ]));
+}
+
+function mergeCatalogPricing(defaultPricing, savedPricing) {
+  const merged = deepClone(defaultPricing);
+  if (!savedPricing || typeof savedPricing !== "object") return merged;
+  for (const [productId, modes] of Object.entries(merged)) {
+    for (const [mode, quantities] of Object.entries(modes)) {
+      for (const quantity of Object.keys(quantities)) {
+        const saved = savedPricing?.[productId]?.[mode]?.[quantity];
+        if (saved !== "" && saved !== null && Number.isFinite(Number(saved)) && Number(saved) >= 0) {
+          quantities[quantity] = Math.round(Number(saved) * 100) / 100;
+        }
+      }
+    }
+  }
+  return merged;
+}
+
+function getCatalogTier(item, printMode, quantity, pricing) {
+  const tier = item?.modes?.[printMode]?.find((entry) => entry.quantity === quantity);
+  if (!tier) return null;
+  return { ...tier, total: pricing?.[item.id]?.[printMode]?.[quantity] ?? tier.total };
+}
+
 const READY_PRODUCT_CATALOG = [
   {
     id: "Cordão de crachá liso",
@@ -494,14 +526,14 @@ const READY_PRODUCT_CATALOG = [
   },
   {
     id: "Wind banner promocional 2m",
-    label: "Wind banner promocional 2m",
+    label: "Wind Banner Promocional 2,00m",
     category: "Windbanner promocional",
     unitPrice: 150,
     quoteDescription: "tecido promocional, mais fino, base de concreto, haste em alumínio",
   },
   {
     id: "Windbanner promocional 1,20m - somente tecido",
-    label: "Windbanner promocional 1,30m - somente tecido",
+    label: "Wind Banner Promocional 1,50m - somente tecido",
     category: "Windbanner promocional",
     pricingMode: "tieredUnit",
     minQuantity: 5,
@@ -513,7 +545,7 @@ const READY_PRODUCT_CATALOG = [
   },
   {
     id: "Windbanner promocional 1,20m - tecido e haste",
-    label: "Windbanner promocional 1,30m - tecido e haste",
+    label: "Wind Banner Promocional 1,50m - tecido e haste",
     category: "Windbanner promocional",
     pricingMode: "tieredUnit",
     minQuantity: 5,
@@ -525,14 +557,15 @@ const READY_PRODUCT_CATALOG = [
   },
   {
     id: "Windbanner promocional 1,20m - tecido, haste e base",
-    label: "Windbanner promocional 1,30m - tecido, haste e base",
+    label: "Wind Banner Promocional 1,50m",
     category: "Windbanner promocional",
     pricingMode: "tieredUnit",
-    minQuantity: 5,
+    minQuantity: 1,
     quoteDescription: "tecido promocional, mais fino, base de concreto, haste em alumínio",
     tiers: [
-      { min: 5, value: 100, label: "De 5 a 10" },
-      { min: 11, value: 95, label: "Acima de 10" },
+      { min: 1, value: 95, label: "1 a 2 unidades" },
+      { min: 3, value: 92, label: "3 a 9 unidades" },
+      { min: 10, value: 85, label: "10 unidades ou mais" },
     ],
   },
   {
@@ -772,7 +805,7 @@ function createDefaultLinearMeterPricing() {
 }
 
 function createDefaultConfig() {
-  return raiseConfiguredPricesTenPercent({
+  const config = raiseConfiguredPricesTenPercent({
     printPricing: {
       blackWhite: [
         { min: 1, value: 2.0, mode: "fixed" },
@@ -1103,7 +1136,17 @@ function createDefaultConfig() {
     m2Media: DEFAULT_M2_MEDIA.map((media) => ({ ...media })),
     catalogSections: [],
     spiralPlasticDiscount: 1.5,
+    windbannerPromotionPricingVersion: 2,
   });
+  config.businessCardPricing = createCatalogPricing(BUSINESS_CARD_CATALOG);
+  config.flyerPricing = createCatalogPricing(FLYER_CATALOG);
+  config.readyProductPricing["Wind banner promocional 2m"].unitPrice = 150;
+  config.readyProductPricing["Windbanner promocional 1,20m - tecido, haste e base"].tiers = [
+    { min: 1, value: 95, label: "1 a 2 unidades" },
+    { min: 3, value: 92, label: "3 a 9 unidades" },
+    { min: 10, value: 85, label: "10 unidades ou mais" },
+  ];
+  return config;
 }
 
 function createDefaultRow(index) {
@@ -2185,6 +2228,8 @@ function mergeConfig(candidate) {
   };
 
   const merged = deepClone(defaults);
+  merged.businessCardPricing = mergeCatalogPricing(defaults.businessCardPricing, candidate.businessCardPricing);
+  merged.flyerPricing = mergeCatalogPricing(defaults.flyerPricing, candidate.flyerPricing);
   if (Array.isArray(candidate.customReadyProducts)) {
     merged.customReadyProducts = normalizeCustomReadyProducts(candidate.customReadyProducts);
   }
@@ -2287,6 +2332,13 @@ function mergeConfig(candidate) {
           : defaultPricing.tiers,
       };
     }
+  }
+
+  if (candidate.windbannerPromotionPricingVersion !== 2) {
+    merged.readyProductPricing["Wind banner promocional 2m"].unitPrice = 150;
+    const completeId = "Windbanner promocional 1,20m - tecido, haste e base";
+    merged.readyProductPricing[completeId].minQuantity = 1;
+    merged.readyProductPricing[completeId].tiers = deepClone(defaults.readyProductPricing[completeId].tiers);
   }
 
   if (candidate.cutPricing && typeof candidate.cutPricing === "object") {
@@ -3556,16 +3608,14 @@ function getBusinessCardValidPrintMode(material, printMode) {
   return availableModes[0] || "Só frente";
 }
 
-function getBusinessCardTier(material, printMode, quantity) {
-  const tiers = [...(material?.modes?.[printMode] || [])].sort((a, b) => a.quantity - b.quantity);
-  if (!tiers.length) {
-    return null;
-  }
-  return tiers.find((tier) => quantity === tier.quantity) || null;
+function getBusinessCardTier(material, printMode, quantity, config) {
+  return getCatalogTier(material, printMode, quantity, config?.businessCardPricing);
 }
 
-function getBusinessCardQuantityOptions(material, printMode) {
-  return [...(material?.modes?.[printMode] || [])].sort((a, b) => a.quantity - b.quantity);
+function getBusinessCardQuantityOptions(material, printMode, config) {
+  return [...(material?.modes?.[printMode] || [])]
+    .sort((a, b) => a.quantity - b.quantity)
+    .map((tier) => getBusinessCardTier(material, printMode, tier.quantity, config));
 }
 
 function normalizeBusinessCardRowChoice(row) {
@@ -3591,8 +3641,8 @@ function buildBusinessCardPrintModeOptions(material, currentValue) {
     .join("");
 }
 
-function buildBusinessCardQuantityOptions(material, printMode, currentValue) {
-  const options = getBusinessCardQuantityOptions(material, printMode);
+function buildBusinessCardQuantityOptions(material, printMode, currentValue, config) {
+  const options = getBusinessCardQuantityOptions(material, printMode, config);
   return [
     `<option value="0"${toWholeNumber(currentValue) <= 0 ? " selected" : ""}>Escolher</option>`,
     ...options.map((tier) => `<option value="${escapeHtml(tier.quantity)}"${toWholeNumber(currentValue) === tier.quantity ? " selected" : ""}>${formatInteger(tier.quantity)} cartões - ${formatCurrency(tier.total)}</option>`),
@@ -3628,12 +3678,14 @@ function getFlyerValidPrintMode(item, printMode) {
   return modes.includes(printMode) ? printMode : modes[0] || "Só frente";
 }
 
-function getFlyerQuantityOptions(item, printMode) {
-  return [...(item?.modes?.[printMode] || [])].sort((a, b) => a.quantity - b.quantity);
+function getFlyerQuantityOptions(item, printMode, config) {
+  return [...(item?.modes?.[printMode] || [])]
+    .sort((a, b) => a.quantity - b.quantity)
+    .map((tier) => getFlyerTier(item, printMode, tier.quantity, config));
 }
 
-function getFlyerTier(item, printMode, quantity) {
-  return getFlyerQuantityOptions(item, printMode).find((tier) => tier.quantity === quantity) || null;
+function getFlyerTier(item, printMode, quantity, config) {
+  return getCatalogTier(item, printMode, quantity, config?.flyerPricing);
 }
 
 function normalizeFlyerRowChoice(row) {
@@ -3659,10 +3711,10 @@ function buildFlyerPrintModeOptions(item, currentValue) {
     .join("");
 }
 
-function buildFlyerQuantityOptions(item, printMode, currentValue) {
+function buildFlyerQuantityOptions(item, printMode, currentValue, config) {
   return [
     `<option value="0"${toWholeNumber(currentValue) <= 0 ? " selected" : ""}>Escolher</option>`,
-    ...getFlyerQuantityOptions(item, printMode).map((tier) => `<option value="${escapeHtml(tier.quantity)}"${toWholeNumber(currentValue) === tier.quantity ? " selected" : ""}>${formatInteger(tier.quantity)} un - ${formatCurrency(tier.total)}</option>`),
+    ...getFlyerQuantityOptions(item, printMode, config).map((tier) => `<option value="${escapeHtml(tier.quantity)}"${toWholeNumber(currentValue) === tier.quantity ? " selected" : ""}>${formatInteger(tier.quantity)} un - ${formatCurrency(tier.total)}</option>`),
   ].join("");
 }
 
@@ -4073,14 +4125,14 @@ function calculateFreeQuoteWorkbook(state) {
   };
 }
 
-function calculateBusinessCardWorkbook(state) {
+function calculateBusinessCardWorkbook(state, config) {
   const rows = state.businessCardItems.map((row, index) => {
     const productionType = OPTIONS.businessCardProductions.includes(row.productionType) ? row.productionType : "Laser";
     const material = getBusinessCardMaterial(row.materialId, productionType);
     const printMode = getBusinessCardValidPrintMode(material, row.printMode);
     const quantity = toWholeNumber(row.quantity);
     const active = isBusinessCardRowActive(row);
-    const tier = getBusinessCardTier(material, printMode, quantity);
+    const tier = getBusinessCardTier(material, printMode, quantity, config);
     const baseTotal = active && quantity > 0 && tier ? toMoneyNumber(tier.total) : 0;
     const extraFinish = OPTIONS.businessCardExtraFinish.includes(row.extraFinish) ? row.extraFinish : "Sem acabamento adicional";
     const extraFinishTotal = active ? calculateBusinessCardExtraFinishTotal(quantity, extraFinish) : 0;
@@ -4132,14 +4184,14 @@ function calculateBusinessCardWorkbook(state) {
   };
 }
 
-function calculateFlyerWorkbook(state) {
+function calculateFlyerWorkbook(state, config) {
   const rows = state.flyerItems.map((row, index) => {
     const productionType = OPTIONS.flyerProductions.includes(row.productionType) ? row.productionType : "Laser";
     const item = getFlyerSelection(row.catalogId, productionType);
     const printMode = getFlyerValidPrintMode(item, row.printMode);
     const quantity = toWholeNumber(row.quantity);
     const active = isFlyerRowActive(row);
-    const tier = getFlyerTier(item, printMode, quantity);
+    const tier = getFlyerTier(item, printMode, quantity, config);
     const baseTotal = active && tier ? toMoneyNumber(tier.total) : 0;
     const foldType = OPTIONS.flyerFolds.includes(row.foldType) ? row.foldType : "Sem dobra";
     const foldTotal = active ? calculateFlyerFoldTotal(quantity, foldType) : 0;
@@ -6065,8 +6117,8 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
   const cartoesCards = [
     createConfigCardMarkup(
       "Tabela de cartões",
-      "Inclui produção laser e offset, com opções de só frente e frente e verso conforme a tabela enviada.",
-      `<p class="helper-text">Use a aba Cartões de visitas para selecionar produção, papel/acabamento, impressão e somente uma das quantidades cadastradas na tabela.</p>`
+      "Altere o preço total de cada tiragem, separado por produção, papel e lado de impressão.",
+      createCatalogPricingMarkup(BUSINESS_CARD_CATALOG, config.businessCardPricing, "business-card-price")
     ),
   ];
 
@@ -6216,14 +6268,15 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
     panfletos: createConfigGroupMarkup(
       "panfletos",
       "Aba: Panfletos e folders",
-      "Tabela fixa de panfletos e folders laser/offset cadastrada no sistema.",
+      "Preços por produção, papel, tamanho, lado de impressão e tiragem.",
       [
         createConfigCardMarkup(
           "Tabela de panfletos e folders",
-          "Inclui papéis, tamanhos, impressão só frente/frente e verso e adicional de dobra.",
-          `<p class="helper-text">A aba Panfletos e folders usa somente as quantidades cadastradas na tabela enviada.</p>`
+          "Altere o preço total de cada tiragem. O adicional de dobra continua calculado no orçamento.",
+          createCatalogPricingMarkup(FLYER_CATALOG, config.flyerPricing, "flyer-price")
         ),
-      ]
+      ],
+      safeSection
     ),
     m2: createConfigGroupMarkup(
       "m2",
@@ -6340,6 +6393,32 @@ function createConfigCardMarkup(title, copy, innerMarkup) {
       ${innerMarkup}
     </article>
   `;
+}
+
+function createCatalogPricingMarkup(catalog, pricing, prefix) {
+  return catalog.map((product) => {
+    const modes = Object.keys(product.modes);
+    const quantities = [...new Set(Object.values(product.modes).flat().map((tier) => tier.quantity))].sort((a, b) => a - b);
+    const label = product.size
+      ? `${product.production} | ${product.paper} | ${product.size}`
+      : `${product.production} | ${product.label}`;
+    return `
+      <details class="catalog-price-group">
+        <summary>${escapeHtml(label)}</summary>
+        <table class="catalog-price-table">
+          <thead><tr><th scope="col">Tiragem</th>${modes.map((mode) => `<th scope="col">${escapeHtml(mode)} (R$)</th>`).join("")}</tr></thead>
+          <tbody>${quantities.map((quantity) => `
+            <tr><th scope="row">${formatInteger(quantity)} un.</th>${modes.map((mode) => {
+              const tier = product.modes[mode].find((entry) => entry.quantity === quantity);
+              if (!tier) return "<td>—</td>";
+              const total = pricing?.[product.id]?.[mode]?.[quantity] ?? tier.total;
+              return `<td><input aria-label="${escapeHtml(`${label}, ${formatInteger(quantity)} unidades, ${mode}`)}" data-config-prefix="${escapeHtml(prefix)}" data-config-key="total" data-config-product-id="${escapeHtml(product.id)}" data-config-mode="${escapeHtml(mode)}" data-config-quantity="${quantity}" type="number" min="0" step="0.01" value="${escapeHtml(total)}"></td>`;
+            }).join("")}</tr>
+          `).join("")}</tbody>
+        </table>
+      </details>
+    `;
+  }).join("");
 }
 
 function createConfigDeleteButtonMarkup(type, payload, disabled = false) {
@@ -8863,8 +8942,8 @@ async function initApp() {
     const credentialWorkbook = calculateCredentialWorkbook(state, config);
     const readyWorkbook = calculateReadyProductWorkbook(state, config);
     const freeQuoteWorkbook = calculateFreeQuoteWorkbook(state);
-    const businessCardWorkbook = calculateBusinessCardWorkbook(state);
-    const flyerWorkbook = calculateFlyerWorkbook(state);
+    const businessCardWorkbook = calculateBusinessCardWorkbook(state, config);
+    const flyerWorkbook = calculateFlyerWorkbook(state, config);
     const blockSulfiteWorkbook = calculateBlockWorkbook(state, "sulfite");
     const blockAutocopiativoWorkbook = calculateBlockWorkbook(state, "autocopiativo");
     const linearMeterWorkbook = calculateLinearMeterWorkbook(state, config);
@@ -9169,7 +9248,7 @@ async function initApp() {
             <td><select class="cell-select" name="productionType">${buildOptions(OPTIONS.businessCardProductions, row.productionType)}</select></td>
             <td><select class="cell-select" name="materialId">${buildBusinessCardMaterialOptions(row.productionType, row.materialId)}</select></td>
             <td><select class="cell-select" name="printMode">${buildBusinessCardPrintModeOptions(material, row.printMode)}</select></td>
-            <td><select class="cell-select" name="quantity">${buildBusinessCardQuantityOptions(material, row.printMode, row.quantity)}</select></td>
+            <td><select class="cell-select" name="quantity">${buildBusinessCardQuantityOptions(material, row.printMode, row.quantity, config)}</select></td>
             <td><span class="readonly-value subtle">${escapeHtml(row.packageLabel || "-")}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.baseTotal)}</span></td>
             <td><select class="cell-select" name="extraFinish">${buildOptions(OPTIONS.businessCardExtraFinish, row.extraFinish)}</select></td>
@@ -9205,7 +9284,7 @@ async function initApp() {
             <td><select class="cell-select" name="catalogId">${buildFlyerCatalogOptions(row.productionType, row.catalogId)}</select></td>
             <td><span class="readonly-value subtle">${escapeHtml(row.size || item?.size || "-")}</span></td>
             <td><select class="cell-select" name="printMode">${buildFlyerPrintModeOptions(item, row.printMode)}</select></td>
-            <td><select class="cell-select" name="quantity">${buildFlyerQuantityOptions(item, row.printMode, row.quantity)}</select></td>
+            <td><select class="cell-select" name="quantity">${buildFlyerQuantityOptions(item, row.printMode, row.quantity, config)}</select></td>
             <td><select class="cell-select" name="foldType">${buildOptions(OPTIONS.flyerFolds, row.foldType)}</select></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.baseTotal)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.foldTotal)}</span></td>
@@ -9526,7 +9605,7 @@ async function initApp() {
 
     const material = getBusinessCardMaterial(row.materialId, row.productionType);
     const printMode = getBusinessCardValidPrintMode(material, row.printMode);
-    const options = getBusinessCardQuantityOptions(material, printMode);
+    const options = getBusinessCardQuantityOptions(material, printMode, config);
     const selectedQuantity = toWholeNumber(row.quantity);
     const popover = document.createElement("div");
     popover.id = "business-card-quantity-popover";
@@ -11239,6 +11318,20 @@ async function initApp() {
       return;
     }
 
+    if (prefix === "business-card-price" || prefix === "flyer-price") {
+      const pricing = prefix === "business-card-price" ? config.businessCardPricing : config.flyerPricing;
+      const quantity = target.dataset.configQuantity;
+      const modePricing = pricing?.[target.dataset.configProductId]?.[target.dataset.configMode];
+      const value = Number(target.value);
+      if (key !== "total" || !modePricing || !Object.hasOwn(modePricing, quantity)
+        || target.value === "" || !Number.isFinite(value) || value < 0) return;
+      modePricing[quantity] = Math.round(value * 100) / 100;
+      persist();
+      renderRowsAndSummary();
+      setConfigStatus("Preço da tiragem atualizado.", "success");
+      return;
+    }
+
     if (prefix === "linear-meter") {
       const path = key.split(".");
       let destination = config.linearMeterPricing;
@@ -11786,8 +11879,8 @@ async function initApp() {
     const credentialWorkbook = calculateCredentialWorkbook(state, config);
     const readyWorkbook = calculateReadyProductWorkbook(state, config);
     const freeQuoteWorkbook = calculateFreeQuoteWorkbook(state);
-    const businessCardWorkbook = calculateBusinessCardWorkbook(state);
-    const flyerWorkbook = calculateFlyerWorkbook(state);
+    const businessCardWorkbook = calculateBusinessCardWorkbook(state, config);
+    const flyerWorkbook = calculateFlyerWorkbook(state, config);
     const linearMeterWorkbook = calculateLinearMeterWorkbook(state, config);
     const m2Workbook = calculateM2WorkbookFromConfig(state, config);
     const resinWorkbook = calculateResinWorkbook(state, config);
@@ -11974,8 +12067,8 @@ async function initApp() {
     const credentialWorkbook = calculateCredentialWorkbook(state, config);
     const readyWorkbook = calculateReadyProductWorkbook(state, config);
     const freeQuoteWorkbook = calculateFreeQuoteWorkbook(state);
-    const businessCardWorkbook = calculateBusinessCardWorkbook(state);
-    const flyerWorkbook = calculateFlyerWorkbook(state);
+    const businessCardWorkbook = calculateBusinessCardWorkbook(state, config);
+    const flyerWorkbook = calculateFlyerWorkbook(state, config);
     const linearMeterWorkbook = calculateLinearMeterWorkbook(state, config);
     const m2Workbook = calculateM2WorkbookFromConfig(state, config);
     const resinWorkbook = calculateResinWorkbook(state, config);
