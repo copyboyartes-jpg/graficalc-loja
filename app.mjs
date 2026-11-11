@@ -425,6 +425,8 @@ function getCatalogTier(item, printMode, quantity, pricing) {
   return { ...tier, total: pricing?.[item.id]?.[printMode]?.[quantity] ?? tier.total };
 }
 
+const REMOVED_PROMOTIONAL_WIND_BANNER_ID = "Windbanner promocional 1,20m - tecido e haste";
+
 const READY_PRODUCT_CATALOG = [
   {
     id: "Cordão de crachá liso",
@@ -541,18 +543,6 @@ const READY_PRODUCT_CATALOG = [
     tiers: [
       { min: 5, value: 60, label: "De 5 a 10" },
       { min: 11, value: 55, label: "Acima de 10" },
-    ],
-  },
-  {
-    id: "Windbanner promocional 1,20m - tecido e haste",
-    label: "Wind Banner Promocional 1,50m - tecido e haste",
-    category: "Windbanner promocional",
-    pricingMode: "tieredUnit",
-    minQuantity: 5,
-    quoteDescription: "tecido promocional, mais fino, haste em alumínio",
-    tiers: [
-      { min: 5, value: 80, label: "De 5 a 10" },
-      { min: 11, value: 75, label: "Acima de 10" },
     ],
   },
   {
@@ -3781,6 +3771,18 @@ function isReadyProductRowActive(row) {
 }
 
 function getReadyProductSelection(config, productType, quantity = 0) {
+  if (productType === REMOVED_PROMOTIONAL_WIND_BANNER_ID) {
+    return {
+      id: productType,
+      label: "Produto removido",
+      quoteDescription: "",
+      minQuantity: 0,
+      unitPrice: 0,
+      totalPrice: null,
+      billedQuantity: toWholeNumber(quantity),
+      discontinued: true,
+    };
+  }
   const pricing = config?.credentialLanyardPricing || {};
   const printedPackages = Array.isArray(pricing.printedPackages) ? pricing.printedPackages : [];
   const requestedQuantity = Math.max(1, toWholeNumber(quantity));
@@ -4026,7 +4028,7 @@ function calculateReadyProductWorkbook(state, config) {
       ? quantity * product.unitPrice
       : product.totalPrice;
     const artCreationFee = getArtCreationFee(row);
-    const rowDiscount = applyRowDiscount(row, subtotal + artCreationFee, quantity);
+    const rowDiscount = applyRowDiscount(row, product.discontinued ? 0 : subtotal + artCreationFee, quantity);
     const packageWarning =
       active &&
       product.pricingMode === "printedBadge" &&
@@ -4042,7 +4044,7 @@ function calculateReadyProductWorkbook(state, config) {
     return {
       ...row,
       active,
-      valid: active ? quantity > 0 && (!minimumQuantity || quantity >= minimumQuantity) : false,
+      valid: active ? !product.discontinued && quantity > 0 && (!minimumQuantity || quantity >= minimumQuantity) : false,
       quantity,
       billedQuantity: product.billedQuantity || quantity,
       productType: product.id,
@@ -4053,7 +4055,9 @@ function calculateReadyProductWorkbook(state, config) {
       ...rowDiscount,
       warning: active && quantity <= 0
         ? `Produto pronto ${index + 1}: informe uma quantidade maior que zero.`
-        : minimumWarning || packageWarning,
+        : product.discontinued && active
+          ? `Produto pronto ${index + 1}: este produto foi removido. Escolha outro produto para continuar.`
+          : minimumWarning || packageWarning,
     };
   });
 
@@ -5516,7 +5520,10 @@ function buildReadyProductOptions(currentValue, config) {
     return accumulator;
   }, {});
 
-  return Object.entries(grouped)
+  const removedPlaceholder = currentValue === REMOVED_PROMOTIONAL_WIND_BANNER_ID
+    ? `<option value="" selected disabled>Produto removido — escolha outro</option>`
+    : "";
+  return removedPlaceholder + Object.entries(grouped)
     .map(
       ([category, items]) => `
         <optgroup label="${escapeHtml(category)}">

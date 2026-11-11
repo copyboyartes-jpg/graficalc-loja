@@ -41,3 +41,30 @@ test('configurações anteriores recebem os novos preços sem perder descriçõe
   merged.readyProductPricing[tallId].unitPrice = 155;
   assert.equal(app.mergeConfig(merged).readyProductPricing[tallId].unitPrice, 155);
 });
+
+test('opção de tecido e haste sai do catálogo e das configurações', () => {
+  const removedId = 'Windbanner promocional 1,20m - tecido e haste';
+  const config = app.mergeConfig({
+    readyProductPricing: {
+      [removedId]: { minQuantity: 3, tiers: [{ min: 3, value: 88 }] },
+    },
+  });
+  assert.equal(config.readyProductPricing[removedId], undefined);
+  assert.doesNotMatch(app.buildReadyProductOptions('', config), /Wind Banner Promocional 1,50m - tecido e haste/);
+  assert.doesNotMatch(app.createReadyProductPricingMarkup(config.readyProductPricing), /Wind Banner Promocional 1,50m - tecido e haste/);
+  assert.match(app.buildReadyProductOptions('', config), /Wind Banner Promocional 1,50m - somente tecido/);
+  assert.match(app.buildReadyProductOptions('', config), /Wind Banner Promocional 1,50m/);
+});
+
+test('rascunho com produto removido pede nova seleção sem trocar ou cobrar outro item', () => {
+  const removedId = 'Windbanner promocional 1,20m - tecido e haste';
+  const state = app.createDefaultState();
+  Object.assign(state.readyProductItems[0], { productType: removedId, quantity: 3, description: 'Pedido antigo' });
+  const restored = app.mergeState(state);
+  const result = app.calculateReadyProductWorkbook(restored, app.createDefaultConfig());
+  assert.equal(result.rows[0].productType, removedId);
+  assert.equal(result.rows[0].valid, false);
+  assert.equal(result.rows[0].total, 0);
+  assert.match(result.rows[0].warning, /produto foi removido/);
+  assert.match(app.buildReadyProductOptions(removedId, app.createDefaultConfig()), /Produto removido — escolha outro/);
+});
