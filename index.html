@@ -19,7 +19,7 @@
     </header>
 
     <nav class="tab-bar" aria-label="Abas principais">
-      <button class="tab-button is-active" data-tab-target="calculo">Cálculo de apostila</button>
+      <button class="tab-button is-active" data-tab-target="calculo">Apostilas e cardápios</button>
       <button class="tab-button" data-tab-target="impressos">Impressos coloridos</button>
       <button class="tab-button" data-tab-target="credenciais">Credenciais</button>
       <button class="tab-button" data-tab-target="produtos-prontos">Produtos prontos</button>
@@ -105,6 +105,10 @@
 
             <div class="preset-grid">
               <label>
+                <span>Produto</span>
+                <select id="preset-product-type"></select>
+              </label>
+              <label>
                 <span>Modo de cálculo</span>
                 <select id="calc-mode-select">
                   <option>Independente</option>
@@ -152,8 +156,12 @@
                 <select id="preset-back-cover-paper"></select>
               </label>
               <label>
-                <span>Espiral</span>
+                <span>Capas plásticas (espiral)</span>
                 <select id="preset-spiral-option"></select>
+              </label>
+              <label>
+                <span>Plastificação do cardápio</span>
+                <select id="preset-menu-lamination-scope"></select>
               </label>
             </div>
 
@@ -175,9 +183,10 @@
         <article class="panel panel-table">
           <div class="panel-heading">
             <div>
-              <h2>Orçamento de apostilas</h2>
-              <p class="panel-copy">Cada linha representa uma apostila diferente. Os totais são recalculados na hora.</p>
+              <h2>Orçamento de apostilas e cardápios</h2>
+              <p class="panel-copy">Cada linha representa uma apostila ou um cardápio plastificado. Os totais são recalculados na hora.</p>
               <p class="helper-text">No miolo laser, escolha o papel para usar sua faixa de preço em Impressos coloridos. O Sulfite 75g mantém a tabela atual da apostila em A4. Em A3, vale a Tabela A3; jato de tinta não está disponível nesse tamanho. O acabamento Livreto usa automaticamente 2 páginas por folha em A3 e A4.</p>
+              <p class="helper-text">Cardápio plastificado: A4 ou A5, com encadernação espiral. Informe em Páginas os lados impressos de cada cardápio. O A5 aproveita 2 por impressão e 2 por Polaseal A4; escolha a plastificação de todas as folhas ou só das capas impressas.</p>
             </div>
           </div>
 
@@ -201,6 +210,7 @@
                   <th>Sel.</th>
                   <th>Item</th>
                   <th>Descrição</th>
+                  <th>Produto</th>
                   <th>Tipo</th>
                   <th>Papel do miolo</th>
                   <th>Tam.</th>
@@ -211,15 +221,17 @@
                   <th>Páginas</th>
                   <th>Pág. por folha</th>
                   <th>Pág. coloridas</th>
-                  <th>Capa</th>
+                  <th>Capa impressa</th>
                   <th>Papel da capa</th>
-                  <th>Contracapa</th>
+                  <th>Contracapa impressa</th>
                   <th>Papel da contracapa</th>
-                  <th>Espiral</th>
+                  <th>Capas plásticas</th>
+                  <th>Plastificação</th>
                   <th>Total miolo</th>
                   <th>Total capa</th>
                   <th>Total contra</th>
                   <th>Acabamento</th>
+                  <th>Total plastificação</th>
                   <th>Criação de arte</th>
                   <th>Tipo desc.</th>
                   <th>Desconto</th>
@@ -1449,7 +1461,7 @@
       }
     })();
   </script>
-  <script src="./app.mjs?v=windbanner-catalogo-20261111"></script>
+  <script src="./app.mjs?v=cardapio-plastificado-20261111"></script>
 </body>
 </html>
 

@@ -42,6 +42,8 @@ function raiseConfiguredPricesTenPercent(config) {
 }
 
 const OPTIONS = {
+  apostilaProducts: ["Apostila", "Cardápio plastificado"],
+  menuLaminationScopes: ["Todas as folhas", "Somente capas"],
   printTypes: ["Preto e branco", "Colorido jato de tinta", "Colorido laser"],
   sizes: ["A4", "A3", "A5", "A6"],
   colorPrintSizes: ["A4", "A3", "Tamanho personalizado"],
@@ -1130,6 +1132,7 @@ function createDefaultConfig() {
   });
   config.businessCardPricing = createCatalogPricing(BUSINESS_CARD_CATALOG);
   config.flyerPricing = createCatalogPricing(FLYER_CATALOG);
+  config.menuPricing = { a5Binding: 3.5, a5NoPlasticCoverDiscount: 0.75 };
   config.readyProductPricing["Wind banner promocional 2m"].unitPrice = 150;
   config.readyProductPricing["Windbanner promocional 1,20m - tecido, haste e base"].tiers = [
     { min: 1, value: 95, label: "1 a 2 unidades" },
@@ -1143,6 +1146,8 @@ function createDefaultRow(index) {
   return {
     id: `row-${index + 1}`,
     description: "",
+    productType: "Apostila",
+    menuLaminationScope: "Todas as folhas",
     printType: "Preto e branco",
     innerPaper: "Sulfite 75g",
     size: "A4",
@@ -1488,6 +1493,8 @@ function createDefaultState() {
     m2CalcMode: "Independente",
     linearMeterCalcMode: "Independente",
     presets: {
+      productType: "Apostila",
+      menuLaminationScope: "Todas as folhas",
       printType: "Preto e branco",
       innerPaper: "Sulfite 75g",
       size: "A4",
@@ -2218,6 +2225,14 @@ function mergeConfig(candidate) {
   };
 
   const merged = deepClone(defaults);
+  if (candidate.menuPricing && typeof candidate.menuPricing === "object") {
+    for (const key of Object.keys(merged.menuPricing)) {
+      const saved = candidate.menuPricing[key];
+      if (saved !== "" && saved !== null && Number.isFinite(Number(saved)) && Number(saved) >= 0) {
+        merged.menuPricing[key] = Math.round(Number(saved) * 100) / 100;
+      }
+    }
+  }
   merged.businessCardPricing = mergeCatalogPricing(defaults.businessCardPricing, candidate.businessCardPricing);
   merged.flyerPricing = mergeCatalogPricing(defaults.flyerPricing, candidate.flyerPricing);
   if (Array.isArray(candidate.customReadyProducts)) {
@@ -2442,7 +2457,9 @@ function mergeState(candidate) {
   state.m2CalcMode = OPTIONS.m2CalcModes.includes(candidate.m2CalcMode) ? candidate.m2CalcMode : state.m2CalcMode;
   state.linearMeterCalcMode = candidate.linearMeterCalcMode === "Juntar mesma base" ? "Juntar mesma base" : "Independente";
   state.presets = { ...state.presets, ...(candidate.presets || {}) };
-  state.presets.size = getValidApostilaSize(state.presets.printType, state.presets.size);
+  state.presets.productType = OPTIONS.apostilaProducts.includes(state.presets.productType) ? state.presets.productType : "Apostila";
+  state.presets.menuLaminationScope = OPTIONS.menuLaminationScopes.includes(state.presets.menuLaminationScope) ? state.presets.menuLaminationScope : "Todas as folhas";
+  state.presets.size = getValidApostilaSize(state.presets.printType, state.presets.size, state.presets.productType);
   state.presets.innerPaper = getValidApostilaInnerPaper(state.presets.innerPaper);
   state.presets.pagesPerSheet = [1, 2, 4, 6].includes(toWholeNumber(state.presets.pagesPerSheet))
     ? toWholeNumber(state.presets.pagesPerSheet) : 1;
@@ -2536,7 +2553,10 @@ function mergeState(candidate) {
     state.rows = candidate.rows.map((row, index) => ({
       ...createDefaultRow(index),
       ...row,
-      size: getValidApostilaSize(row?.printType, row?.size),
+      productType: row?.productType === "Cardápio plastificado" ? "Cardápio plastificado" : "Apostila",
+      menuLaminationScope: OPTIONS.menuLaminationScopes.includes(row?.menuLaminationScope) ? row.menuLaminationScope : "Todas as folhas",
+      size: getValidApostilaSize(row?.printType, row?.size, row?.productType),
+      finishing: row?.productType === "Cardápio plastificado" ? "Encadernação espiral" : row?.finishing || "Sem acabamento",
       innerPaper: getValidApostilaInnerPaper(row?.innerPaper),
       quantity: toWholeNumber(row?.quantity),
       pages: toWholeNumber(row?.pages),
@@ -3080,12 +3100,13 @@ function lookupTier(tiers, quantity, valueKey = "value") {
   return Number(selected?.[valueKey] || 0);
 }
 
-function getApostilaSizeOptions(printType) {
+function getApostilaSizeOptions(printType, productType = "Apostila") {
+  if (productType === "Cardápio plastificado") return ["A4", "A5"];
   return printType === "Colorido jato de tinta" ? OPTIONS.sizes.filter((size) => size !== "A3") : OPTIONS.sizes;
 }
 
-function getValidApostilaSize(printType, size) {
-  return getApostilaSizeOptions(printType).includes(size) ? size : "A4";
+function getValidApostilaSize(printType, size, productType = "Apostila") {
+  return getApostilaSizeOptions(printType, productType).includes(size) ? size : "A4";
 }
 
 function getValidApostilaInnerPaper(paper) {
@@ -3157,6 +3178,9 @@ function getApostilaPagesPerSheet(size) {
 }
 
 function getApostilaInnerPagesPerSheet(row) {
+  if (row?.productType === "Cardápio plastificado") {
+    return row.size === "A5" ? 2 : 1;
+  }
   // A5 and A6 already use their physical imposition on A4 sheets.
   if (row?.size !== "A4" && row?.size !== "A3") {
     return getApostilaPagesPerSheet(row?.size);
@@ -3232,6 +3256,9 @@ function getBindingSheetsPerCopy(row) {
   if (pages <= 0) {
     return 0;
   }
+  if (row.productType === "Cardápio plastificado") {
+    return Math.ceil(pages / (row.printMode === "Frente e verso" ? 2 : 1));
+  }
   const imposedPages = Math.ceil(pages / getApostilaInnerPagesPerSheet(row));
   return row.printMode === "Frente e verso" ? Math.ceil(imposedPages / 2) : imposedPages;
 }
@@ -3251,6 +3278,14 @@ function getSpiralUnitPrice(row, bindingSheetsPerCopy, config) {
     return 0;
   }
 
+  if (row.productType === "Cardápio plastificado" && row.size === "A5") {
+    const base = toMoneyNumber(config.menuPricing?.a5Binding ?? 3.5);
+    const discount = row.spiralOption === "Sem capas plásticas"
+      ? toMoneyNumber(config.menuPricing?.a5NoPlasticCoverDiscount ?? 0.75)
+      : 0;
+    return Math.max(0, base - discount);
+  }
+
   const band = config.spiralPricing.find((item) => bindingSheetsPerCopy <= Number(item.maxSheets || 0));
   if (!band) {
     return 0;
@@ -3261,6 +3296,23 @@ function getSpiralUnitPrice(row, bindingSheetsPerCopy, config) {
   const unit = Number(band.rates?.[rateKey] || 0);
   const discount = ["Sem capas plásticas", "Sem capas plasticas"].includes(row.spiralOption) ? Number(config.spiralPlasticDiscount || 0) : 0;
   return Math.max(0, unit - discount) * (row.size === "A3" ? 2 : 1);
+}
+
+function getMenuLaminationLeavesPerCopy(row) {
+  if (row.productType !== "Cardápio plastificado") return 0;
+  const coverLeaves = Number(row.coverType !== "Sem capa") + Number(row.backCoverType !== "Sem contracapa");
+  return (row.menuLaminationScope === "Somente capas" ? 0 : getBindingSheetsPerCopy(row)) + coverLeaves;
+}
+
+function calculateMenuLamination(rows, quantity, config) {
+  const first = rows[0];
+  if (!first || first.productType !== "Cardápio plastificado" || quantity <= 0) {
+    return { polasealCount: 0, total: 0 };
+  }
+  const leaves = rows.reduce((sum, row) => sum + getMenuLaminationLeavesPerCopy(row), 0) * quantity;
+  const polasealCount = Math.ceil(leaves / (first.size === "A5" ? 2 : 1));
+  const unit = lookupTier(config.colorPrintExtras?.laminationWhole?.a4 || [], polasealCount);
+  return { polasealCount, total: polasealCount * unit };
 }
 
 function getBookletUnitPrice(quantity, config) {
@@ -3527,8 +3579,24 @@ function getInnerImpressionBreakdown(row) {
   const fullColorMode = row.printType !== "Preto e branco" && colorPages === 0;
   const colorPagesPerCopy = fullColorMode ? totalPages : colorPages;
   const blackWhitePagesPerCopy = fullColorMode ? 0 : Math.max(0, totalPages - colorPagesPerCopy);
-  const colorImpressions = copies * getPagesPerA4(colorPagesPerCopy, row);
-  const blackWhiteImpressions = copies * getPagesPerA4(blackWhitePagesPerCopy, row);
+  const isA5Menu = row.productType === "Cardápio plastificado" && row.size === "A5";
+  let colorImpressions;
+  let blackWhiteImpressions;
+  if (isA5Menu && row.printMode === "Frente e verso") {
+    const frontPages = Math.ceil(totalPages / 2);
+    const backPages = Math.floor(totalPages / 2);
+    const colorFrontPages = Math.ceil(colorPagesPerCopy / 2);
+    const colorBackPages = Math.floor(colorPagesPerCopy / 2);
+    const imposed = (pagesPerSide) => Math.ceil(copies * pagesPerSide / 2);
+    colorImpressions = imposed(colorFrontPages) + imposed(colorBackPages);
+    blackWhiteImpressions = imposed(frontPages - colorFrontPages) + imposed(backPages - colorBackPages);
+  } else if (isA5Menu) {
+    colorImpressions = Math.ceil(copies * colorPagesPerCopy / 2);
+    blackWhiteImpressions = Math.ceil(copies * blackWhitePagesPerCopy / 2);
+  } else {
+    colorImpressions = copies * getPagesPerA4(colorPagesPerCopy, row);
+    blackWhiteImpressions = copies * getPagesPerA4(blackWhitePagesPerCopy, row);
+  }
 
   return {
     totalImpressions: colorImpressions + blackWhiteImpressions,
@@ -3558,6 +3626,18 @@ function buildApostilaPrintDetail(row) {
   return row.printType === "Colorido laser"
     ? `${row.printType} | Miolo: ${getApostilaInnerPaper(row)}`
     : row.printType;
+}
+
+function getMenuQuoteDetail(row) {
+  if (row.productType !== "Cardápio plastificado") return "";
+  const scope = row.menuLaminationScope === "Somente capas" ? "Plastificação somente das capas" : "Plastificação de todas as folhas";
+  const plasticCovers = row.spiralOption === "Sem capas plásticas" ? "Sem capas plásticas" : "Com capas plásticas";
+  return `${row.printMode} | ${scope} | ${plasticCovers}`;
+}
+
+function getApostilaQuantityLabel(row) {
+  if (row.productType === "Cardápio plastificado") return row.quantity === 1 ? "cardápio" : "cardápios";
+  return row.quantity === 1 ? "apostila" : "apostilas";
 }
 
 function isColorPrintRowActive(row) {
@@ -4362,7 +4442,10 @@ function calculateBlockWorkbook(state, tab) {
 function calculateWorkbook(state, config) {
   const rows = state.rows.map((row) => ({
     ...row,
-    size: getValidApostilaSize(row.printType, row.size),
+    productType: row.productType === "Cardápio plastificado" ? "Cardápio plastificado" : "Apostila",
+    menuLaminationScope: OPTIONS.menuLaminationScopes.includes(row.menuLaminationScope) ? row.menuLaminationScope : "Todas as folhas",
+    size: getValidApostilaSize(row.printType, row.size, row.productType),
+    finishing: row.productType === "Cardápio plastificado" ? "Encadernação espiral" : row.finishing,
     innerPaper: getValidApostilaInnerPaper(row.innerPaper),
     quantity: toWholeNumber(row.quantity),
     pages: toWholeNumber(row.pages),
@@ -4418,14 +4501,25 @@ function calculateWorkbook(state, config) {
       return;
     }
 
-    if (!groupedRowsMap[groupName]) {
-      groupedRowsMap[groupName] = [];
+    const groupKey = item.row.productType === "Cardápio plastificado"
+      ? `${groupName}::cardapio::${item.row.size}::${item.row.menuLaminationScope}::${item.row.spiralOption}`
+      : `${groupName}::apostila`;
+    if (!groupedRowsMap[groupKey]) {
+      groupedRowsMap[groupKey] = [];
     }
 
-    groupedRowsMap[groupName].push({ ...item, index, groupName });
+    groupedRowsMap[groupKey].push({ ...item, index, groupName });
   });
 
-  for (const [groupName, entries] of Object.entries(groupedRowsMap)) {
+  const groupedNames = Object.values(groupedRowsMap).map((entries) => entries[0].groupName);
+  for (const groupName of new Set(groupedNames)) {
+    if (groupedNames.filter((name) => name === groupName).length > 1) {
+      warnings.push(`Grupo ${groupName}: produtos, tamanhos, plastificações ou capas plásticas diferentes foram encadernados separadamente.`);
+    }
+  }
+
+  for (const entries of Object.values(groupedRowsMap)) {
+    const groupName = entries[0].groupName;
     const leader = entries[0];
     const finishingType = leader.row.finishing;
     const spiralOption = leader.row.spiralOption;
@@ -4453,6 +4547,20 @@ function calculateWorkbook(state, config) {
       warnings.push(`Grupo ${groupName}: as quantidades das linhas estão diferentes. O acabamento foi calculado usando a menor quantidade do grupo.`);
     }
 
+    const groupedMenu = entries.every((entry) => entry.row.productType === "Cardápio plastificado")
+      && !mixedSizes
+      && entries.every((entry) => entry.row.menuLaminationScope === leader.row.menuLaminationScope);
+    const menuLamination = groupedMenu
+      ? calculateMenuLamination(entries.map((entry) => entry.row), groupQuantity, config)
+      : null;
+    if (groupedMenu && leader.row.menuLaminationScope === "Somente capas"
+      && menuLamination.polasealCount === 0 && entries.some((entry) => isRowActive(entry.row))) {
+      warnings.push(`Grupo ${groupName}: escolha capa ou contracapa para plastificar, ou selecione todas as folhas.`);
+    }
+    if (entries.some((entry) => entry.row.productType === "Cardápio plastificado") && !groupedMenu) {
+      warnings.push(`Grupo ${groupName}: cardápios com tamanhos ou plastificações diferentes foram calculados separadamente para a plastificação.`);
+    }
+
     let finishingUnit = 0;
     let finishingTotal = 0;
 
@@ -4476,6 +4584,7 @@ function calculateWorkbook(state, config) {
         sheetsPerCopy,
         finishingUnit: entryIndex === 0 ? finishingUnit : 0,
         finishingTotal: entryIndex === 0 ? finishingTotal : 0,
+        menuLamination: entryIndex === 0 ? menuLamination : groupedMenu ? { polasealCount: 0, total: 0 } : null,
       };
     });
   }
@@ -4550,11 +4659,17 @@ function calculateWorkbook(state, config) {
       finishingTotal = row.quantity * finishingUnit;
     }
 
+    const menuLamination = groupMeta?.menuLamination
+      || calculateMenuLamination([row], row.quantity, config);
     const artCreationFee = getArtCreationFee(row);
-    const rowDiscount = applyRowDiscount(row, innerTotal + coverTotal + backTotal + finishingTotal + artCreationFee, row.quantity);
+    const rowDiscount = applyRowDiscount(row, innerTotal + coverTotal + backTotal + finishingTotal + menuLamination.total + artCreationFee, row.quantity);
 
     if (row.colorPages > row.pages && isRowActive(row)) {
       warnings.push(`Item ${index + 1}: as páginas coloridas não podem ser maiores que o total de páginas. O app usou o limite da quantidade total.`);
+    }
+    if (!hasGroupedFinishing && row.productType === "Cardápio plastificado" && row.menuLaminationScope === "Somente capas"
+      && getMenuLaminationLeavesPerCopy(row) === 0 && isRowActive(row)) {
+      warnings.push(`Item ${index + 1}: escolha capa ou contracapa para plastificar, ou selecione todas as folhas.`);
     }
 
     return {
@@ -4578,6 +4693,8 @@ function calculateWorkbook(state, config) {
       groupedQuantity: groupMeta?.groupQuantity || 0,
       finishingUnit,
       finishingTotal,
+      menuPolasealCount: menuLamination.polasealCount,
+      menuLaminationTotal: menuLamination.total,
       artCreationFee,
       ...rowDiscount,
     };
@@ -4617,7 +4734,7 @@ function summarizeApostilaPages(rows) {
     const quantity = Math.max(0, toWholeNumber(row.quantity));
     const pagesPerCopy = Math.max(0, toWholeNumber(row.pages));
     if (!isRowActive(row) || !quantity || !pagesPerCopy) return;
-    const size = getValidApostilaSize(row.printType, row.size);
+    const size = getValidApostilaSize(row.printType, row.size, row.productType);
     const groupName = normalizeBindingGroup(row.bindingGroup);
     const colorPages = row.printType === "Preto e branco" ? 0 : getNormalizedColorPages(row);
     const parts = colorPages > 0
@@ -5511,6 +5628,11 @@ function buildOptions(options, currentValue) {
     .join("");
 }
 
+function buildSpiralOptions(currentValue) {
+  return `<option value="Completa"${currentValue === "Completa" ? " selected" : ""}>Com capas plásticas</option>
+    <option value="Sem capas plásticas"${currentValue === "Sem capas plásticas" ? " selected" : ""}>Sem capas plásticas</option>`;
+}
+
 function buildReadyProductOptions(currentValue, config) {
   const grouped = [...READY_PRODUCT_CATALOG, ...normalizeCustomReadyProducts(config?.customReadyProducts)].reduce((accumulator, item) => {
     if (!accumulator[item.category]) {
@@ -5764,13 +5886,15 @@ function resetBudgetRowsToDefaults(state) {
 }
 
 function applyPresetToRow(row, preset) {
+  row.productType = OPTIONS.apostilaProducts.includes(preset.productType) ? preset.productType : "Apostila";
+  row.menuLaminationScope = OPTIONS.menuLaminationScopes.includes(preset.menuLaminationScope) ? preset.menuLaminationScope : "Todas as folhas";
   row.printType = preset.printType;
   row.innerPaper = getApostilaInnerPaper(preset);
-  row.size = getValidApostilaSize(row.printType, preset.size);
+  row.size = getValidApostilaSize(row.printType, preset.size, row.productType);
   row.printMode = preset.printMode;
   row.pagesPerSheet = [1, 2, 4, 6].includes(toWholeNumber(preset.pagesPerSheet))
     ? toWholeNumber(preset.pagesPerSheet) : 1;
-  row.finishing = preset.finishing;
+  row.finishing = row.productType === "Cardápio plastificado" ? "Encadernação espiral" : preset.finishing;
   row.coverType = preset.coverType;
   row.coverPaper = preset.coverPaper;
   row.backCoverType = preset.backCoverType;
@@ -5792,7 +5916,7 @@ function applyPresetToGroup(rows, preset, groupName) {
 
 function createConfigSectionTabsMarkup(activeSection = "calculo") {
   const sections = [
-    { id: "calculo", label: "Cálculo de apostila", helper: "Impressão, capas e acabamentos." },
+    { id: "calculo", label: "Apostilas e cardápios", helper: "Impressão, plastificação, capas e acabamentos." },
     { id: "impressos", label: "Impressos coloridos", helper: "Papéis, cortes e produtos extras." },
     { id: "credenciais", label: "Credenciais", helper: "Materiais, laminação e cordões." },
     { id: "produtos-prontos", label: "Produtos prontos", helper: "Cordões e itens vendidos separadamente." },
@@ -5932,6 +6056,14 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
           )
         ),
       ].join("")
+    ),
+    createConfigCardMarkup(
+      "Cardápio plastificado",
+      `O A5 usa duas unidades por impressão A4 e duas por Polaseal A4. O A4 usa a tabela de espiral acima e desconta ${formatCurrency(config.spiralPlasticDiscount)} quando não há capas plásticas. A plastificação usa os preços de Impressos coloridos.`,
+      `<div class="config-field-grid">
+        <label><span>Encadernação A5 com capas (R$ / cardápio)</span><input data-config-prefix="menu-price" data-config-key="a5Binding" type="number" min="0" step="0.01" value="${escapeHtml(config.menuPricing.a5Binding)}"></label>
+        <label><span>Desconto A5 sem capas (R$ / cardápio)</span><input data-config-prefix="menu-price" data-config-key="a5NoPlasticCoverDiscount" type="number" min="0" step="0.01" value="${escapeHtml(config.menuPricing.a5NoPlasticCoverDiscount)}"></label>
+      </div>`
     ),
     createCatalogTabCardMarkup("calculo", "Produtos extras desta aba", config.catalogSections, config, viewMode),
   ];
@@ -6239,7 +6371,7 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
   const configGroups = {
     calculo: createConfigGroupMarkup(
       "calculo",
-      "Aba: Cálculo de apostila",
+      "Aba: Apostilas e cardápios",
       "Tudo o que aparece aqui afeta somente a aba de apostilas.",
       apostilaCards,
       safeSection
@@ -7585,9 +7717,9 @@ function collectQuoteEntries(workbook, colorWorkbook, credentialWorkbook, readyW
       return {
         source: "apostila",
         sourceIndex: index,
-        kind: "Apostila",
+        kind: row.productType === "Cardápio plastificado" ? "Cardápio plastificado" : "Apostila",
         description: row.description,
-        detail: `${formatInteger(row.quantity)} apostilas | ${getApostilaSizeDetail(row)} | ${formatInteger(row.pages)} páginas${row.colorPages > 0 ? ` (${formatInteger(row.blackWhitePages)} PB + ${formatInteger(row.colorPages)} coloridas)` : ""} | ${buildApostilaPrintDetail(row)} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}`,
+        detail: `${formatInteger(row.quantity)} ${getApostilaQuantityLabel(row)} | ${getApostilaSizeDetail(row)} | ${formatInteger(row.pages)} páginas${row.colorPages > 0 ? ` (${formatInteger(row.blackWhitePages)} PB + ${formatInteger(row.colorPages)} coloridas)` : ""} | ${buildApostilaPrintDetail(row)} | ${row.finishing}${getMenuQuoteDetail(row) ? ` | ${getMenuQuoteDetail(row)}` : ""}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}`,
         extraDetail: coverDetail,
         artDetail: formatArtCreationDetail(row),
         discountDetail: row.discountDescription,
@@ -7844,7 +7976,7 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
     ...workbook.activeRows.map((row, index) => {
       const coverDetail = buildApostilaCoverDetail(row);
       return {
-        text: `- ${row.description || `Apostila ${index + 1}`} | ${row.quantity} apostilas | ${getApostilaSizeDetail(row)} | ${row.pages} páginas${row.colorPages > 0 ? ` (${row.blackWhitePages} PB + ${row.colorPages} coloridas)` : ""} | ${buildApostilaPrintDetail(row)} | ${row.finishing}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}${coverDetail ? ` | ${coverDetail}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
+        text: `- ${row.description || `${row.productType === "Cardápio plastificado" ? "Cardápio" : "Apostila"} ${index + 1}`} | ${row.quantity} ${getApostilaQuantityLabel(row)} | ${getApostilaSizeDetail(row)} | ${row.pages} páginas${row.colorPages > 0 ? ` (${row.blackWhitePages} PB + ${row.colorPages} coloridas)` : ""} | ${buildApostilaPrintDetail(row)} | ${row.finishing}${getMenuQuoteDetail(row) ? ` | ${getMenuQuoteDetail(row)}` : ""}${row.bindingGroup ? ` | Grupo ${row.bindingGroup}` : ""}${coverDetail ? ` | ${coverDetail}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
       };
     }),
     ...colorWorkbook.activeRows.map((row, index) => ({
@@ -8647,15 +8779,21 @@ async function initApp() {
     const innerPaperSelect = document.getElementById("preset-inner-paper");
     innerPaperSelect.innerHTML = buildOptions(OPTIONS.colorPaperTypes, state.presets.printType === "Colorido laser" ? state.presets.innerPaper : "Sulfite 75g");
     innerPaperSelect.disabled = state.presets.printType !== "Colorido laser";
-    document.getElementById("preset-size").innerHTML = buildOptions(getApostilaSizeOptions(state.presets.printType), state.presets.size);
+    document.getElementById("preset-product-type").innerHTML = buildOptions(OPTIONS.apostilaProducts, state.presets.productType);
+    document.getElementById("preset-menu-lamination-scope").innerHTML = buildOptions(OPTIONS.menuLaminationScopes, state.presets.menuLaminationScope);
+    document.getElementById("preset-menu-lamination-scope").disabled = state.presets.productType !== "Cardápio plastificado";
+    document.getElementById("preset-size").innerHTML = buildOptions(getApostilaSizeOptions(state.presets.printType, state.presets.productType), state.presets.size);
     document.getElementById("preset-print-mode").innerHTML = buildOptions(OPTIONS.printModes, state.presets.printMode);
-    document.getElementById("preset-pages-per-sheet").innerHTML = buildOptions(["1", "2", "4", "6"], String(state.presets.pagesPerSheet));
-    document.getElementById("preset-finishing").innerHTML = buildOptions(OPTIONS.finishing, state.presets.finishing);
+    const menuPreset = state.presets.productType === "Cardápio plastificado";
+    document.getElementById("preset-pages-per-sheet").innerHTML = buildOptions(["1", "2", "4", "6"], menuPreset ? String(state.presets.size === "A5" ? 2 : 1) : String(state.presets.pagesPerSheet));
+    document.getElementById("preset-pages-per-sheet").disabled = menuPreset;
+    document.getElementById("preset-finishing").innerHTML = buildOptions(OPTIONS.finishing, state.presets.productType === "Cardápio plastificado" ? "Encadernação espiral" : state.presets.finishing);
+    document.getElementById("preset-finishing").disabled = state.presets.productType === "Cardápio plastificado";
     document.getElementById("preset-cover").innerHTML = buildOptions(OPTIONS.coverTypes, state.presets.coverType);
     document.getElementById("preset-cover-paper").innerHTML = buildOptions(OPTIONS.coverPapers, state.presets.coverPaper);
     document.getElementById("preset-back-cover").innerHTML = buildOptions(OPTIONS.backCoverTypes, state.presets.backCoverType);
     document.getElementById("preset-back-cover-paper").innerHTML = buildOptions(OPTIONS.coverPapers, state.presets.backCoverPaper);
-    document.getElementById("preset-spiral-option").innerHTML = buildOptions(OPTIONS.spiralOptions, state.presets.spiralOption);
+    document.getElementById("preset-spiral-option").innerHTML = buildSpiralOptions(state.presets.spiralOption);
     renderPresetGroupOptions();
   }
 
@@ -9022,31 +9160,35 @@ async function initApp() {
     rowsTableBody.innerHTML = workbook.rows
       .map((row, index) => {
         const rowClass = row.active ? "" : "is-empty";
+        const isMenu = row.productType === "Cardápio plastificado";
         const autoBookletImposition = row.finishing === "Livreto" && (row.size === "A4" || row.size === "A3");
         return `
           <tr class="${rowClass}" data-row-index="${index}">
             <td><input type="checkbox" class="row-selector" data-row-id="${escapeHtml(row.id)}"${selectedRowIds.has(row.id) ? " checked" : ""}></td>
             <td><strong>${String(index + 1).padStart(2, "0")}</strong></td>
             <td><input class="cell-input description" name="description" value="${escapeHtml(row.description)}"></td>
+            <td><select class="cell-select" name="productType">${buildOptions(OPTIONS.apostilaProducts, row.productType)}</select></td>
             <td><select class="cell-select" name="printType">${buildOptions(OPTIONS.printTypes, row.printType)}</select></td>
             <td><select class="cell-select" name="innerPaper"${row.printType === "Colorido laser" ? "" : " disabled"}>${buildOptions(OPTIONS.colorPaperTypes, row.printType === "Colorido laser" ? row.innerPaper : "Sulfite 75g")}</select></td>
-            <td><select class="cell-select" name="size">${buildOptions(getApostilaSizeOptions(row.printType), row.size)}</select></td>
+            <td><select class="cell-select" name="size">${buildOptions(getApostilaSizeOptions(row.printType, row.productType), row.size)}</select></td>
             <td><select class="cell-select" name="printMode">${buildOptions(OPTIONS.printModes, row.printMode)}</select></td>
-            <td><select class="cell-select" name="finishing">${buildOptions(OPTIONS.finishing, row.finishing)}</select></td>
+            <td><select class="cell-select" name="finishing"${isMenu ? " disabled" : ""}>${buildOptions(OPTIONS.finishing, row.finishing)}</select></td>
             <td><input class="cell-input" name="bindingGroup" value="${escapeHtml(row.bindingGroup)}" placeholder="Ex.: Grupo A"></td>
             <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${row.quantity > 0 ? escapeHtml(row.quantity) : ""}"></td>
             <td><input class="cell-input" name="pages" type="number" min="0" step="1" value="${row.pages > 0 ? escapeHtml(row.pages) : ""}"></td>
-            <td><select class="cell-select" name="pagesPerSheet"${autoBookletImposition ? " disabled" : ""}>${buildOptions(["1", "2", "4", "6"], autoBookletImposition ? "2" : String(row.pagesPerSheet || 1))}</select></td>
+            <td><select class="cell-select" name="pagesPerSheet"${autoBookletImposition || isMenu ? " disabled" : ""}>${buildOptions(["1", "2", "4", "6"], isMenu ? String(row.size === "A5" ? 2 : 1) : autoBookletImposition ? "2" : String(row.pagesPerSheet || 1))}</select></td>
             <td><input class="cell-input" name="colorPages" type="number" min="0" step="1" value="${row.colorPages > 0 ? escapeHtml(row.colorPages) : ""}"></td>
             <td><select class="cell-select" name="coverType">${buildOptions(OPTIONS.coverTypes, row.coverType)}</select></td>
             <td><select class="cell-select" name="coverPaper">${buildOptions(OPTIONS.coverPapers, row.coverPaper)}</select></td>
             <td><select class="cell-select" name="backCoverType">${buildOptions(OPTIONS.backCoverTypes, row.backCoverType)}</select></td>
             <td><select class="cell-select" name="backCoverPaper">${buildOptions(OPTIONS.coverPapers, row.backCoverPaper)}</select></td>
-            <td><select class="cell-select" name="spiralOption">${buildOptions(OPTIONS.spiralOptions, row.spiralOption)}</select></td>
+            <td><select class="cell-select" name="spiralOption">${buildSpiralOptions(row.spiralOption)}</select></td>
+            <td><select class="cell-select" name="menuLaminationScope"${isMenu ? "" : " disabled"}>${buildOptions(OPTIONS.menuLaminationScopes, row.menuLaminationScope)}</select></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.innerTotal)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.coverTotal)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.backTotal)}</span></td>
             <td><span class="readonly-value subtle">${formatCurrency(row.finishingTotal)}${row.groupedFinishing ? `<br><small>${row.bindingGroupLeader ? `Grupo ${escapeHtml(row.bindingGroup)}` : `Grupo ${escapeHtml(row.bindingGroup)} (na 1a linha)`}</small>` : ""}</span></td>
+            <td><span class="readonly-value subtle">${formatCurrency(row.menuLaminationTotal)}${row.menuPolasealCount > 0 ? `<br><small>${formatInteger(row.menuPolasealCount)} Polaseal A4</small>` : ""}</span></td>
             <td><input class="cell-input" name="artCreationFee" type="number" min="0" step="0.01" value="${escapeHtml(row.artCreationFee ?? 0)}" placeholder="0,00"></td>
             <td><select class="cell-select" name="discountType">${buildOptions(["R$", "%"], row.discountType)}</select></td>
             <td><input class="cell-input" name="discountValue" type="number" min="0" step="0.01" value="${escapeHtml(row.discountValue ?? 0)}" placeholder="0,00"></td>
@@ -10140,7 +10282,7 @@ async function initApp() {
 
   function updatePreset(name, value) {
     state.presets[name] = name === "pagesPerSheet" ? toWholeNumber(value) : value;
-    state.presets.size = getValidApostilaSize(state.presets.printType, state.presets.size);
+    state.presets.size = getValidApostilaSize(state.presets.printType, state.presets.size, state.presets.productType);
     state.presets.innerPaper = getValidApostilaInnerPaper(state.presets.innerPaper);
     persist();
     renderPresetControls();
@@ -10484,6 +10626,8 @@ async function initApp() {
     ["preset-size", "size"],
     ["preset-print-mode", "printMode"],
     ["preset-pages-per-sheet", "pagesPerSheet"],
+    ["preset-product-type", "productType"],
+    ["preset-menu-lamination-scope", "menuLaminationScope"],
     ["preset-finishing", "finishing"],
     ["preset-cover", "coverType"],
     ["preset-cover-paper", "coverPaper"],
@@ -10643,8 +10787,15 @@ async function initApp() {
     } else {
       row[field] = target.value;
     }
-    if (field === "printType" || field === "size") {
-      row.size = getValidApostilaSize(row.printType, row.size);
+    if (field === "productType") {
+      row.productType = OPTIONS.apostilaProducts.includes(row.productType) ? row.productType : "Apostila";
+      if (row.productType === "Cardápio plastificado") row.finishing = "Encadernação espiral";
+    }
+    if (field === "menuLaminationScope") {
+      row.menuLaminationScope = OPTIONS.menuLaminationScopes.includes(row.menuLaminationScope) ? row.menuLaminationScope : "Todas as folhas";
+    }
+    if (field === "printType" || field === "size" || field === "productType") {
+      row.size = getValidApostilaSize(row.printType, row.size, row.productType);
     }
     if (field === "innerPaper") {
       row.innerPaper = getValidApostilaInnerPaper(row.innerPaper);
@@ -11336,6 +11487,16 @@ async function initApp() {
       persist();
       renderRowsAndSummary();
       setConfigStatus("Preço da tiragem atualizado.", "success");
+      return;
+    }
+
+    if (prefix === "menu-price") {
+      const value = Number(target.value);
+      if (!Object.hasOwn(config.menuPricing, key) || target.value === "" || !Number.isFinite(value) || value < 0) return;
+      config.menuPricing[key] = Math.round(value * 100) / 100;
+      persist();
+      renderRowsAndSummary();
+      setConfigStatus("Preço do cardápio atualizado.", "success");
       return;
     }
 
