@@ -23,13 +23,13 @@ test('reajuste de 10% arredonda centavos e mantém tiragens e dimensões', () =>
   assert.equal(config.credentialLanyardPricing.roundWhite2mm, 0.83);
 });
 
-test('catálogos fixos de cartões, panfletos e blocos são reajustados', () => {
+test('cartões e panfletos mantêm reajuste; blocos seguem o PDF', () => {
   const card = vm.runInContext('BUSINESS_CARD_CATALOG[0]', app);
   const flyer = vm.runInContext('FLYER_CATALOG.find((item) => item.production === "Laser" && item.paper === "Couche 120g" && item.size === "10x14cm")', app);
   assert.equal(card.modes['Só frente'][0].total, 46.75);
   assert.equal(card.modes['Só frente'][0].quantity, 100);
   assert.equal(flyer.modes['Só frente'].find((tier) => tier.quantity === 1500).total, 599.5);
-  assert.equal(app.window.BLOCK_CATALOG[0].price, 105.6);
+  assert.equal(app.window.BLOCK_CATALOG[0].price, 96);
   assert.equal(app.window.BLOCK_CATALOG[0].quantity, 6);
 });
 

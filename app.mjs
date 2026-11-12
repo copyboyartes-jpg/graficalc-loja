@@ -4356,7 +4356,31 @@ function getBlockPriceItem(tab, row) {
   ) || null;
 }
 
+function normalizeLegacyBlockFormat(format, tab) {
+  if (tab === "autocopiativo" && format === "14,4x10cm") {
+    return "A6";
+  }
+  if (tab !== "sulfite") {
+    return format;
+  }
+  const legacyFormats = {
+    "rifa 20x7 (4 por folha) - 50 folhas": "Rifa 20,4x7,2cm (4 por folha) - 50 folhas",
+    "rifa 20x7 (4 por folha) - 25 folhas": "Rifa 20,4x7,2cm (4 por folha) - 25 folhas",
+    "rifa 20x7 (4 por folha) - 15 folhas": "Rifa 10x14,4cm (4 por folha) - 15 folhas",
+    "rifa 20x7 (4 por folha) - 10 folhas": "Rifa 10x14,4cm (4 por folha) - 10 folhas",
+    "rifa 20x5,7 (5 por folha) - 50 folhas": "Rifa 20x5,8cm (5 por folha) - 50 folhas",
+    "rifa 20x5,7 (5 por folha) - 25 folhas": "Rifa 20x5,8cm (5 por folha) - 25 folhas",
+    "rifa 20x5,7 (5 por folha) - 15 folhas": "Rifa 20x5,8cm (5 por folha) - 15 folhas",
+    "rifa 20x5,7 (5 por folha) - 10 folhas": "Rifa 20x5,8cm (5 por folha) - 10 folhas",
+    "6 por folha": "Comanda (6 por folha A4)",
+    "10x7cm (8 por folha)": "Comanda (8 por folha A4)",
+    "A6 (10x14cm)": "A6",
+  };
+  return legacyFormats[format] || format;
+}
+
 function normalizeBlockRowChoice(row, tab) {
+  row.format = normalizeLegacyBlockFormat(row.format, tab);
   const formats = getBlockFormats(tab);
   if (!formats.includes(row.format)) {
     row.format = formats[0] || "";
@@ -4396,9 +4420,11 @@ function calculateBlockWorkbook(state, tab) {
   const rows = (state.blockItems?.[tab] || []).map((row, index) => {
     const quantity = toWholeNumber(row.quantity);
     const active = isBlockRowActive(row);
-    const priceItem = getBlockPriceItem(tab, row);
+    const format = normalizeLegacyBlockFormat(row.format, tab);
+    const priceItem = getBlockPriceItem(tab, { ...row, format });
     const baseTotal = active && priceItem ? toMoneyNumber(priceItem.price) : 0;
-    const artCreationFee = getArtCreationFee(row);
+    const enteredArtCreationFee = getArtCreationFee(row);
+    const artCreationFee = enteredArtCreationFee > 0 ? Math.max(35, enteredArtCreationFee) : 0;
     const rowDiscount = applyRowDiscount(row, baseTotal + artCreationFee, quantity);
     const warning = active && quantity <= 0
       ? `Bloco ${index + 1}: escolha uma quantidade da tabela.`
@@ -4408,11 +4434,13 @@ function calculateBlockWorkbook(state, tab) {
 
     return {
       ...row,
+      format,
       active,
       valid: active ? quantity > 0 && Boolean(priceItem) : false,
       quantity,
       vias: toWholeNumber(row.vias) || 1,
       measure: priceItem?.measure || "",
+      sheetsPerBlock: priceItem?.sheetsPerBlock || 50,
       tabLabel: BLOCK_TAB_LABELS[tab] || "Blocos",
       baseTotal,
       artCreationFee,
@@ -4437,6 +4465,10 @@ function calculateBlockWorkbook(state, tab) {
       averageValue: totalQuantity > 0 ? totalGeneral / totalQuantity : 0,
     },
   };
+}
+
+function getBlockQuoteDetail(row, paper) {
+  return `${formatInteger(row.quantity)} blocos | ${row.format} | ${row.measure} | ${formatInteger(row.vias)} via${row.vias > 1 ? "s" : ""} | ${row.sheetsPerBlock} folhas por bloco | ${paper} | Inclui capa 120g, impressão preta, cola, picote e numeração`;
 }
 
 function calculateWorkbook(state, config) {
@@ -7795,7 +7827,7 @@ function collectQuoteEntries(workbook, colorWorkbook, credentialWorkbook, readyW
       sourceIndex: index,
       kind: "Blocos sulfite",
       description: row.description || "Bloco sulfite",
-      detail: `${formatInteger(row.quantity)} blocos | ${row.format} | ${row.measure} | ${formatInteger(row.vias)} via${row.vias > 1 ? "s" : ""}`,
+      detail: getBlockQuoteDetail(row, "Papel sulfite 75g"),
       artDetail: formatArtCreationDetail(row),
       discountDetail: row.discountDescription,
       total: row.total,
@@ -7805,7 +7837,7 @@ function collectQuoteEntries(workbook, colorWorkbook, credentialWorkbook, readyW
       sourceIndex: index,
       kind: "Blocos autocopiativos",
       description: row.description || "Bloco autocopiativo",
-      detail: `${formatInteger(row.quantity)} blocos | ${row.format} | ${row.measure} | ${formatInteger(row.vias)} via${row.vias > 1 ? "s" : ""}`,
+      detail: getBlockQuoteDetail(row, "Papel autocopiativo"),
       artDetail: formatArtCreationDetail(row),
       discountDetail: row.discountDescription,
       total: row.total,
@@ -7998,10 +8030,10 @@ function createQuoteText(state, workbook, colorWorkbook, credentialWorkbook, rea
       text: `- ${row.description || `Panfleto/folder ${index + 1}`} | ${row.quantity} unidades | ${row.productionType} | ${row.paper} | ${row.size} | ${row.printMode}${row.foldType !== "Sem dobra" ? ` | ${row.foldType}` : ""}${row.foldTotal > 0 ? ` | Dobra: ${formatCurrency(row.foldTotal)}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...blockSulfiteWorkbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || `Bloco sulfite ${index + 1}`} | ${row.quantity} blocos | ${row.format} | ${row.measure} | ${row.vias} via${row.vias > 1 ? "s" : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
+      text: `- ${row.description || `Bloco sulfite ${index + 1}`} | ${getBlockQuoteDetail(row, "Papel sulfite 75g")}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...blockAutocopiativoWorkbook.activeRows.map((row, index) => ({
-      text: `- ${row.description || `Bloco autocopiativo ${index + 1}`} | ${row.quantity} blocos | ${row.format} | ${row.measure} | ${row.vias} via${row.vias > 1 ? "s" : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
+      text: `- ${row.description || `Bloco autocopiativo ${index + 1}`} | ${getBlockQuoteDetail(row, "Papel autocopiativo")}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
     })),
     ...linearMeterWorkbook.activeRows.map((row, index) => ({
       text: `- ${row.description || row.productLabel || `Metro linear ${index + 1}`} | ${formatMeasure(row.groupLinearMeters || row.linearMeters)} m${row.groupId ? " no encaixe compartilhado" : ""} | ${row.productLabel}${row.variantLabel ? ` | ${row.variantLabel}` : ""}${row.materialWidthCm > 0 ? ` | Largura: ${row.fixedWidthLabel}` : ""}${formatArtCreationDetail(row) ? ` | ${formatArtCreationDetail(row)}` : ""}${row.discountDescription ? ` | ${row.discountDescription}` : ""} | ${formatCurrency(row.total)}`,
@@ -11169,7 +11201,10 @@ async function initApp() {
 
     if (field === "vias" || field === "quantity") {
       row[field] = toWholeNumber(target.value);
-    } else if (field === "artCreationFee" || field === "discountValue") {
+    } else if (field === "artCreationFee") {
+      const amount = toMoneyNumber(target.value);
+      row[field] = amount > 0 ? Math.max(35, amount) : 0;
+    } else if (field === "discountValue") {
       row[field] = toMoneyNumber(target.value);
     } else if (field === "discountType") {
       row[field] = normalizeDiscountType(target.value);
