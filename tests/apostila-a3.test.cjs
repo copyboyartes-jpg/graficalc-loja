@@ -130,7 +130,8 @@ test("Somar quantidades separa A3, A4 e A5", () => {
   ], app.createDefaultConfig(), "Somar quantidades").rows;
   assert.equal(rows[0].innerTotal, 2.75);
   assert.ok(Math.abs(rows[1].innerTotal - 3.96) < 0.00001);
-  assert.equal(rows[2].innerTotal, 4.4);
+  assert.equal(rows[2].innerImpressions, 2);
+  assert.equal(rows[2].innerTotal, 3.3);
 });
 
 test("linhas A3 somam impressões entre si sem misturar preços de capa A4", () => {

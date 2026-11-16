@@ -3194,6 +3194,13 @@ function getApostilaInnerPagesPerSheet(row) {
   return [1, 2, 4, 6].includes(pagesPerSheet) ? pagesPerSheet : 1;
 }
 
+function hasAutomaticApostilaImposition(row) {
+  return row.productType === "Cardápio plastificado"
+    || row.size === "A5"
+    || row.size === "A6"
+    || row.finishing === "Livreto";
+}
+
 function getApostilaSizeDetail(row) {
   const size = row.size || "A4";
   const pagesPerSheet = getApostilaInnerPagesPerSheet(row);
@@ -3256,7 +3263,8 @@ function getBindingSheetsPerCopy(row) {
   if (pages <= 0) {
     return 0;
   }
-  if (row.productType === "Cardápio plastificado") {
+  // A5/A6 are cut from the parent A4 sheet before binding.
+  if (row.productType === "Cardápio plastificado" || row.size === "A5" || row.size === "A6") {
     return Math.ceil(pages / (row.printMode === "Frente e verso" ? 2 : 1));
   }
   const imposedPages = Math.ceil(pages / getApostilaInnerPagesPerSheet(row));
@@ -3579,20 +3587,22 @@ function getInnerImpressionBreakdown(row) {
   const fullColorMode = row.printType !== "Preto e branco" && colorPages === 0;
   const colorPagesPerCopy = fullColorMode ? totalPages : colorPages;
   const blackWhitePagesPerCopy = fullColorMode ? 0 : Math.max(0, totalPages - colorPagesPerCopy);
-  const isA5Menu = row.productType === "Cardápio plastificado" && row.size === "A5";
+  const compactImposition = row.size === "A5" || row.size === "A6"
+    ? getApostilaInnerPagesPerSheet(row)
+    : 0;
   let colorImpressions;
   let blackWhiteImpressions;
-  if (isA5Menu && row.printMode === "Frente e verso") {
+  if (compactImposition > 0 && row.printMode === "Frente e verso") {
     const frontPages = Math.ceil(totalPages / 2);
     const backPages = Math.floor(totalPages / 2);
     const colorFrontPages = Math.ceil(colorPagesPerCopy / 2);
     const colorBackPages = Math.floor(colorPagesPerCopy / 2);
-    const imposed = (pagesPerSide) => Math.ceil(copies * pagesPerSide / 2);
+    const imposed = (pagesPerSide) => Math.ceil(copies * pagesPerSide / compactImposition);
     colorImpressions = imposed(colorFrontPages) + imposed(colorBackPages);
     blackWhiteImpressions = imposed(frontPages - colorFrontPages) + imposed(backPages - colorBackPages);
-  } else if (isA5Menu) {
-    colorImpressions = Math.ceil(copies * colorPagesPerCopy / 2);
-    blackWhiteImpressions = Math.ceil(copies * blackWhitePagesPerCopy / 2);
+  } else if (compactImposition > 0) {
+    colorImpressions = Math.ceil(copies * colorPagesPerCopy / compactImposition);
+    blackWhiteImpressions = Math.ceil(copies * blackWhitePagesPerCopy / compactImposition);
   } else {
     colorImpressions = copies * getPagesPerA4(colorPagesPerCopy, row);
     blackWhiteImpressions = copies * getPagesPerA4(blackWhitePagesPerCopy, row);
@@ -8817,8 +8827,8 @@ async function initApp() {
     document.getElementById("preset-size").innerHTML = buildOptions(getApostilaSizeOptions(state.presets.printType, state.presets.productType), state.presets.size);
     document.getElementById("preset-print-mode").innerHTML = buildOptions(OPTIONS.printModes, state.presets.printMode);
     const menuPreset = state.presets.productType === "Cardápio plastificado";
-    document.getElementById("preset-pages-per-sheet").innerHTML = buildOptions(["1", "2", "4", "6"], menuPreset ? String(state.presets.size === "A5" ? 2 : 1) : String(state.presets.pagesPerSheet));
-    document.getElementById("preset-pages-per-sheet").disabled = menuPreset;
+    document.getElementById("preset-pages-per-sheet").innerHTML = buildOptions(["1", "2", "4", "6"], String(getApostilaInnerPagesPerSheet(state.presets)));
+    document.getElementById("preset-pages-per-sheet").disabled = hasAutomaticApostilaImposition(state.presets);
     document.getElementById("preset-finishing").innerHTML = buildOptions(OPTIONS.finishing, state.presets.productType === "Cardápio plastificado" ? "Encadernação espiral" : state.presets.finishing);
     document.getElementById("preset-finishing").disabled = state.presets.productType === "Cardápio plastificado";
     document.getElementById("preset-cover").innerHTML = buildOptions(OPTIONS.coverTypes, state.presets.coverType);
@@ -9193,7 +9203,7 @@ async function initApp() {
       .map((row, index) => {
         const rowClass = row.active ? "" : "is-empty";
         const isMenu = row.productType === "Cardápio plastificado";
-        const autoBookletImposition = row.finishing === "Livreto" && (row.size === "A4" || row.size === "A3");
+        const automaticImposition = hasAutomaticApostilaImposition(row);
         return `
           <tr class="${rowClass}" data-row-index="${index}">
             <td><input type="checkbox" class="row-selector" data-row-id="${escapeHtml(row.id)}"${selectedRowIds.has(row.id) ? " checked" : ""}></td>
@@ -9208,7 +9218,7 @@ async function initApp() {
             <td><input class="cell-input" name="bindingGroup" value="${escapeHtml(row.bindingGroup)}" placeholder="Ex.: Grupo A"></td>
             <td><input class="cell-input" name="quantity" type="number" min="0" step="1" value="${row.quantity > 0 ? escapeHtml(row.quantity) : ""}"></td>
             <td><input class="cell-input" name="pages" type="number" min="0" step="1" value="${row.pages > 0 ? escapeHtml(row.pages) : ""}"></td>
-            <td><select class="cell-select" name="pagesPerSheet"${autoBookletImposition || isMenu ? " disabled" : ""}>${buildOptions(["1", "2", "4", "6"], isMenu ? String(row.size === "A5" ? 2 : 1) : autoBookletImposition ? "2" : String(row.pagesPerSheet || 1))}</select></td>
+            <td><select class="cell-select" name="pagesPerSheet"${automaticImposition ? " disabled" : ""}>${buildOptions(["1", "2", "4", "6"], String(getApostilaInnerPagesPerSheet(row)))}</select></td>
             <td><input class="cell-input" name="colorPages" type="number" min="0" step="1" value="${row.colorPages > 0 ? escapeHtml(row.colorPages) : ""}"></td>
             <td><select class="cell-select" name="coverType">${buildOptions(OPTIONS.coverTypes, row.coverType)}</select></td>
             <td><select class="cell-select" name="coverPaper">${buildOptions(OPTIONS.coverPapers, row.coverPaper)}</select></td>
