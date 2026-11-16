@@ -36,17 +36,31 @@ test('cardápio A5 usa duas páginas por impressão e duas folhas por Polaseal',
   assert.equal(row.innerImpressions, 1);
   assert.equal(row.bindingSheetsPerCopy, 2);
   assert.equal(row.menuPolasealCount, 1);
-  assert.equal(row.finishingTotal, 3.5);
+  assert.equal(row.finishingTotal, config.spiralPricing[0].rates['1']);
   assert.equal(row.menuLaminationTotal, config.colorPrintExtras.laminationWhole.a4[0].value);
-  assert.equal(row.total, row.innerTotal + row.menuLaminationTotal + row.finishingTotal);
+  assert.ok(Math.abs(row.total - row.innerTotal - row.menuLaminationTotal - row.finishingTotal) < 0.000001);
 });
 
-test('A5 compartilha a impressão e o Polaseal entre exemplares, sem capas desconta R$ 0,75', () => {
-  const row = calculate(menuRow({ pages: 1, quantity: 3, spiralOption: 'Sem capas plásticas' })).activeRows[0];
+test('A5 compartilha a impressão e o Polaseal e usa o desconto A4 sem capas', () => {
+  const config = app.createDefaultConfig();
+  const row = calculate(menuRow({ pages: 1, quantity: 3, spiralOption: 'Sem capas plásticas' }), config).activeRows[0];
   assert.equal(row.innerImpressions, 2);
   assert.equal(row.menuPolasealCount, 2);
-  assert.equal(row.finishingUnit, 2.75);
-  assert.equal(row.finishingTotal, 8.25);
+  assert.equal(row.finishingUnit, config.spiralPricing[0].rates['1'] - config.spiralPlasticDiscount);
+  assert.equal(row.finishingTotal, 3 * row.finishingUnit);
+});
+
+test('cardápios A4 e A5 usam a mesma faixa de espiral e o mesmo desconto', () => {
+  const config = app.createDefaultConfig();
+  for (const [pages, quantity] of [[2, 1], [60, 25], [120, 55]]) {
+    for (const spiralOption of ['Com capas plásticas', 'Sem capas plásticas']) {
+      const fields = { pages, quantity, spiralOption };
+      const a4 = calculate(menuRow({ ...fields, size: 'A4' }), config).activeRows[0];
+      const a5 = calculate(menuRow({ ...fields, size: 'A5' }), config).activeRows[0];
+      assert.equal(a5.finishingUnit, a4.finishingUnit, `${pages} páginas, ${quantity} unidades, ${spiralOption}`);
+      assert.equal(a5.finishingTotal, a4.finishingTotal);
+    }
+  }
 });
 
 test('A5 frente e verso imprime duas passadas e aproveita duas peças em cada lado', () => {
@@ -83,7 +97,7 @@ test('arquivos do mesmo grupo compartilham o Polaseal e uma encadernação', () 
   const rows = app.calculateWorkbook(state, app.createDefaultConfig()).activeRows;
   assert.equal(rows[0].menuPolasealCount, 1);
   assert.equal(rows[1].menuPolasealCount, 0);
-  assert.equal(rows[0].finishingTotal, 3.5);
+  assert.equal(rows[0].finishingTotal, app.createDefaultConfig().spiralPricing[0].rates['1']);
   assert.equal(rows[1].finishingTotal, 0);
 });
 
@@ -98,23 +112,27 @@ test('cardápio e apostila com o mesmo nome de grupo não dividem a encadernaç�
 });
 
 test('configurações e orçamentos antigos permanecem com o cálculo de apostila', () => {
-  const config = app.mergeConfig({});
-  assert.equal(config.menuPricing.a5Binding, 3.5);
-  assert.equal(config.menuPricing.a5NoPlasticCoverDiscount, 0.75);
+  const config = app.mergeConfig({ menuPricing: { a5Binding: 3.5, a5NoPlasticCoverDiscount: 0.75 } });
+  assert.equal(config.spiralPlasticDiscount, 1.5);
+  assert.equal(Object.hasOwn(config, 'menuPricing'), false);
   const old = app.createDefaultState();
   delete old.rows[0].productType;
   const restored = app.mergeState(old);
   assert.equal(restored.rows[0].productType, 'Apostila');
   assert.equal(app.calculateWorkbook(restored, config).rows[0].menuLaminationTotal, 0);
-  assert.match(app.createConfigSectionsMarkup(config, 'advanced', 'calculo'), /data-config-key="a5Binding"/);
+  const markup = app.createConfigSectionsMarkup(config, 'advanced', 'calculo');
+  assert.doesNotMatch(markup, /data-config-key="a5Binding"/);
+  assert.match(markup, /A4\/A5 usam esta mesma tabela/);
   assert.match(source, /name="menuLaminationScope"/);
 });
 
 test('preços editados de encadernação e plastificação entram no cardápio', () => {
   const config = app.mergeConfig({ menuPricing: { a5Binding: 4.25, a5NoPlasticCoverDiscount: 1 } });
+  config.spiralPricing[0].rates['1'] = 6.25;
+  config.spiralPlasticDiscount = 1;
   config.colorPrintExtras.laminationWhole.a4[0].value = 6;
   const row = calculate(menuRow({ spiralOption: 'Sem capas plásticas' }), config).activeRows[0];
-  assert.equal(row.finishingTotal, 3.25);
+  assert.equal(row.finishingTotal, 5.25);
   assert.equal(row.menuLaminationTotal, 6);
 });
 

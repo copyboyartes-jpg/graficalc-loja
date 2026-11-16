@@ -1132,7 +1132,6 @@ function createDefaultConfig() {
   });
   config.businessCardPricing = createCatalogPricing(BUSINESS_CARD_CATALOG);
   config.flyerPricing = createCatalogPricing(FLYER_CATALOG);
-  config.menuPricing = { a5Binding: 3.5, a5NoPlasticCoverDiscount: 0.75 };
   config.readyProductPricing["Wind banner promocional 2m"].unitPrice = 150;
   config.readyProductPricing["Windbanner promocional 1,20m - tecido, haste e base"].tiers = [
     { min: 1, value: 95, label: "1 a 2 unidades" },
@@ -2225,14 +2224,6 @@ function mergeConfig(candidate) {
   };
 
   const merged = deepClone(defaults);
-  if (candidate.menuPricing && typeof candidate.menuPricing === "object") {
-    for (const key of Object.keys(merged.menuPricing)) {
-      const saved = candidate.menuPricing[key];
-      if (saved !== "" && saved !== null && Number.isFinite(Number(saved)) && Number(saved) >= 0) {
-        merged.menuPricing[key] = Math.round(Number(saved) * 100) / 100;
-      }
-    }
-  }
   merged.businessCardPricing = mergeCatalogPricing(defaults.businessCardPricing, candidate.businessCardPricing);
   merged.flyerPricing = mergeCatalogPricing(defaults.flyerPricing, candidate.flyerPricing);
   if (Array.isArray(candidate.customReadyProducts)) {
@@ -3284,14 +3275,6 @@ function getInnerImpressions(row) {
 function getSpiralUnitPrice(row, bindingSheetsPerCopy, config) {
   if (bindingSheetsPerCopy <= 0 || bindingSheetsPerCopy > 500) {
     return 0;
-  }
-
-  if (row.productType === "Cardápio plastificado" && row.size === "A5") {
-    const base = toMoneyNumber(config.menuPricing?.a5Binding ?? 3.5);
-    const discount = row.spiralOption === "Sem capas plásticas"
-      ? toMoneyNumber(config.menuPricing?.a5NoPlasticCoverDiscount ?? 0.75)
-      : 0;
-    return Math.max(0, base - discount);
   }
 
   const band = config.spiralPricing.find((item) => bindingSheetsPerCopy <= Number(item.maxSheets || 0));
@@ -6082,7 +6065,7 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
         createInlineConfigBlockMarkup(
           "Encadernação espiral",
           createSpiralTableMarkup(config.spiralPricing),
-          "Valores por unidade de apostila, conforme faixa de folhas e quantidade de exemplares. Para A3, o valor final da encadernação é dobrado."
+          `Apostilas e cardápios A4/A5 usam esta mesma tabela por unidade, conforme faixa de folhas e quantidade de exemplares. Sem capas plásticas, descontar ${formatCurrency(config.spiralPlasticDiscount)} por unidade. Para A3, o valor final da encadernação é dobrado.`
         ),
         createInlineConfigBlockMarkup(
           "Livreto",
@@ -6098,14 +6081,6 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
           )
         ),
       ].join("")
-    ),
-    createConfigCardMarkup(
-      "Cardápio plastificado",
-      `O A5 usa duas unidades por impressão A4 e duas por Polaseal A4. O A4 usa a tabela de espiral acima e desconta ${formatCurrency(config.spiralPlasticDiscount)} quando não há capas plásticas. A plastificação usa os preços de Impressos coloridos.`,
-      `<div class="config-field-grid">
-        <label><span>Encadernação A5 com capas (R$ / cardápio)</span><input data-config-prefix="menu-price" data-config-key="a5Binding" type="number" min="0" step="0.01" value="${escapeHtml(config.menuPricing.a5Binding)}"></label>
-        <label><span>Desconto A5 sem capas (R$ / cardápio)</span><input data-config-prefix="menu-price" data-config-key="a5NoPlasticCoverDiscount" type="number" min="0" step="0.01" value="${escapeHtml(config.menuPricing.a5NoPlasticCoverDiscount)}"></label>
-      </div>`
     ),
     createCatalogTabCardMarkup("calculo", "Produtos extras desta aba", config.catalogSections, config, viewMode),
   ];
@@ -11532,16 +11507,6 @@ async function initApp() {
       persist();
       renderRowsAndSummary();
       setConfigStatus("Preço da tiragem atualizado.", "success");
-      return;
-    }
-
-    if (prefix === "menu-price") {
-      const value = Number(target.value);
-      if (!Object.hasOwn(config.menuPricing, key) || target.value === "" || !Number.isFinite(value) || value < 0) return;
-      config.menuPricing[key] = Math.round(value * 100) / 100;
-      persist();
-      renderRowsAndSummary();
-      setConfigStatus("Preço do cardápio atualizado.", "success");
       return;
     }
 
