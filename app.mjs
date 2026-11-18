@@ -1609,6 +1609,22 @@ function normalizeClientMatchValue(value) {
   return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+function filterServiceOrders(orders, { search = "", client = "", employee = "", status = "all" } = {}, teamMembers = []) {
+  const searchTerm = normalizeClientMatchValue(search);
+  const clientTerm = normalizeClientMatchValue(client);
+  const employeeTerm = normalizeClientMatchValue(employee);
+  const matchingMemberIds = new Set(employeeTerm
+    ? teamMembers.filter((member) => normalizeClientMatchValue(member.name).includes(employeeTerm)).map((member) => member.id)
+    : []);
+  return orders.filter((order) => {
+    if (status !== "all" && normalizeServiceOrderStatus(order.status) !== status) return false;
+    if (clientTerm && !normalizeClientMatchValue(order.clientName).includes(clientTerm)) return false;
+    if (employeeTerm && !normalizeClientMatchValue(order.employeeName).includes(employeeTerm) && !matchingMemberIds.has(order.assignedMemberId)) return false;
+    const searchable = `${order.number} ${order.clientName} ${order.employeeName} ${order.quoteTitle} ${(order.items || []).map((item) => `${item.description} ${item.detail}`).join(" ")}`;
+    return normalizeClientMatchValue(searchable).includes(searchTerm);
+  });
+}
+
 function findUniqueClientMatch(clients, clientData) {
   const cnpj = String(clientData?.cnpj || "").replace(/\D/g, "");
   const name = normalizeClientMatchValue(clientData?.name);
@@ -8181,6 +8197,8 @@ async function initApp() {
   let historySearchQuery = "";
   let historyStatusFilter = "all";
   let serviceOrderSearchQuery = "";
+  let serviceOrderClientQuery = "";
+  let serviceOrderEmployeeQuery = "";
   let serviceOrderStatusFilter = "all";
   const serviceOrderCreationDrafts = new Map();
   let teamMembers = [];
@@ -9070,15 +9088,25 @@ async function initApp() {
     document.getElementById("os-production-count").textContent = formatInteger(state.serviceOrders.filter((order) => normalizeServiceOrderStatus(order.status) === "Em produção").length);
     document.getElementById("os-ready-count").textContent = formatInteger(state.serviceOrders.filter((order) => normalizeServiceOrderStatus(order.status) === "Pronto pra entrega").length);
     document.getElementById("os-collected-count").textContent = formatInteger(state.serviceOrders.filter((order) => normalizeServiceOrderStatus(order.status) === "Retirado").length);
-    const search = normalizeClientMatchValue(serviceOrderSearchQuery);
-    const filteredOrders = state.serviceOrders.filter((order) => {
-      if (serviceOrderStatusFilter !== "all" && normalizeServiceOrderStatus(order.status) !== serviceOrderStatusFilter) return false;
-      const searchable = `${order.number} ${order.clientName} ${order.employeeName} ${order.quoteTitle} ${order.items.map((item) => `${item.description} ${item.detail}`).join(" ")}`;
-      return normalizeClientMatchValue(searchable).includes(search);
-    });
+    const updateSuggestions = (element, values) => {
+      const names = [...new Set(values.map((value) => String(value || "").trim()).filter(Boolean))]
+        .sort((left, right) => left.localeCompare(right, "pt-BR"));
+      const signature = JSON.stringify(names);
+      if (element.dataset.signature === signature) return;
+      element.innerHTML = names.map((name) => `<option value="${escapeHtml(name)}"></option>`).join("");
+      element.dataset.signature = signature;
+    };
+    updateSuggestions(document.getElementById("os-client-options"), [...state.clients.map((client) => client.name), ...state.serviceOrders.map((order) => order.clientName)]);
+    updateSuggestions(document.getElementById("os-employee-options"), teamMembers.map((member) => member.name));
+    const filteredOrders = filterServiceOrders(state.serviceOrders, {
+      search: serviceOrderSearchQuery,
+      client: serviceOrderClientQuery,
+      employee: serviceOrderEmployeeQuery,
+      status: serviceOrderStatusFilter,
+    }, teamMembers);
     serviceOrdersList.innerHTML = filteredOrders.length
       ? filteredOrders.map((order) => createServiceOrderMarkup(order, { employeeDraft: serviceOrderEmployeeDrafts.get(order.id) || order.assignedMemberId || teamMembers.find((member) => member.name === order.employeeName)?.id || "", selectedForPrint: selectedServiceOrderIds.has(order.id), teamMembers })).join("")
-      : `<div class="empty-state"><strong>${state.serviceOrders.length ? "Nenhuma O.S. encontrada" : "Nenhuma O.S. gerada"}</strong><span>${state.serviceOrders.length ? "Ajuste a busca ou a etapa selecionada." : "Aprove um orçamento, informe o funcionário responsável e clique em Gerar O.S."}</span></div>`;
+      : `<div class="empty-state"><strong>${state.serviceOrders.length ? "Nenhuma O.S. encontrada" : "Nenhuma O.S. gerada"}</strong><span>${state.serviceOrders.length ? "Ajuste os filtros ou a etapa selecionada." : "Aprove um orçamento, informe o funcionário responsável e clique em Gerar O.S."}</span></div>`;
     printSelectedServiceOrdersButton.disabled = selectedServiceOrderIds.size === 0;
     printSelectedServiceOrdersButton.textContent = `Imprimir selecionadas (${selectedServiceOrderIds.size})`;
   }
@@ -12005,6 +12033,14 @@ async function initApp() {
     serviceOrderSearchQuery = event.target.value;
     renderServiceOrdersTab();
   });
+  document.getElementById("os-client-filter").addEventListener("input", (event) => {
+    serviceOrderClientQuery = event.target.value;
+    renderServiceOrdersTab();
+  });
+  document.getElementById("os-employee-filter").addEventListener("input", (event) => {
+    serviceOrderEmployeeQuery = event.target.value;
+    renderServiceOrdersTab();
+  });
   document.getElementById("os-status-filter").addEventListener("change", (event) => {
     serviceOrderStatusFilter = event.target.value;
     renderServiceOrdersTab();
@@ -12399,6 +12435,10 @@ async function initApp() {
       if (!order) return;
       serviceOrderSearchQuery = order.number;
       document.getElementById("os-search").value = order.number;
+      serviceOrderClientQuery = "";
+      document.getElementById("os-client-filter").value = "";
+      serviceOrderEmployeeQuery = "";
+      document.getElementById("os-employee-filter").value = "";
       serviceOrderStatusFilter = "all";
       document.getElementById("os-status-filter").value = "all";
       renderServiceOrdersTab();

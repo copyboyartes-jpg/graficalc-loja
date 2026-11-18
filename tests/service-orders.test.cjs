@@ -186,3 +186,26 @@ test("materiais detalhados ocupam duas colunas antes de criar continuação", ()
   assert.match(markup, /data-columns="2"/);
   assert.match(markup, /Rótulo 5/);
 });
+
+test("filtros de O.S. combinam cliente, colaborador, busca e etapa", () => {
+  const orders = [
+    { id: "1", number: "00001-2026", clientName: "João da Silva", employeeName: "Ana Lúcia", assignedMemberId: "ana", status: "Em produção", quoteTitle: "Cartão", items: [{ description: "Cartão de visita", detail: "100 unidades" }] },
+    { id: "2", number: "00002-2026", clientName: "João da Silva", employeeName: "Beto", assignedMemberId: "beto", status: "Retirado", quoteTitle: "Adesivo", items: [] },
+    { id: "3", number: "00003-2026", clientName: "Maria", employeeName: "Ana Lúcia", assignedMemberId: "ana", status: "Em produção", quoteTitle: "Panfleto", items: [] },
+  ];
+  const members = [{ id: "ana", name: "Ana Lúcia" }, { id: "beto", name: "Beto" }];
+  const ids = (filters) => Array.from(app.filterServiceOrders(orders, filters, members), (order) => order.id).join(",");
+  assert.equal(ids({ client: "joao" }), "1,2");
+  assert.equal(ids({ employee: "lucia" }), "1,3");
+  assert.equal(ids({ client: "joao", employee: "ana", status: "Em produção", search: "cartao" }), "1");
+  assert.equal(ids({ client: "maria", employee: "beto" }), "");
+  assert.equal(ids({ search: "00002" }), "2");
+  assert.equal(ids({ status: "Retirado" }), "2");
+  assert.equal(ids({ employee: "Ana Lúcia" }), "1,3");
+});
+
+test("filtro por colaborador cadastrado encontra O.S. anterior à mudança de nome", () => {
+  const order = { number: "00004-2026", clientName: "Cliente", employeeName: "Ana", assignedMemberId: "ana", status: "Em produção", items: [] };
+  const found = app.filterServiceOrders([order], { employee: "Ana Lúcia" }, [{ id: "ana", name: "Ana Lúcia" }]);
+  assert.equal(found.length, 1);
+});

@@ -1244,8 +1244,10 @@
               <p class="panel-copy">Acompanhe a produção, a entrega e quem atendeu cada pedido. A numeração das O.S. é única para toda a equipe.</p>
             </div>
           </div>
-          <div class="history-filters">
-            <label><span>Buscar O.S.</span><input id="os-search" type="search" placeholder="Número, cliente, item ou funcionário"></label>
+          <div class="history-filters os-filters">
+            <label><span>Cliente</span><input id="os-client-filter" type="text" list="os-client-options" placeholder="Digite ou escolha um cliente" autocomplete="off"><datalist id="os-client-options"></datalist></label>
+            <label><span>Colaborador responsável</span><input id="os-employee-filter" type="text" list="os-employee-options" placeholder="Digite ou escolha um colaborador" autocomplete="off"><datalist id="os-employee-options"></datalist></label>
+            <label><span>Buscar O.S.</span><input id="os-search" type="search" placeholder="Número, item ou título"></label>
             <label><span>Etapa</span><select id="os-status-filter"><option value="all">Todas</option><option value="Em produção">Em produção</option><option value="Pronto pra entrega">Pronto pra entrega</option><option value="Retirado">Retirado</option></select></label>
           </div>
           <div class="toolbar os-print-toolbar">
@@ -1463,7 +1465,7 @@
       }
     })();
   </script>
-  <script src="./app.mjs?v=cardapio-espiral-a4-20261116"></script>
+  <script src="./app.mjs?v=os-filtros-20261118"></script>
 </body>
 </html>
 

@@ -592,6 +592,10 @@ textarea:disabled {
   gap: 12px;
 }
 
+.os-filters {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .client-stat-row {
   display: flex;
   flex-wrap: wrap;
@@ -1025,7 +1029,8 @@ textarea:disabled {
 }
 
 @media (max-width: 600px) {
-  .history-filters {
+  .history-filters,
+  .os-filters {
     grid-template-columns: minmax(0, 1fr);
   }
 }
