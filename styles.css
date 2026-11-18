@@ -2218,6 +2218,76 @@ textarea {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.os-template-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(180px, 1.2fr);
+  overflow: hidden;
+  border: 1px solid rgba(31, 42, 47, 0.3);
+  border-radius: 12px;
+  color: #222;
+  background: #fff;
+  font: 12px Arial, sans-serif;
+}
+
+.os-template-preview-main {
+  min-width: 0;
+  border-right: 1px solid rgba(31, 42, 47, 0.3);
+}
+
+.os-template-preview-main header,
+.os-template-preview-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 16px;
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(31, 42, 47, 0.16);
+}
+
+.os-template-preview-main header h4,
+.os-template-preview-main header small {
+  display: block;
+  margin: 0;
+  text-align: center;
+}
+
+.os-template-preview-materials {
+  min-height: 70px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(31, 42, 47, 0.16);
+}
+
+.os-template-preview-materials p {
+  margin: 6px 0 0;
+}
+
+.os-template-preview aside {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 20px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.os-template-preview aside p {
+  margin: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 700px) {
+  .os-template-preview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .os-template-preview-main {
+    border-right: 0;
+  }
+  .os-template-preview aside {
+    border-top: 1px solid rgba(31, 42, 47, 0.3);
+  }
+}
+
 .config-table input {
   min-width: 90px;
 }
@@ -2968,6 +3038,8 @@ textarea {
     margin: 0;
     text-align: justify;
     line-height: 1.19;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
   }
 
   .os-slip-signatures {

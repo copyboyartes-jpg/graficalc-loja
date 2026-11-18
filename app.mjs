@@ -796,6 +796,39 @@ function createDefaultLinearMeterPricing() {
   };
 }
 
+const DEFAULT_SERVICE_ORDER_TEMPLATE = {
+  title: "Ordem de Serviço",
+  continuation: "Continuação",
+  attendance: "Atendimento:",
+  finishing: "Acabamento:",
+  number: "Nº",
+  client: "Cliente:",
+  phone: "Fone:",
+  taxId: "CNPJ/CPF:",
+  date: "Data:",
+  delivery: "Entrega:",
+  hours: "Horas:",
+  employee: "Funcionário:",
+  materials: "Descrição dos materiais:",
+  notes: "Observação:",
+  total: "total",
+  paid: "pago",
+  balance: "falta pagar",
+  notice: "Confirmo ter conferido todo o pedido retirado na presente data. Não obstante, abdico o direito de reclamações quanto à cor, tamanho, quantidade ou quaisquer outros possíveis motivos para solicitação de re-produção após a retirada deste material.",
+  signatureName: "Nome:",
+  signature: "Ass:",
+  signatureDate: "Data:",
+};
+
+function normalizeServiceOrderTemplate(candidate) {
+  const template = { ...DEFAULT_SERVICE_ORDER_TEMPLATE };
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return template;
+  for (const key of Object.keys(template)) {
+    if (typeof candidate[key] === "string") template[key] = repairBrokenText(candidate[key]).slice(0, key === "notice" ? 380 : 80);
+  }
+  return template;
+}
+
 function createDefaultConfig() {
   const config = raiseConfiguredPricesTenPercent({
     printPricing: {
@@ -1138,6 +1171,7 @@ function createDefaultConfig() {
     { min: 3, value: 92, label: "3 a 9 unidades" },
     { min: 10, value: 85, label: "10 unidades ou mais" },
   ];
+  config.serviceOrderTemplate = normalizeServiceOrderTemplate();
   return config;
 }
 
@@ -1929,9 +1963,7 @@ function formatServiceOrderDate(value) {
   return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat("pt-BR").format(date);
 }
 
-const SERVICE_ORDER_NOTICE = "Confirmo ter conferido todo o pedido retirado na presente data. Não obstante, abdico o direito de reclamações quanto à cor, tamanho, quantidade ou quaisquer outros possíveis motivos para solicitação de re-produção após a retirada deste material.";
-
-function createServiceOrderSlipMarkup(order, company = {}) {
+function createServiceOrderSlipMarkup(order, company = {}, template = DEFAULT_SERVICE_ORDER_TEMPLATE) {
   const payment = getServiceOrderPayment(order);
   const logo = company.logoDataUrl
     ? `<img class="os-slip-logo" src="${escapeHtml(company.logoDataUrl)}" alt="${escapeHtml(company.name || "Logo da empresa")}">`
@@ -1942,17 +1974,17 @@ function createServiceOrderSlipMarkup(order, company = {}) {
     : `<div class="os-slip-material-column"><div class="os-slip-material">${escapeHtml(order.quoteTitle || "Consultar orçamento vinculado")}</div></div>`;
   return `<article class="os-slip" data-slip-order-id="${escapeHtml(order.id)}">
     <div class="os-slip-left">
-      <header class="os-slip-header"><div class="os-slip-brand">${logo}</div><div class="os-slip-title"><h2>Ordem de Serviço</h2>${order.printPart ? `<small>Continuação ${order.printPart} de ${order.printPartCount}</small>` : ""}</div></header>
-      <div class="os-slip-strip"><span><b>Atendimento:</b> ${escapeHtml(order.employeeName || "")}</span><span><b>Acabamento:</b> <i class="os-slip-blank"></i></span><span><b>Nº</b> ${escapeHtml(order.number)}</span></div>
-      <div class="os-slip-customer"><span><b>Cliente:</b> ${escapeHtml(order.clientName || "")}</span><span><b>Fone:</b> ${escapeHtml(order.clientContact || "")}</span></div>
-      <div class="os-slip-cnpj"><b>CNPJ/CPF:</b> ${escapeHtml(order.clientCnpj || "")}</div>
-      <div class="os-slip-dates"><span><b>Data:</b> ${escapeHtml(formatServiceOrderDate(order.createdAt))}</span><span><b>Entrega:</b> ${escapeHtml(order.productionDeadline || "")}</span><span><b>Horas:</b> ______</span></div>
-      <div class="os-slip-employee"><b>Funcionário:</b> ${escapeHtml(order.employeeName || "")}</div>
-      <div class="os-slip-description"><b>Descrição dos materiais:</b><div class="os-slip-materials" data-columns="${columns.length}">${materials}</div></div>
-      <div class="os-slip-notes"><b>Observação:</b> ${escapeHtml(order.notes || "")}</div>
-      <div class="os-slip-payments"><span><b>total</b><strong>${formatCurrency(payment.total)}</strong></span><span><b>pago</b><strong>${formatCurrency(payment.paidAmount)}</strong></span><span><b>falta pagar</b><strong>${formatCurrency(payment.balanceDue)}</strong></span></div>
+      <header class="os-slip-header"><div class="os-slip-brand">${logo}</div><div class="os-slip-title"><h2>${escapeHtml(template.title)}</h2>${order.printPart ? `<small>${escapeHtml(template.continuation)} ${order.printPart} de ${order.printPartCount}</small>` : ""}</div></header>
+      <div class="os-slip-strip"><span><b>${escapeHtml(template.attendance)}</b> ${escapeHtml(order.employeeName || "")}</span><span><b>${escapeHtml(template.finishing)}</b> <i class="os-slip-blank"></i></span><span><b>${escapeHtml(template.number)}</b> ${escapeHtml(order.number)}</span></div>
+      <div class="os-slip-customer"><span><b>${escapeHtml(template.client)}</b> ${escapeHtml(order.clientName || "")}</span><span><b>${escapeHtml(template.phone)}</b> ${escapeHtml(order.clientContact || "")}</span></div>
+      <div class="os-slip-cnpj"><b>${escapeHtml(template.taxId)}</b> ${escapeHtml(order.clientCnpj || "")}</div>
+      <div class="os-slip-dates"><span><b>${escapeHtml(template.date)}</b> ${escapeHtml(formatServiceOrderDate(order.createdAt))}</span><span><b>${escapeHtml(template.delivery)}</b> ${escapeHtml(order.productionDeadline || "")}</span><span><b>${escapeHtml(template.hours)}</b> ______</span></div>
+      <div class="os-slip-employee"><b>${escapeHtml(template.employee)}</b> ${escapeHtml(order.employeeName || "")}</div>
+      <div class="os-slip-description"><b>${escapeHtml(template.materials)}</b><div class="os-slip-materials" data-columns="${columns.length}">${materials}</div></div>
+      <div class="os-slip-notes"><b>${escapeHtml(template.notes)}</b> ${escapeHtml(order.notes || "")}</div>
+      <div class="os-slip-payments"><span><b>${escapeHtml(template.total)}</b><strong>${formatCurrency(payment.total)}</strong></span><span><b>${escapeHtml(template.paid)}</b><strong>${formatCurrency(payment.paidAmount)}</strong></span><span><b>${escapeHtml(template.balance)}</b><strong>${formatCurrency(payment.balanceDue)}</strong></span></div>
     </div>
-    <aside class="os-slip-right"><p>${escapeHtml(SERVICE_ORDER_NOTICE)}</p><div class="os-slip-signatures"><div>Nome: <i></i></div><div>Ass: <i></i></div><div>Data: <i></i></div></div></aside>
+    <aside class="os-slip-right"><p>${escapeHtml(template.notice)}</p><div class="os-slip-signatures"><div>${escapeHtml(template.signatureName)} <i></i></div><div>${escapeHtml(template.signature)} <i></i></div><div>${escapeHtml(template.signatureDate)} <i></i></div></div></aside>
   </article>`;
 }
 
@@ -2001,7 +2033,7 @@ function splitServiceOrderItemsForPrint(items) {
   return chunks;
 }
 
-function createServiceOrderPrintMarkup(orders, company = {}) {
+function createServiceOrderPrintMarkup(orders, company = {}, template = DEFAULT_SERVICE_ORDER_TEMPLATE) {
   const slips = orders.flatMap((order) => {
     const chunks = splitServiceOrderItemsForPrint(order.items);
     return chunks.map((chunk, index) => ({
@@ -2014,7 +2046,7 @@ function createServiceOrderPrintMarkup(orders, company = {}) {
   });
   const pages = [];
   for (let index = 0; index < slips.length; index += 3) {
-    pages.push(`<div class="os-print-page">${slips.slice(index, index + 3).map((order) => createServiceOrderSlipMarkup(order, company)).join("")}</div>`);
+    pages.push(`<div class="os-print-page">${slips.slice(index, index + 3).map((order) => createServiceOrderSlipMarkup(order, company, template)).join("")}</div>`);
   }
   return pages.join("");
 }
@@ -2240,6 +2272,7 @@ function mergeConfig(candidate) {
   };
 
   const merged = deepClone(defaults);
+  merged.serviceOrderTemplate = normalizeServiceOrderTemplate(candidate.serviceOrderTemplate);
   merged.businessCardPricing = mergeCatalogPricing(defaults.businessCardPricing, candidate.businessCardPricing);
   merged.flyerPricing = mergeCatalogPricing(defaults.flyerPricing, candidate.flyerPricing);
   if (Array.isArray(candidate.customReadyProducts)) {
@@ -2865,7 +2898,7 @@ function saveConfigViewMode(mode) {
 }
 
 function normalizeConfigSection(section) {
-  const validSections = ["impressos", "credenciais", "produtos-prontos", "cartoes", "panfletos", "blocos-sulfite", "blocos-autocopiativo", "m2", "resinados", "metro-linear", "orcamento-livre"];
+  const validSections = ["impressos", "credenciais", "produtos-prontos", "cartoes", "panfletos", "blocos-sulfite", "blocos-autocopiativo", "m2", "resinados", "metro-linear", "orcamento-livre", "os"];
   return validSections.includes(section) ? section : "calculo";
 }
 
@@ -5967,6 +6000,7 @@ function createConfigSectionTabsMarkup(activeSection = "calculo") {
     { id: "metro-linear", label: "Metro linear", helper: "DTF, UV, canvas e papéis por metro." },
     { id: "resinados", label: "Resinados", helper: "Tabela A3, margem de resina e valor mínimo." },
     { id: "orcamento-livre", label: "Orçamento livre", helper: "Itens avulsos digitados manualmente." },
+    { id: "os", label: "Ordem de serviço", helper: "Textos e aviso da comanda impressa." },
   ];
 
   return `
@@ -5989,6 +6023,52 @@ function createConfigSectionTabsMarkup(activeSection = "calculo") {
         .join("")}
     </div>
   `;
+}
+
+function createServiceOrderTemplateConfigMarkup(config) {
+  const template = normalizeServiceOrderTemplate(config.serviceOrderTemplate);
+  const groups = [
+    ["Cabeçalho", [["title", "Título"], ["continuation", "Continuação"], ["attendance", "Atendimento"], ["finishing", "Acabamento"], ["number", "Número"]]],
+    ["Dados e materiais", [["client", "Cliente"], ["phone", "Telefone"], ["taxId", "CNPJ/CPF"], ["date", "Data"], ["delivery", "Entrega"], ["hours", "Horas"], ["employee", "Funcionário"], ["materials", "Descrição dos materiais"], ["notes", "Observação"]]],
+    ["Pagamento e assinatura", [["total", "Total"], ["paid", "Pago"], ["balance", "Falta pagar"], ["signatureName", "Nome de quem retira"], ["signature", "Assinatura"], ["signatureDate", "Data da assinatura"]]],
+  ];
+  const preview = (key) => `<strong data-os-template-preview-key="${key}">${escapeHtml(template[key])}</strong>`;
+  const fields = groups.map(([title, entries]) => `
+    <section class="config-subblock">
+      <h4>${escapeHtml(title)}</h4>
+      <div class="config-grid os-template-fields">
+        ${entries.map(([key, label]) => `<label><span>${escapeHtml(label)}</span><input type="text" maxlength="80" data-config-prefix="service-order-template" data-config-key="${key}" value="${escapeHtml(template[key])}"></label>`).join("")}
+      </div>
+    </section>
+  `).join("");
+  return createConfigCardMarkup(
+    "Modelo da O.S. impressa",
+    "Edite os textos fixos da comanda. Cliente, funcionário, itens, valores e número continuam preenchidos pelo pedido. As alterações valem para as próximas impressões, inclusive de O.S. já criadas.",
+    `${fields}
+      <section class="config-subblock">
+        <h4>Aviso de retirada</h4>
+        <label><span>Texto exibido à direita da O.S.</span><textarea rows="6" maxlength="380" data-config-prefix="service-order-template" data-config-key="notice">${escapeHtml(template.notice)}</textarea></label>
+        <p class="helper-text">Mantenha o aviso curto para caber junto às assinaturas na comanda de 20 × 9,5 cm.</p>
+      </section>
+      <section class="config-subblock">
+        <h4>Prévia dos textos</h4>
+        <p class="helper-text">Dados e valores abaixo são exemplos. A disposição final é ajustada para a impressão.</p>
+        <div class="os-template-preview">
+          <div class="os-template-preview-main">
+            <header><span>Copy Boy</span><div><h4 data-os-template-preview-key="title">${escapeHtml(template.title)}</h4><small>${preview("continuation")} 2 de 2</small></div></header>
+            <div class="os-template-preview-row"><span>${preview("attendance")} Ana</span><span>${preview("finishing")} ______</span><span>${preview("number")} 00001-2026</span></div>
+            <div class="os-template-preview-row"><span>${preview("client")} Cliente Exemplo</span><span>${preview("phone")} 48 98427.8468</span></div>
+            <div class="os-template-preview-row"><span>${preview("taxId")} 00.000.000/0001-00</span></div>
+            <div class="os-template-preview-row"><span>${preview("date")} 18/11/2026</span><span>${preview("delivery")} 2 dias úteis</span><span>${preview("hours")} ______</span></div>
+            <div class="os-template-preview-row"><span>${preview("employee")} Ana</span></div>
+            <div class="os-template-preview-materials">${preview("materials")}<p>1. Cartões de visita · 100 unidades</p></div>
+            <div class="os-template-preview-row"><span>${preview("notes")} Conferir acabamento</span></div>
+            <div class="os-template-preview-row"><span>${preview("total")} R$ 100,00</span><span>${preview("paid")} R$ 50,00</span><span>${preview("balance")} R$ 50,00</span></div>
+          </div>
+          <aside><p data-os-template-preview-key="notice">${escapeHtml(template.notice)}</p><div>${preview("signatureName")} ______<br>${preview("signature")} ______<br>${preview("signatureDate")} ______</div></aside>
+        </div>
+      </section>`
+  );
 }
 
 function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = "calculo") {
@@ -6476,6 +6556,13 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
       "Aba: Orçamento livre",
       "Aqui você digita serviços avulsos com descrição e valor manual.",
       freeQuoteCards,
+      safeSection
+    ),
+    os: createConfigGroupMarkup(
+      "os",
+      "Aba: Ordem de serviço",
+      "Personalize os rótulos e o aviso usados na comanda impressa.",
+      [createServiceOrderTemplateConfigMarkup(config)],
       safeSection
     ),
   };
@@ -8394,7 +8481,7 @@ async function initApp() {
       setStatusMessage(serviceOrdersFeedback, "Selecione ao menos uma O.S. para imprimir.", "warning");
       return;
     }
-    serviceOrderPrintRoot.innerHTML = createServiceOrderPrintMarkup(orders, state.company);
+    serviceOrderPrintRoot.innerHTML = createServiceOrderPrintMarkup(orders, state.company, config.serviceOrderTemplate);
     const previousTitle = document.title;
     let restored = false;
     let fallbackTimer;
@@ -11521,6 +11608,17 @@ async function initApp() {
         renderRowsAndSummary();
         setConfigStatus("Produto extra atualizado.", "success");
       }
+      return;
+    }
+
+    if (prefix === "service-order-template") {
+      if (!Object.hasOwn(DEFAULT_SERVICE_ORDER_TEMPLATE, key)) return;
+      config.serviceOrderTemplate[key] = target.value;
+      configSections.querySelectorAll("[data-os-template-preview-key]").forEach((element) => {
+        if (element.dataset.osTemplatePreviewKey === key) element.textContent = target.value;
+      });
+      persist();
+      setConfigStatus("Texto da O.S. atualizado.", "success");
       return;
     }
 

@@ -209,3 +209,32 @@ test("filtro por colaborador cadastrado encontra O.S. anterior à mudança de no
   const found = app.filterServiceOrders([order], { employee: "Ana Lúcia" }, [{ id: "ana", name: "Ana Lúcia" }]);
   assert.equal(found.length, 1);
 });
+
+test("modelo de O.S. é editável nas configurações e preserva textos antigos como padrão", () => {
+  const config = app.mergeConfig({ serviceOrderTemplate: { title: "Comanda de produção", notice: "Retirada conferida." } });
+  assert.equal(config.serviceOrderTemplate.title, "Comanda de produção");
+  assert.equal(config.serviceOrderTemplate.notice, "Retirada conferida.");
+  assert.equal(config.serviceOrderTemplate.client, "Cliente:");
+  assert.equal(app.mergeConfig({}).serviceOrderTemplate.title, "Ordem de Serviço");
+  assert.equal(app.normalizeConfigSection("os"), "os");
+  const settings = app.createConfigSectionsMarkup(config, "basic", "os");
+  assert.match(settings, /data-config-prefix="service-order-template" data-config-key="notice"/);
+  assert.match(settings, /Comanda de produção/);
+  assert.match(settings, /Prévia dos textos/);
+});
+
+test("comanda impressa usa os textos configurados e escapa HTML do aviso", () => {
+  const order = app.createServiceOrderFromQuote(approvedQuote, [client], [], "Ana", date, "00001-2026");
+  const template = app.mergeConfig({ serviceOrderTemplate: {
+    title: "Pedido de produção",
+    client: "Contratante:",
+    balance: "saldo",
+    notice: "Conferido <script>alert(1)</script>",
+  } }).serviceOrderTemplate;
+  const markup = app.createServiceOrderPrintMarkup([order], { name: "Copy Boy" }, template);
+  assert.match(markup, /Pedido de produção/);
+  assert.match(markup, /Contratante:<\/b> Cliente Exemplo/);
+  assert.match(markup, /<b>saldo<\/b>/);
+  assert.match(markup, /Conferido &lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+  assert.doesNotMatch(markup, /<script>/);
+});
