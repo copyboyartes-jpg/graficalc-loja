@@ -89,6 +89,39 @@ test("livreto A3 mantém o mesmo valor e cálculo A4", () => {
   assert.ok(Math.abs(a3.finishingTotal - 19.8) < 0.00001);
 });
 
+test("livreto dobrado A3 para A4 usa a faixa de 100 impressões por papel", () => {
+  const config = app.createDefaultConfig();
+  config.colorPrintPricingA3["170g"].find((tier) => tier.min === 31).value = 5.3;
+  config.colorPrintPricingA3["170g"].find((tier) => tier.min === 101).value = 4.85;
+  config.colorPrintPricingA3["250g"].find((tier) => tier.min === 31).value = 5.95;
+  config.colorPrintPricingA3["250g"].find((tier) => tier.min === 101).value = 5.7;
+  const row = quote({
+    printType: "Colorido laser",
+    innerPaper: "Couche 170g",
+    printMode: "Frente e verso",
+    finishing: "Livreto",
+    pages: 4,
+    quantity: 50,
+    coverType: "Colorida frente e verso",
+    coverPaper: "Papel couche 250g",
+  }, config).rows[0];
+  assert.equal(row.innerImpressions, 100);
+  assert.equal(row.coverImpressions, 100);
+  assert.equal(row.innerTotal, 530);
+  assert.equal(row.coverTotal, 595);
+  assert.ok(Math.abs(row.finishingTotal - 27.5) < 0.000001);
+  assert.ok(Math.abs(row.total - 1152.5) < 0.000001);
+  assert.ok(Math.abs(row.unitValue - 23.05) < 0.000001);
+  assert.equal(app.lookupTier(config.colorPrintPricingA3["170g"], 101), 4.85);
+  assert.equal(app.lookupTier(config.colorPrintPricingA3["250g"], 101), 5.7);
+  assert.match(app.getApostilaSizeDetail(row), /A4 final.*folha A3/);
+});
+
+test("ímã de geladeira fica apenas em impressos coloridos", () => {
+  assert.equal(app.getValidApostilaInnerPaper("Ímã de geladeira"), "Sulfite 75g");
+  assert.equal(app.getValidApostilaInnerPaper("Couche 170g"), "Couche 170g");
+});
+
 test("livreto A3 com 24 páginas laser couche 170 usa 12 impressões", () => {
   const row = quote({
     printType: "Colorido laser",
@@ -104,7 +137,7 @@ test("livreto A3 com 24 páginas laser couche 170 usa 12 impressões", () => {
   assert.equal(row.innerTotal, 72.6);
   assert.equal(row.finishingTotal, 2.2);
   assert.equal(row.total, 74.8);
-  assert.match(app.getApostilaSizeDetail(row), /2 páginas por folha/);
+  assert.match(app.getApostilaSizeDetail(row), /A4 final.*2 páginas por face/);
 });
 
 test("livreto A4 também impõe duas páginas, sem mudar outros acabamentos", () => {

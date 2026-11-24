@@ -124,7 +124,7 @@
                 <select id="preset-inner-paper"></select>
               </label>
               <label>
-                <span>Tamanho</span>
+                <span>Tamanho (folha para livreto)</span>
                 <select id="preset-size"></select>
               </label>
               <label>
@@ -187,7 +187,7 @@
               <p class="panel-copy">Cada linha representa uma apostila ou um cardápio plastificado. Os totais são recalculados na hora.</p>
               <p class="helper-text">No miolo laser, escolha o papel para usar sua faixa de preço em Impressos coloridos. O Sulfite 75g mantém a tabela atual da apostila em A4. Em A3, vale a Tabela A3; jato de tinta não está disponível nesse tamanho. O acabamento Livreto usa automaticamente 2 páginas por folha em A3 e A4.</p>
               <p class="helper-text">Páginas por folha indica quantas páginas cabem em cada face impressa: em A4/A3 escolha 1, 2, 4 ou 6; em A5 são 2 por A4 e em A6 são 4 por A4, automaticamente. Frente e verso usa as duas faces; a encadernação considera as folhas após o corte.</p>
-              <p class="helper-text"><strong>Tamanho é o formato final da apostila.</strong> A4 com 2 páginas por folha continua sendo uma apostila A4: somente o miolo recebe duas páginas reduzidas em cada face, e a capa permanece A4. Para produzir uma apostila A5 cortada, selecione A5; nesse caso, duas capas A5 aproveitam uma face A4.</p>
+              <p class="helper-text"><strong>Para apostilas comuns, Tamanho é o formato final.</strong> A4 com 2 páginas por face continua sendo uma apostila A4: somente o miolo recebe duas páginas reduzidas em cada face, e a capa permanece A4. Para produzir uma apostila A5 cortada, selecione A5; nesse caso, duas capas A5 aproveitam uma face A4. <strong>Para Livreto, Tamanho indica a folha aberta antes da dobra:</strong> A3 produz A4 final; A4 produz A5 final.</p>
               <p class="helper-text">Cardápio plastificado: A4 ou A5, com encadernação espiral pela mesma tabela de preços do A4. Informe em Páginas os lados impressos de cada cardápio. O A5 aproveita 2 por impressão e 2 por Polaseal A4; escolha a plastificação de todas as folhas ou só das capas impressas.</p>
             </div>
           </div>
@@ -215,7 +215,7 @@
                   <th>Produto</th>
                   <th>Tipo</th>
                   <th>Papel do miolo</th>
-                  <th>Tamanho final</th>
+                  <th>Tamanho / folha do livreto</th>
                   <th>Impressão</th>
                   <th>Acabamento</th>
                   <th>Grupo de acab.</th>
@@ -1465,7 +1465,7 @@
       }
     })();
   </script>
-  <script src="./app.mjs?v=ima-geladeira-20261124"></script>
+  <script src="./app.mjs?v=livreto-formato-20261124"></script>
 </body>
 </html>
 

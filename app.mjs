@@ -91,6 +91,8 @@ const OPTIONS = {
   freeQuoteDiscountTypes: ["R$", "%"],
 };
 
+const APOSTILA_INNER_PAPERS = OPTIONS.colorPaperTypes.filter((paper) => paper !== "Ímã de geladeira");
+
 const BLOCK_CATALOG = Array.isArray(window.BLOCK_CATALOG) ? window.BLOCK_CATALOG : [];
 const BLOCK_TAB_LABELS = {
   sulfite: "Blocos em papel sulfite 75g",
@@ -3155,7 +3157,7 @@ function getValidApostilaSize(printType, size, productType = "Apostila") {
 }
 
 function getValidApostilaInnerPaper(paper) {
-  return OPTIONS.colorPaperTypes.includes(paper) ? paper : "Sulfite 75g";
+  return APOSTILA_INNER_PAPERS.includes(paper) ? paper : "Sulfite 75g";
 }
 
 function getApostilaInnerPaper(row) {
@@ -3249,6 +3251,12 @@ function hasAutomaticApostilaImposition(row) {
 function getApostilaSizeDetail(row) {
   const size = row.size || "A4";
   const pagesPerSheet = getApostilaInnerPagesPerSheet(row);
+  if (row.finishing === "Livreto" && size === "A3") {
+    return "Livreto A4 final (impresso em folha A3, 2 páginas por face)";
+  }
+  if (row.finishing === "Livreto" && size === "A4") {
+    return "Livreto A5 final (impresso em folha A4, 2 páginas por face)";
+  }
   if ((size === "A4" || size === "A3") && pagesPerSheet > 1) {
     return `Apostila tamanho ${size} impressa com ${pagesPerSheet} páginas por folha`;
   }
@@ -8922,7 +8930,7 @@ async function initApp() {
     document.getElementById("linear-meter-calc-mode-select").value = state.linearMeterCalcMode;
     document.getElementById("preset-print-type").innerHTML = buildOptions(OPTIONS.printTypes, state.presets.printType);
     const innerPaperSelect = document.getElementById("preset-inner-paper");
-    innerPaperSelect.innerHTML = buildOptions(OPTIONS.colorPaperTypes, state.presets.printType === "Colorido laser" ? state.presets.innerPaper : "Sulfite 75g");
+    innerPaperSelect.innerHTML = buildOptions(APOSTILA_INNER_PAPERS, state.presets.printType === "Colorido laser" ? state.presets.innerPaper : "Sulfite 75g");
     innerPaperSelect.disabled = state.presets.printType !== "Colorido laser";
     document.getElementById("preset-product-type").innerHTML = buildOptions(OPTIONS.apostilaProducts, state.presets.productType);
     document.getElementById("preset-menu-lamination-scope").innerHTML = buildOptions(OPTIONS.menuLaminationScopes, state.presets.menuLaminationScope);
@@ -9324,7 +9332,7 @@ async function initApp() {
             <td><input class="cell-input description" name="description" value="${escapeHtml(row.description)}"></td>
             <td><select class="cell-select" name="productType">${buildOptions(OPTIONS.apostilaProducts, row.productType)}</select></td>
             <td><select class="cell-select" name="printType">${buildOptions(OPTIONS.printTypes, row.printType)}</select></td>
-            <td><select class="cell-select" name="innerPaper"${row.printType === "Colorido laser" ? "" : " disabled"}>${buildOptions(OPTIONS.colorPaperTypes, row.printType === "Colorido laser" ? row.innerPaper : "Sulfite 75g")}</select></td>
+            <td><select class="cell-select" name="innerPaper"${row.printType === "Colorido laser" ? "" : " disabled"}>${buildOptions(APOSTILA_INNER_PAPERS, row.printType === "Colorido laser" ? row.innerPaper : "Sulfite 75g")}</select></td>
             <td><select class="cell-select" name="size">${buildOptions(getApostilaSizeOptions(row.printType, row.productType), row.size)}</select></td>
             <td><select class="cell-select" name="printMode">${buildOptions(OPTIONS.printModes, row.printMode)}</select></td>
             <td><select class="cell-select" name="finishing"${isMenu ? " disabled" : ""}>${buildOptions(OPTIONS.finishing, row.finishing)}</select></td>
