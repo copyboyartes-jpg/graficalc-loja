@@ -186,3 +186,19 @@ test("configuração antiga ganha tabela PB A3 sem alterar A4", () => {
   assert.equal(config.printPricing.blackWhite[0].value, 9);
   assert.equal(app.getConfigArrayByPrefix(config, "bw-a3"), config.printPricing.blackWhiteA3);
 });
+
+test("configuração de apostilas exibe a mesma tabela A3 laser usada no cálculo", () => {
+  const config = app.createDefaultConfig();
+  const tiers170 = app.getConfigArrayByPrefix(config, "color-a3-170g");
+  const tiers250 = app.getConfigArrayByPrefix(config, "color-a3-250g");
+  tiers170.find((tier) => tier.min === 31).value = 5.3;
+  tiers250.find((tier) => tier.min === 31).value = 5.95;
+  const markup = app.createConfigSectionsMarkup(config, "basic", "calculo");
+  assert.match(markup, /Impressão A3 laser/);
+  assert.match(markup, /data-config-prefix="color-a3-170g"/);
+  assert.match(markup, /data-config-prefix="color-a3-250g"/);
+  assert.match(markup, /value="5\.3"/);
+  assert.match(markup, /value="5\.95"/);
+  assert.equal(app.getApostilaLaserPricing("A3", "Couche 170g", config), tiers170);
+  assert.equal(app.getApostilaCoverPricing({ size: "A3" }, "Papel couche 250g", config), tiers250);
+});

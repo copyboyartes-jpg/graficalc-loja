@@ -6091,6 +6091,11 @@ function createServiceOrderTemplateConfigMarkup(config) {
 function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = "calculo") {
   const apostilaCards = [
     createConfigCardMarkup(
+      "Impressão A3 laser — miolo e capas",
+      "Consulte e altere aqui o valor por impressão A3 de cada papel. Frente e verso conta como duas impressões: 50 livretos com uma folha frente e verso usam 100 impressões por papel, na faixa que vai até 100. Esta é a mesma tabela A3 de Impressos coloridos.",
+      createColorPrintA3ConfigMarkup(config.colorPrintPricingA3)
+    ),
+    createConfigCardMarkup(
       "Preços de impressão",
       "Esses valores alimentam a aba de cálculo de apostila.",
       [
@@ -6120,7 +6125,7 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
               { key: "label", type: "text" },
             ]
           ),
-          "Frente e verso conta como duas impressões. Laser e capas A3 usam a Tabela A3 de Impressos coloridos."
+          "Frente e verso conta como duas impressões. Os preços de laser e capas A3 estão na primeira tabela desta seção."
         ),
         createInlineConfigBlockMarkup(
           "Colorido jato de tinta",
