@@ -64,6 +64,7 @@ const OPTIONS = {
     "Couche 300g",
     "Metalizado branco",
     "Metalizado amarelo",
+    "Ímã de geladeira",
   ],
   credentialMaterials: [
     "Couche 250g",
@@ -1170,6 +1171,10 @@ function createDefaultConfig() {
     { min: 1, value: 95, label: "1 a 2 unidades" },
     { min: 3, value: 92, label: "3 a 9 unidades" },
     { min: 10, value: 85, label: "10 unidades ou mais" },
+  ];
+  config.colorPrintPricing["Ímã de geladeira"] = [
+    { min: 1, value: 17.6, label: "1 a 10 folhas" },
+    { min: 11, value: 16, label: "Acima de 10 folhas" },
   ];
   config.serviceOrderTemplate = normalizeServiceOrderTemplate();
   return config;
@@ -3360,6 +3365,7 @@ function getBookletUnitPrice(quantity, config) {
 }
 
 function getColorPaperPricingKey(paperType) {
+  if (paperType === "Ímã de geladeira") return paperType;
   if (paperType === "Sulfite 75g" || paperType === "Offset 120g") {
     return paperType;
   }
@@ -3372,7 +3378,7 @@ function getColorPaperPricingKey(paperType) {
   return "300g";
 }
 
-function getColorPrintSheetDefinition(size, config) {
+function getColorPrintSheetDefinition(size, config, paperType = "") {
   const customSheet = config?.colorPrintSheetArea || createDefaultConfig().colorPrintSheetArea;
   if (size === "A3") {
     return {
@@ -3384,11 +3390,12 @@ function getColorPrintSheetDefinition(size, config) {
     };
   }
   if (size === "Tamanho personalizado") {
+    const isFridgeMagnet = paperType === "Ímã de geladeira";
     return {
       key: "custom",
-      label: "Tamanho personalizado",
-      widthMm: Number(customSheet.widthMm || 0),
-      heightMm: Number(customSheet.heightMm || 0),
+      label: isFridgeMagnet ? "A4" : "Tamanho personalizado",
+      widthMm: isFridgeMagnet ? A4_WIDTH_MM : Number(customSheet.widthMm || 0),
+      heightMm: isFridgeMagnet ? A4_HEIGHT_MM : Number(customSheet.heightMm || 0),
       pricingMap: config?.colorPrintPricing,
     };
   }
@@ -4870,7 +4877,7 @@ function calculateColorPrintWorkbook(state, config) {
     const rawBleedMm = Math.max(0, toDecimalNumber(row.bleedMm));
     const quantity = toWholeNumber(row.quantity);
     const active = isColorPrintRowActive(row);
-    const sheet = getColorPrintSheetDefinition(row.size, config);
+    const sheet = getColorPrintSheetDefinition(row.size, config, row.paperType);
     const pricingMap = sheet.pricingMap || config.colorPrintPricing;
     const sizeLabel = sheet.label || row.size || "A4";
     const predefinedSize = isPredefinedColorPrintSize(sheet.key);
@@ -4956,7 +4963,9 @@ function calculateColorPrintWorkbook(state, config) {
     const a4Sheets = predefinedSize ? quantity : Math.ceil(quantity / fit.itemsPerSheet);
     const a4Impressions = predefinedSize ? quantity * sides : a4Sheets * sides;
     const pricingKey = getColorPaperPricingKey(row.paperType);
-    const printUnit = lookupTier(pricingMap[pricingKey], a4Impressions);
+    const magnetPricing = row.paperType === "Ímã de geladeira";
+    const pricingTiers = magnetPricing ? config.colorPrintPricing[pricingKey] : pricingMap[pricingKey];
+    const printUnit = lookupTier(pricingTiers, magnetPricing ? a4Sheets : a4Impressions) * (magnetPricing && sheet.key === "A3" ? 2 : 1);
     const printTotal = a4Impressions * printUnit;
     const estimatedCuts = predefinedSize ? 0 : estimateCuts(fit.cols, fit.rows);
     let suggestedCutPrice = 0;
@@ -6182,6 +6191,20 @@ function createConfigSectionsMarkup(config, viewMode = "basic", activeSection = 
   ];
 
   const impressosCards = [
+    createConfigCardMarkup(
+      "Ímã de geladeira",
+      "Preço por folha A4 impressa. O tamanho personalizado aproveita uma folha A4; cada folha A3 custa o dobro do valor A4 da mesma faixa.",
+      createTableMarkup(
+        ["Qtd mínima de folhas", "Valor por folha A4", "Faixa"],
+        config.colorPrintPricing["Ímã de geladeira"],
+        "color-Ímã de geladeira",
+        [
+          { key: "min", type: "number", step: "1" },
+          { key: "value", type: "number", step: "0.01" },
+          { key: "label", type: "text" },
+        ]
+      )
+    ),
     createConfigCardMarkup(
       "Preços por papel",
       "Esses valores são usados na aba de impressos coloridos.",
