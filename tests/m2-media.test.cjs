@@ -39,7 +39,7 @@ function m2Quote(mediaId, config = app.createDefaultConfig()) {
   };
 }
 
-test("as seis mídias aparecem no seletor e nas configurações", () => {
+test("as oito mídias aparecem no seletor e nas configurações", () => {
   const config = app.createDefaultConfig();
   const labels = [
     "Lona brilho",
@@ -48,13 +48,17 @@ test("as seis mídias aparecem no seletor e nas configurações", () => {
     "Adesivo blackout Brilho",
     "Adesivo transparente brilho",
     "Adesivo jateado",
+    "Chapa PS 1mm",
+    "Chapa PS 2mm",
   ];
   assert.deepEqual(Array.from(config.m2Media, (item) => item.label), labels);
   const options = app.buildM2MediaOptions("adesivo-jateado", config);
   assert.match(options, /value="adesivo-jateado" selected/);
   const settings = app.createM2MediaMarkup(config.m2Media);
   assert.match(settings, /Adicionar mídia/);
-  assert.equal((settings.match(/data-m2-media-index=/g) || []).length, 6);
+  assert.equal((settings.match(/data-m2-media-index=/g) || []).length, 8);
+  assert.match(app.buildM2MediaOptions("chapa-ps-1mm", config), /value="chapa-ps-1mm" selected/);
+  assert.match(app.buildM2MediaOptions("chapa-ps-2mm", config), /value="chapa-ps-2mm" selected/);
 });
 
 test("a mídia escolhida aparece no orçamento sem alterar o cálculo", () => {
@@ -65,6 +69,11 @@ test("a mídia escolhida aparece no orçamento sem alterar o cálculo", () => {
   assert.match(withMedia.html, /Lona \| Mídia: Lona brilho/);
   assert.match(withMedia.text, /Mídia: Lona brilho \| R\$/);
   assert.doesNotMatch(withoutMedia.html, /Mídia:/);
+  for (const [id, label] of [["chapa-ps-1mm", "Chapa PS 1mm"], ["chapa-ps-2mm", "Chapa PS 2mm"]]) {
+    const result = m2Quote(id);
+    assert.equal(result.workbook.totals.totalGeneral, withoutMedia.workbook.totals.totalGeneral);
+    assert.match(result.html, new RegExp(`Mídia: ${label}`));
+  }
 });
 
 test("mídia adicionada à configuração pode ser usada e mantém o nome no histórico", () => {
@@ -85,7 +94,24 @@ test("configurações anteriores recebem as mídias sem sobrescrever preços", (
   delete oldConfig.m2Media;
   oldConfig.m2Pricing.lona[1].value = 77;
   const merged = app.mergeConfig(oldConfig);
-  assert.equal(merged.m2Media.length, 6);
+  assert.equal(merged.m2Media.length, 8);
   assert.equal(merged.m2Pricing.lona[1].value, 77);
   assert.equal(m2Quote("adesivo-branco-fosco", merged).workbook.activeRows[0].mediaLabel, "Adesivo branco fosco");
+});
+
+test("configurações existentes recebem as chapas sem duplicar mídias nem perder escolhas", () => {
+  const oldConfig = app.createDefaultConfig();
+  delete oldConfig.m2MediaPsVersion;
+  oldConfig.m2Media = oldConfig.m2Media.filter((item) => !["adesivo-jateado", "chapa-ps-1mm", "chapa-ps-2mm"].includes(item.id));
+  oldConfig.m2Media.push({ id: "ps-custom", label: "Chapa PS 1 mm" });
+  oldConfig.m2Media.push({ id: "midia-custom", label: "Mídia personalizada" });
+  const merged = app.mergeConfig(oldConfig);
+  assert.equal(merged.m2Media.some((item) => item.id === "adesivo-jateado"), false);
+  assert.equal(merged.m2Media.some((item) => item.id === "midia-custom"), true);
+  assert.equal(merged.m2Media.some((item) => item.id === "chapa-ps-1mm"), false);
+  assert.equal(merged.m2Media.filter((item) => /Chapa PS 1\s?mm/.test(item.label)).length, 1);
+  assert.equal(merged.m2Media.some((item) => item.id === "chapa-ps-2mm"), true);
+  assert.equal(app.mergeConfig(merged).m2Media.length, merged.m2Media.length);
+  const edited = { ...merged, m2Media: merged.m2Media.filter((item) => item.id !== "chapa-ps-2mm") };
+  assert.equal(app.mergeConfig(edited).m2Media.some((item) => item.id === "chapa-ps-2mm"), false);
 });

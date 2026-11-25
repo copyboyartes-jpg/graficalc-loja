@@ -211,6 +211,11 @@ const M2_CATALOG = [
   { id: "ps2mm", label: "Chapa PS 2mm", configKey: "ps2mm" },
 ];
 
+const M2_PS_MEDIA = [
+  { id: "chapa-ps-1mm", label: "Chapa PS 1mm" },
+  { id: "chapa-ps-2mm", label: "Chapa PS 2mm" },
+];
+
 const DEFAULT_M2_MEDIA = [
   { id: "lona-brilho", label: "Lona brilho" },
   { id: "adesivo-branco-brilho", label: "Adesivo branco brilho" },
@@ -218,6 +223,7 @@ const DEFAULT_M2_MEDIA = [
   { id: "adesivo-blackout-brilho", label: "Adesivo blackout Brilho" },
   { id: "adesivo-transparente-brilho", label: "Adesivo transparente brilho" },
   { id: "adesivo-jateado", label: "Adesivo jateado" },
+  ...M2_PS_MEDIA,
 ];
 
 const DEFAULT_M2_DESCRIPTIONS = {
@@ -1162,6 +1168,7 @@ function createDefaultConfig() {
       { id: M2_LASER_CUT_FINISH_ID, label: "Corte lazer", type: "area", price: 10.0 },
     ],
     m2Media: DEFAULT_M2_MEDIA.map((media) => ({ ...media })),
+    m2MediaPsVersion: 1,
     catalogSections: [],
     spiralPlasticDiscount: 1.5,
     windbannerPromotionPricingVersion: 2,
@@ -2466,7 +2473,16 @@ function mergeConfig(candidate) {
   merged.m2Finishes = normalizeM2Finishes(candidate.m2Finishes, defaults.m2Finishes);
 
   if (Array.isArray(candidate.m2Media)) {
-    merged.m2Media = normalizeM2Media(candidate.m2Media);
+    const media = normalizeM2Media(candidate.m2Media);
+    if (candidate.m2MediaPsVersion !== 1) {
+      const mediaName = (label) => normalizeClientMatchValue(label).replace(/[^a-z0-9]/g, "");
+      for (const psMedia of M2_PS_MEDIA) {
+        if (!media.some((item) => item.id === psMedia.id || mediaName(item.label) === mediaName(psMedia.label))) {
+          media.push({ ...psMedia });
+        }
+      }
+    }
+    merged.m2Media = media;
   }
 
   if (Array.isArray(candidate.catalogSections)) {
